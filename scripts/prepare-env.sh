@@ -6,9 +6,12 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 echo "==> Node"
-node_major="$(node -p 'process.versions.node.split(".")[0]')"
-if [ "$node_major" -lt 22 ]; then
-  echo "Se necesita Node 22 o superior (tienes $(node --version))." >&2
+node_min="22.23.2" # suelo de seguridad (CLAUDE.md, regla 12)
+node_cur="$(node -p 'process.versions.node')"
+node_major="${node_cur%%.*}"
+if [ "$node_major" -ne 22 ] || [ "$(printf '%s\n%s\n' "$node_min" "$node_cur" | sort -V | head -n1)" != "$node_min" ]; then
+  echo "Se necesita Node 22.x >= $node_min por vulnerabilidades corregidas (tienes v$node_cur)." >&2
+  echo "Solución: nvm install 22 && nvm use 22" >&2
   exit 1
 fi
 node --version
