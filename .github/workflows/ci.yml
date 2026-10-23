@@ -1,0 +1,117 @@
+# xARGOS CI — único check obligatorio en las reglas de rama: "ci-ok"
+name: ci
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # A main solo se llega desde develop
+  promote-guard:
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if [ "${{ github.head_ref }}" != "develop" ]; then
+            echo "A main solo se llega con una PR desde develop."
+            exit 1
+          fi
+
+  # Formato de rama: <tipo>/<issue>-<area>-<descripcion> (ver CONTRIBUTING.md)
+  branch-name:
+    if: github.event_name == 'pull_request' && github.base_ref == 'develop'
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          if ! echo "$BRANCH" | grep -Eq '^(feat|fix|spike|chore|docs|test|refactor)/[0-9]+-(api|web|guard|shared|scripts|repo)-[a-z0-9]+(-[a-z0-9]+)*$'; then
+            echo "Rama no válida: '$BRANCH'"
+            echo "Formato: <tipo>/<issue>-<area>-<descripcion>   p. ej. feat/14-guard-snapshot-assert"
+            exit 1
+          fi
+
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      program: ${{ steps.filter.outputs.program }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            program:
+              - 'programs/**/*.rs'
+              - 'programs/**/Cargo.toml'
+              - 'Anchor.toml'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  js:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # lee "packageManager" de package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+  program:
+    needs: changes
+    if: needs.changes.outputs.program == 'true'
+    runs-on: ubuntu-latest
+    env:
+      # Poner la versión EXACTA que uséis en local (anchor --version)
+      ANCHOR_VERSION: "1.0.0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Solana CLI (Anza)
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+      - name: Install Anchor (avm)
+        run: |
+          cargo install --git https://github.com/solana-foundation/anchor avm --locked
+          avm install "$ANCHOR_VERSION"
+          avm use "$ANCHOR_VERSION"
+      - run: anchor build
+      - run: cargo test -p guard # tests LiteSVM sobre target/deploy/guard.so
+
+  ci-ok:
+    if: always()
+    needs: [promote-guard, branch-name, secrets, js, program]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "Algún job ha fallado."
+            exit 1
+          fi

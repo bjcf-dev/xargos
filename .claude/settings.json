@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(~/SAVE/**)",
+      "Read(~/.config/solana/**)",
+      "Read(~/.config/xargos/**)",
+      "Read(~/.ssh/**)",
+      "Read(./.env)",
+      "Read(./**/.env)",
+      "Bash(solana config set:*)",
+      "Bash(git push origin main:*)",
+      "Bash(git push origin develop:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)"
+    ]
+  }
+}

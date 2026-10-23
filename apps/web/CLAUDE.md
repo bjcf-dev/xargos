@@ -1,0 +1,37 @@
+# apps/web — contexto del frontend (Leandro)
+
+Complementa al `CLAUDE.md` de la raíz. Arquitectura completa: `docs/xargos-execution-brief.md` §6. Contrato: `docs/api-contract.md`.
+
+## Qué tiene que conseguir
+
+Que un juez pruebe xARGOS **sin wallet ni faucet** y entienda en segundos la garantía "todo o nada":
+- **Demo A:** el agente paga con x402, firma y recibe lo prometido.
+- **Demo B:** tras un price shock, la tx revierte por el guard. La UI enseña qué paso falló y que la posición sigue intacta.
+- Una explicación clara de los pagos fallidos (es un criterio del jurado).
+
+## Estructura
+
+```
+app/                        # rutas: /, /demo, /recipes
+app/api/xargos/[...path]/   # proxy al backend (añade DEMO_ACCESS_CODE, reenvía cabeceras x402)
+features/demo/              # máquina de estados, componentes, hooks
+lib/api/                    # ÚNICO cliente HTTP; parsea con los esquemas de packages/shared
+lib/solana/                 # Kit: keypair del agente, firmar, enviar, explorer
+mocks/                      # MSW con las fixtures de packages/shared
+components/ui/              # shadcn
+```
+
+## Reglas propias
+
+- **El navegador solo llama a `/api/xargos/*`.** Ninguna clave ni URL privada en código de cliente ni en variables `NEXT_PUBLIC_*`.
+- **Ningún `fetch` directo en componentes**: todo pasa por `lib/api`.
+- **Máquina de estados de la demo** como unión discriminada con `useReducer`: `idle → setup → paying → built → signing → confirmed | reverted | expired → rebuilding`, con tests en Vitest.
+- **Keypair del agente generado en el navegador** (`generateKeyPairSigner` de Kit), guardado en `sessionStorage`; al backend solo va la pública (D13).
+- **Ninguna cifra escrita a mano:** todo sale de `quote` y `guard`.
+- **Solo decir "guard" si falló el guard:** leer `meta.err` y el log `GUARD_FAIL` (D15).
+- `/demo/setup` y `/demo/price-shock` son asíncronos: progreso por fases con polling, y mensajes claros para `RATE_LIMITED` y `ACCESS_DENIED`.
+- `NEXT_PUBLIC_API_MODE=mock | local | staging`; por defecto `mock`, que funciona sin backend ni secretos.
+
+## Netlify
+
+Producción = solo `main` (cada deploy gasta créditos). `netlify.toml` salta el build si no cambia el front. Las funciones se cortan a ~10 s: no hacer esperas largas en el proxy.

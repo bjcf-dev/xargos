@@ -1,0 +1,70 @@
+# xARGOS
+
+**Multi-step DeFi recipes for AI agents, paid per request with x402 on Solana. Kept as promised, or not executed at all.**
+
+> Encode Solana Hackathon 2026 · Challenge: _Best Use of x402 on Solana_ · 🚧 Work in progress
+
+## The problem
+
+AI agents that manage funds on Solana often need multi-step operations: exit an Orca LP position, collect fees, swap the other token to USDC. Building that transaction correctly is hard, and each step only checks its own minimum, so the combined result can come out much worse than expected.
+
+## What xARGOS does
+
+1. The agent asks for a recipe and pays a small fee per request with **x402** (USDC, no accounts or API keys).
+2. It receives the full **ready-to-sign transaction**.
+3. The transaction starts with `snapshot` and ends with `assert_min_delta` from our **guard program**: if the agent receives less than the promised minimum, **Solana reverts the whole transaction**.
+
+No custody, no escrow: the guarantee is enforced by the chain.
+
+## How Solana makes it possible
+
+- **Atomic transactions:** every step succeeds together or none does.
+- **x402 on Solana:** fast, cheap USDC payments over HTTP, verified and settled on-chain.
+- **On-chain guard:** a tiny Anchor program that measures what the agent actually received inside the same transaction.
+
+## Failed payments
+
+| Case                                   | What happens                                                                                   |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Invalid or insufficient payment        | 402 with the reason; nothing is built                                                          |
+| We can't build or simulate the recipe  | The payment is **not settled**: the agent pays nothing                                         |
+| The transaction expires before sending | Free rebuild for 120 s with the same `buildId`                                                 |
+| The outcome misses the minimum         | The whole transaction reverts on-chain; the agent only pays the recipe fee and the network fee |
+
+## Repository
+
+```
+apps/web/          Frontend (Next.js) — demo without wallet or faucet
+services/api/      Backend (Hono) — x402 payments and recipe builder
+programs/guard/    On-chain guard (Anchor)
+packages/shared/   API contract shared by web and api (Zod)
+scripts/           Devnet setup (Orca pool, lookup table, funding)
+docs/              Design decisions and contract
+```
+
+## Getting started
+
+Requirements: Node 22+, pnpm (via `corepack enable`), [gitleaks](https://github.com/gitleaks/gitleaks). Backend only: Rust, Solana CLI (Anza), Anchor 1.0.x.
+
+```bash
+git clone <repo-url> && cd xargos
+bash scripts/prepare-env.sh
+cp .env.example .env    # not needed for the frontend mock mode
+pnpm check
+```
+
+All on **Solana devnet**. Contribution flow: [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Prior work & third-party code
+
+Allowed by the organizers as long as it is disclosed (confirmed by Encode, Oct 20, 2026).
+- Tooling and libraries: pnpm, TypeScript, Biome, Vitest, Zod, lefthook (see `package.json` files).
+- Scaffolds: none yet.
+- Pre-existing utilities: none.
+
+All other code was written during the hackathon (from Oct 12, 2026).
+
+## Team
+
+- **Billy** — backend, guard program
+- **Leandro** — frontend

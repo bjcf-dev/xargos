@@ -1,0 +1,34 @@
+# Instalar: pnpm add -D -w lefthook @biomejs/biome && pnpm lefthook install
+# gitleaks se instala aparte (binario): https://github.com/gitleaks/gitleaks
+#   En gitleaks >= 8.19 el comando equivalente es: gitleaks git --pre-commit --staged --redact
+#   Comprobad vuestra versión con "gitleaks version" y dejad la línea que funcione.
+
+pre-commit:
+  parallel: true
+  commands:
+    secrets:
+      run: gitleaks protect --staged --redact --verbose
+    format:
+      glob: "*.{ts,tsx,js,jsx,json,jsonc,css}"
+      run: pnpm biome check --write --no-errors-on-unmatched {staged_files}
+      stage_fixed: true
+
+commit-msg:
+  commands:
+    conventional:
+      run: |
+        msg=$(head -n1 "{1}")
+        if ! echo "$msg" | grep -Eq '^(feat|fix|refactor|test|docs|chore|ci|build|perf)(\((api|web|guard|shared|scripts|repo)\))?!?: .{3,72}$'; then
+          echo "Mensaje no válido: '$msg'"
+          echo "Formato: tipo(scope): descripción  (máx. 72 caracteres)"
+          echo "Tipos: feat fix refactor test docs chore ci build perf"
+          echo "Scopes: api web guard shared scripts repo"
+          exit 1
+        fi
+
+pre-push:
+  commands:
+    typecheck:
+      run: pnpm typecheck
+    test:
+      run: pnpm test

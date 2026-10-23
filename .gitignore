@@ -1,0 +1,32 @@
+# Dependencias y builds
+node_modules/
+dist/
+.next/
+out/
+.netlify/
+coverage/
+*.tsbuildinfo
+
+# Solana / Anchor
+target/
+.anchor/
+test-ledger/
+
+# Secretos: NUNCA se suben
+.env
+.env.*
+!.env.example
+*.pem
+id.json
+*-keypair.json
+keys/
+
+# Documentos solo locales (briefs de ejecución, notas)
+local/
+
+# Sistema / editores
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.log

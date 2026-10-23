@@ -1,0 +1,16 @@
+# Netlify — frontend de xARGOS (monorepo pnpm, package directory = apps/web)
+# Verificad en la UI de Netlify que detecta el monorepo y Next.js; el runtime de
+# Next.js en Netlify se aplica solo, no hace falta plugin manual.
+
+[build]
+  command = "pnpm build"
+  publish = ".next"
+  # Salta el build si el commit no toca el front, el contrato ni el lockfile.
+  # Exit 0 = no construir. Ahorra créditos (cada deploy de producción gasta 15).
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- ../../apps/web ../../packages/shared ../../pnpm-lock.yaml"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# Los secretos (URL del backend, DEMO_ACCESS_CODE) se ponen en el panel de Netlify,
+# separados para producción y para develop/previews. Nunca aquí.

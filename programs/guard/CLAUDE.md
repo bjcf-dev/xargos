@@ -1,0 +1,26 @@
+# programs/guard — contexto del programa (Billy)
+
+Complementa al `CLAUDE.md` de la raíz. Decisiones: `docs/decisions.md` D5–D8. Trampas: `docs/lessons-from-save.md` 1–6.
+
+## Qué hace
+
+Dos instrucciones, nada más. Sin custodia: solo lee saldos.
+- **`snapshot(agent_token_account)`**, primera instrucción de la receta: guarda `amount` y `slot` en la PDA `["snap", agent, mint]`.
+- **`assert_min_delta(min_delta: u64)`**, última: exige `snapshot.slot == slot actual`, calcula `received = saldo_actual − snapshot.amount` y, si `received < min_delta`, hace `msg!("GUARD_FAIL received={} min={}", received, min_delta)` y devuelve `MinDeltaNotMet`.
+- Una instrucción de inicialización de la PDA, que llama el backend en `/demo/setup`.
+
+## Comprobaciones obligatorias
+
+- `token_account.owner == agent` y `token_account.mint == mint`.
+- `min_delta > 0`.
+- Aritmética con `checked_sub` (si el saldo baja, `received` = 0 y falla el assert, sin panic).
+
+## Tests (LiteSVM)
+
+Delta suficiente pasa · delta insuficiente falla con `MinDeltaNotMet` y el log `GUARD_FAIL` · snapshot de otro slot falla · cuenta de otro owner falla · mint distinto falla · `min_delta = 0` falla.
+
+## Build y despliegue
+
+- `anchor build` **antes** de `cargo test` (los tests cargan el `.so`; también regenera el IDL para Codama).
+- Despliegue solo con `Anchor.toml` (`cluster = "devnet"`, `wallet` en `~/.config/xargos/`). Nunca con la config global de Solana.
+- No importar crates de Orca ni hacer CPI a otros programas.
