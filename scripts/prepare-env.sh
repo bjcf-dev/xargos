@@ -6,15 +6,7 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 echo "==> Node"
-node_min="22.23.2" # suelo de seguridad (CLAUDE.md, regla 12)
-node_cur="$(node -p 'process.versions.node')"
-node_major="${node_cur%%.*}"
-if [ "$node_major" -ne 22 ] || [ "$(printf '%s\n%s\n' "$node_min" "$node_cur" | sort -V | head -n1)" != "$node_min" ]; then
-  echo "Se necesita Node 22.x >= $node_min por vulnerabilidades corregidas (tienes v$node_cur)." >&2
-  echo "Solución: nvm install 22 && nvm use 22" >&2
-  exit 1
-fi
-node --version
+bash scripts/check-node.sh || exit 1
 
 echo "==> pnpm (vía corepack)"
 corepack enable >/dev/null 2>&1 || true

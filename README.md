@@ -44,7 +44,7 @@ docs/              Design decisions and contract
 
 ## Getting started
 
-Requirements: Node 22.23.2+ (security floor, see CLAUDE.md rule 12), pnpm (via `corepack enable`), [gitleaks](https://github.com/gitleaks/gitleaks). Backend only: Rust, Solana CLI (Anza), Anchor 1.0.x.
+Requirements: Node 22.23.4+ (security floor, see CLAUDE.md rule 12), pnpm (via `corepack enable`), [gitleaks](https://github.com/gitleaks/gitleaks). Backend only: Rust, Solana CLI (Anza), Anchor 1.0.x.
 
 ```bash
 git clone <repo-url> && cd xargos

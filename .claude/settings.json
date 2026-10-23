@@ -13,5 +13,17 @@
       "Bash(git push --force:*)",
       "Bash(git push -f:*)"
     ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/check-node.sh\" --session"
+          }
+        ]
+      }
+    ]
   }
 }
