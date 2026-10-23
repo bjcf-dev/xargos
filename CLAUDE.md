@@ -26,7 +26,7 @@ Equipo: **Billy** (backend `services/api` + programa `programs/guard` + `scripts
 9. **Verificar antes de usar.** Nombres de paquetes, firmas y cuentas se comprueban en el `.d.ts` instalado o en la doc oficial. Si no puedes verificar algo, dilo en vez de suponerlo.
 10. **Pruebas reales, no narradas.** Un hito de devnet se demuestra con la firma de la transacción (enlace al explorer con `?cluster=devnet`) y la salida literal de los comandos.
 11. **Código de fuera = declarado.** Si añades una dependencia, un scaffold o código anterior al 12 oct, actualiza "Prior work & third-party code" del README en la misma PR.
-12. **Node ≥ 22.23.2 (suelo de seguridad).** Las versiones anteriores tienen vulnerabilidades altas corregidas el 29 jul 2026 (HTTP/2 y Permission Model). Antes de trabajar: `node --version`; si es menor, `nvm install 22 && nvm use 22`. No bajes el mínimo ni uses Node 24+ sin PR al brief. Fuente: https://nodejs.org/en/blog/vulnerability/july-2026-security-releases
+12. **Node 22.x ≥ 22.23.4 (suelo de seguridad, aviso del 21 oct 2026).** Las versiones anteriores tienen vulnerabilidades altas (DNS, validación TLS de hostnames, Brotli). Al abrir sesión, un hook ejecuta `scripts/check-node.sh`: **si avisa, para y sigue sus instrucciones**: intenta corregirlo en tu shell (`source ~/.nvm/nvm.sh && nvm install 22 && nvm use 22`) y, si no puedes, dale al usuario los pasos exactos que imprime el script (cerrar sesión, `nvm install 22 && nvm use 22`, `node --version`, reabrir `claude` desde esa terminal). No instales ni ejecutes nada con un Node inferior. El mínimo vive solo en `scripts/check-node.sh`; para subirlo, PR que cambie ese archivo, `package.json` y el README. Fuente: https://nodejs.org/en/blog/vulnerability/october-2026-security-releases
 
 ## Dónde está cada cosa
 
@@ -43,7 +43,7 @@ Equipo: **Billy** (backend `services/api` + programa `programs/guard` + `scripts
 
 ## Stack (resumen)
 
-pnpm workspaces · Node 22 (≥ 22.23.2) · TypeScript strict · **`@solana/kit`** (no web3.js v1) · Zod en `packages/shared` · Biome · Vitest · Anchor 1.0.x + LiteSVM · Codama · x402 oficial (`@x402/core`, `@x402/svm`, `@x402/fetch`) · Hono · Next.js App Router · Netlify (front) · Railway (back).
+pnpm workspaces · Node 22 (≥ 22.23.4) · TypeScript strict · **`@solana/kit`** (no web3.js v1) · Zod en `packages/shared` · Biome · Vitest · Anchor 1.0.x + LiteSVM · Codama · x402 oficial (`@x402/core`, `@x402/svm`, `@x402/fetch`) · Hono · Next.js App Router · Netlify (front) · Railway (back).
 
 ## Cómo trabajar conmigo (preferencias de Billy)
 
