@@ -26,7 +26,8 @@ export type ApiClientOptions = {
 };
 
 export function createApiClient({
-  fetch = globalThis.fetch.bind(globalThis),
+  // Se resuelve en cada llamada: así se usa el fetch vigente (p. ej. el que parchea MSW).
+  fetch = (input, init) => globalThis.fetch(input, init),
   baseUrl = DEFAULT_BASE_URL,
 }: ApiClientOptions = {}) {
   async function request<S extends z.ZodType>(
