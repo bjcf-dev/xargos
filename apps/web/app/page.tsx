@@ -1,7 +1,4 @@
-import { fixtureRecipe, Recipe } from "@xargos/shared";
-
-// Provisional hasta F2: la receta llegará por lib/api (MSW en modo mock).
-const recipe = Recipe.parse(fixtureRecipe);
+import { RecipeList } from "./recipe-list";
 
 export default function Home() {
   return (
@@ -11,10 +8,7 @@ export default function Home() {
         Multi-step DeFi recipes for AI agents, paid per request with x402 on Solana devnet. The
         transaction either delivers what was promised or does not execute at all.
       </p>
-      <section className="mt-8 rounded-lg border border-border bg-card p-4">
-        <h2 className="font-semibold">{recipe.name}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{recipe.description}</p>
-      </section>
+      <RecipeList />
     </main>
   );
 }
