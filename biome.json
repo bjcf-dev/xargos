@@ -15,8 +15,14 @@
       "!**/dist",
       "!**/coverage",
       "!**/generated",
-      "!**/*.md"
+      "!**/*.md",
+      "!**/pnpm-lock.yaml"
     ]
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
   },
   "formatter": {
     "enabled": true,
