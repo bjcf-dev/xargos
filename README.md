@@ -58,7 +58,7 @@ All on **Solana devnet**. Contribution flow: [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Prior work & third-party code
 
 Allowed by the organizers as long as it is disclosed (confirmed by Encode, Oct 20, 2026).
-- Tooling and libraries: pnpm, TypeScript, Biome, Vitest, Zod, lefthook (see `package.json` files).
+- Tooling and libraries: pnpm, TypeScript, Biome, Vitest, Zod, lefthook, Hono, `@hono/node-server`, tsx, `@solana/kit`, `@solana-program/token`, and the official x402 packages `@x402/core`, `@x402/svm`, `@x402/hono`, `@x402/fetch` (see `package.json` files).
 - Scaffolds: none yet.
 - Pre-existing utilities: none.
 
