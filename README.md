@@ -59,7 +59,10 @@ All on **Solana devnet**. Contribution flow: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Allowed by the organizers as long as it is disclosed (confirmed by Encode, Oct 20, 2026).
 - Tooling and libraries: pnpm, TypeScript, Biome, Vitest, Zod, lefthook (see `package.json` files).
-- Scaffolds: none yet.
+  Frontend (`apps/web`): Next.js, React, Tailwind CSS, next-themes, Base UI, lucide-react, class-variance-authority, cn, tw-animate-css, Testing Library, jsdom.
+- Scaffolds:
+  - `apps/web` started from the `nextjs` template of [`create-solana-dapp`](https://github.com/solana-foundation/create-solana-dapp) v4.8.5 ([solana-foundation/templates](https://github.com/solana-foundation/templates), MIT), trimmed: we kept the layout, theme provider/toggle, explorer helper and Next/PostCSS config, and dropped the wallet connection, demo actions, cluster selector and Surfpool tests.
+  - `apps/web/components/ui/*`, `apps/web/components.json` and the theme tokens in `apps/web/app/globals.css` come from [shadcn/ui](https://ui.shadcn.com) (CLI v4.22.1, `base-nova` preset, MIT).
 - Pre-existing utilities: none.
 
 All other code was written during the hackathon (from Oct 12, 2026).
