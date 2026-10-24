@@ -16,7 +16,7 @@ export function MswProvider({ children }: PropsWithChildren) {
     if (apiMode !== "mock") return;
     let active = true;
     import("@/mocks/browser")
-      .then(({ worker }) => worker.start({ onUnhandledFrame: "bypass", quiet: true }))
+      .then(({ startMockWorker }) => startMockWorker())
       .then(
         () => active && setState("ready"),
         (error: unknown) => {
