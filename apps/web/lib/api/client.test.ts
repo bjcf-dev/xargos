@@ -157,6 +157,20 @@ describe("createApiClient", () => {
     expect(error.status).toBeUndefined();
   });
 
+  it("uses the global fetch installed at call time, not at creation time", async () => {
+    // Herramientas como MSW sustituyen globalThis.fetch después de crear el cliente.
+    const api = createApiClient({ baseUrl: BASE });
+    const original = globalThis.fetch;
+    const { fetch, calls } = fakeFetch(() => json([fixtureRecipe]));
+    globalThis.fetch = fetch as typeof globalThis.fetch;
+    try {
+      await expect(api.listRecipes()).resolves.toEqual([fixtureRecipe]);
+      expect(calls).toHaveLength(1);
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
   it("uses /api/xargos as the default base URL", async () => {
     const { fetch, calls } = fakeFetch(() => json([fixtureRecipe]));
     const api = createApiClient({ fetch });
