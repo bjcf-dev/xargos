@@ -10,6 +10,14 @@ const nextConfig: NextConfig = {
     // extensionAlias, por eso dev y build usan --webpack.
     extensionAlias: { ".js": [".ts", ".tsx", ".js"] },
   },
+  webpack: (config, { isServer }) => {
+    // msw/browser no exporta nada para Node ("node": null). El SSR compila el
+    // MswProvider aunque el import() solo corra en el navegador.
+    if (isServer) {
+      config.resolve.alias = { ...config.resolve.alias, "msw/browser": false };
+    }
+    return config;
+  },
 };
 
 export default nextConfig;
