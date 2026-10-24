@@ -5,18 +5,22 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "spike:live": "tsx src/spike/live.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
-    "@solana/kit": "^8.5.0",
+    "@solana-program/token": "^0.18.0",
+    "@solana/kit": "^6.10.0",
     "@x402/core": "^2.28.0",
+    "@x402/fetch": "^2.28.0",
     "@x402/hono": "^2.28.0",
     "@x402/svm": "^2.28.0",
     "hono": "^4.13.13"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^5.0.5"
   }
