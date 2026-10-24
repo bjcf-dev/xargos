@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { fixtureBuildResponse, fixtureRecipe, fixtureShockConfirmed } from "@xargos/shared";
+import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { createApiClient } from "@/lib/api/client";
@@ -78,6 +79,34 @@ describe("mock handlers", () => {
   it("answers a setup status for an agent that never started with VALIDATION_ERROR", async () => {
     useFreshHandlers();
     await expect(api.getSetupStatus(AGENT)).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("surfaces a 402 with its PAYMENT-REQUIRED header intact", async () => {
+    useFreshHandlers();
+    server.use(
+      http.post(
+        "*/api/xargos/recipes/:recipeId/build",
+        () => new HttpResponse(null, { status: 402, headers: { "PAYMENT-REQUIRED": "x402-req" } }),
+      ),
+    );
+
+    await expect(
+      api.build(fixtureRecipe.id, { agent: AGENT, position: AGENT }),
+    ).rejects.toMatchObject({ code: "PAYMENT_REQUIRED", status: 402, paymentRequired: "x402-req" });
+  });
+
+  it.each([
+    [429, "RATE_LIMITED"],
+    [403, "ACCESS_DENIED"],
+  ] as const)("maps a %i setup rejection to %s", async (status, code) => {
+    useFreshHandlers();
+    server.use(
+      http.post("*/api/xargos/demo/setup", () =>
+        HttpResponse.json({ error: { code, message: "Rejected" } }, { status }),
+      ),
+    );
+
+    await expect(api.startSetup({ agent: AGENT })).rejects.toMatchObject({ code, status });
   });
 
   it("confirms a price shock after a pending poll", async () => {
