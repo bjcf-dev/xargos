@@ -158,7 +158,11 @@ export function demoReducer(state: DemoState, event: DemoEvent): DemoState {
     case "RESET":
       return initialDemoState;
 
-    default:
+    default: {
+      // Si se añade un evento a DemoEvent sin tratarlo aquí, esto no compila.
+      const unhandled: never = event;
+      void unhandled;
       return state;
+    }
   }
 }

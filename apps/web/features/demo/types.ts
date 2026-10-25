@@ -14,7 +14,11 @@ export type Run = {
   shock?: PriceShockStatus;
 };
 
-/** Qué dice la cadena del revert (D15): solo se habla del guard si falló el guard. */
+/**
+ * Qué dice la cadena del revert (D15): solo se habla del guard si falló el guard.
+ * `guard` usa bigint (unidades base exactas): JSON.stringify(state) lanza con bigint,
+ * así que el estado de la demo no se serializa tal cual (sessionStorage, logs, server actions).
+ */
 export type RevertFailure = {
   /** Índice de InstructionError; null si la cadena no lo da. */
   instructionIndex: number | null;
