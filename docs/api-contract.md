@@ -107,6 +107,31 @@ Toda respuesta de error (4xx/5xx salvo el 402 de x402) tiene la forma `{ error: 
 | Tx caducada                                      | Rebuild con `buildId` hasta `rebuildUntil`; después `REBUILD_WINDOW_CLOSED` |
 | El resultado no llega a `minDelta`               | La tx revierte on-chain; la UI lo detecta con `getTransaction`              |
 
+## Errores HTTP
+
+El status de cada código vive en `ERROR_HTTP` (`packages/shared/src/errors.ts`), que es la fuente única: back, mocks y tests lo importan. Esta tabla lo resume.
+
+| Código                                  | HTTP | Cuándo                                                      | ¿Reintentar igual? |
+| --------------------------------------- | ---- | ----------------------------------------------------------- | ------------------ |
+| `PAYMENT_REQUIRED` / `PAYMENT_INVALID`  | 402  | Sin pago / pago inválido o insuficiente                     | No                 |
+| `VALIDATION_ERROR`                      | 400  | Petición mal formada                                        | No                 |
+| `ACCESS_DENIED`                         | 403  | Código de acceso de la demo incorrecto                      | No                 |
+| `REBUILD_WINDOW_CLOSED`                 | 410  | Ya pasó `rebuildUntil`: hay que pedir un build nuevo (pago) | No                 |
+| `RATE_LIMITED`                          | 429  | Demasiadas peticiones; cabecera `Retry-After`               | Sí, tras esperar   |
+| `BUILD_FAILED` / `INTERNAL`             | 500  | Falla el build o error interno; **no se liquida**           | Sí, con espera     |
+| `SETUP_FAILED` / `SHOCK_FAILED`         | 500  | Normalmente viajan dentro del estado del job (`failed`)     | Sí                 |
+| `BUILD_EXPIRED`                         | 410  | **Reservado**: el backend no lo emite (ver `rebuildUntil`)  | No                 |
+
+Reglas:
+
+- **Un error nunca se responde con 2xx/3xx.** x402 solo evita el cobro si la respuesta es ≥ 400 (D17); hay un test que lo vigila.
+- **`details` solo con información segura:** campos inválidos en `VALIDATION_ERROR` y la espera en `RATE_LIMITED`. En `BUILD_FAILED` e `INTERNAL` el mensaje es genérico; la causa va a los logs con el `buildId`, nunca al cliente (ni stack traces, ni URLs de RPC con `api-key`).
+- **`Cache-Control: no-store`** en toda respuesta de error (un `410` se puede cachear por defecto).
+- Cualquier excepción no prevista acaba en `INTERNAL` 500 genérico, con el mismo formato `{ error }`.
+- La pantalla de "caducada" la dibuja el front desde `expiresAt`; el backend solo responde `REBUILD_WINDOW_CLOSED` cuando se acaba la ventana gratuita.
+
+Evolución prevista (RFC 9457, versionado, catálogo): ver [ADR 0002](adr/0002-error-contract.md).
+
 ## Revert parseable
 
 `assert_min_delta` escribe `GUARD_FAIL received=<unidades> min=<unidades>` y devuelve el error `MinDeltaNotMet`. El front lo obtiene con `getTransaction(signature, { maxSupportedTransactionVersion: 0 })` → `meta.logMessages` y `meta.err` (`InstructionError: [índice, Custom(código)]`), y mapea el índice a `steps`.
