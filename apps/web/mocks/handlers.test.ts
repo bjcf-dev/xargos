@@ -1,5 +1,10 @@
 // @vitest-environment node
-import { fixtureBuildResponse, fixtureRecipe, fixtureShockConfirmed } from "@xargos/shared";
+import {
+  ERROR_HTTP,
+  fixtureBuildResponse,
+  fixtureRecipe,
+  fixtureShockConfirmed,
+} from "@xargos/shared";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -53,7 +58,7 @@ describe("mock handlers", () => {
     useFreshHandlers();
     await expect(api.build("nope", { agent: AGENT, position: AGENT })).rejects.toMatchObject({
       code: "VALIDATION_ERROR",
-      status: 400,
+      status: ERROR_HTTP.VALIDATION_ERROR.status,
     });
   });
 
