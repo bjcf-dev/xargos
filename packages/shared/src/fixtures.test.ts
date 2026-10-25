@@ -56,6 +56,11 @@ describe("fixtures of intermediate states and errors", () => {
     ["fixtureErrorRateLimited", fixtures.fixtureErrorRateLimited, "RATE_LIMITED"],
     ["fixtureErrorAccessDenied", fixtures.fixtureErrorAccessDenied, "ACCESS_DENIED"],
     ["fixtureErrorBuildExpired", fixtures.fixtureErrorBuildExpired, "BUILD_EXPIRED"],
+    [
+      "fixtureErrorRebuildWindowClosed",
+      fixtures.fixtureErrorRebuildWindowClosed,
+      "REBUILD_WINDOW_CLOSED",
+    ],
   ])("%s is a valid ErrorResponse with code %s", (_name, fixture, code) => {
     expect(ErrorResponse.parse(fixture).error.code).toBe(code);
   });
