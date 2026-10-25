@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ErrorResponse } from "./index.js";
+import { ErrorResponse } from "./index";
 
 describe("ErrorResponse", () => {
   it("acepta un error válido del contrato", () => {

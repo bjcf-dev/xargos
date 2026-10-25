@@ -6,14 +6,14 @@ import {
   parseGuardFail,
   Recipe,
   routes,
-} from "./contract.js";
+} from "./contract";
 import {
   fixtureBuildResponse,
   fixtureGuardFailLogs,
   fixtureRecipe,
   fixtureSetupReady,
   fixtureShockConfirmed,
-} from "./fixtures.js";
+} from "./fixtures";
 
 describe("fixtures cumplen el contrato", () => {
   it("Recipe", () => expect(Recipe.parse(fixtureRecipe)).toEqual(fixtureRecipe));
