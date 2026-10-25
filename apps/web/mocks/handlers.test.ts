@@ -30,7 +30,7 @@ describe("mock handlers", () => {
 
   it("builds without payment in mock mode, for the requesting agent", async () => {
     useFreshHandlers();
-    const build = await api.build(fixtureRecipe.id, { agent: AGENT, position: AGENT });
+    const { data: build } = await api.build(fixtureRecipe.id, { agent: AGENT, position: AGENT });
 
     expect(build.recipeId).toBe(fixtureRecipe.id);
     expect(build.steps).toEqual(fixtureBuildResponse.steps);
@@ -41,7 +41,7 @@ describe("mock handlers", () => {
   it("returns expiry times in the future so the expiry flow can run", async () => {
     useFreshHandlers();
     const now = Date.now();
-    const build = await api.build(fixtureRecipe.id, { agent: AGENT, position: AGENT });
+    const { data: build } = await api.build(fixtureRecipe.id, { agent: AGENT, position: AGENT });
 
     expect(Date.parse(build.expiresAt)).toBeGreaterThan(now);
     expect(Date.parse(build.rebuildUntil)).toBeGreaterThan(Date.parse(build.expiresAt));
