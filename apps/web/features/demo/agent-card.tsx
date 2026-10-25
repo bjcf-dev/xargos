@@ -45,7 +45,8 @@ export function AgentCard({ state, agent, setup, mode }: AgentCardProps) {
   const running = state.status === "setup" && done < PHASES.length;
 
   return (
-    <Card>
+    // self-start: sin él la tarjeta se estira hasta el alto de la columna del panel.
+    <Card className="self-start">
       <CardHeader>
         <CardTitle>{mode === "mock" ? "Simulated agent" : "Agent"}</CardTitle>
         <CardDescription className="font-mono">{ellipsify(agent, 6)}</CardDescription>
