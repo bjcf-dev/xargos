@@ -1,7 +1,8 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { fixtureRecipe } from "@xargos/shared";
+import { delay, HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createApiClient } from "@/lib/api/client";
 import { createHandlers } from "@/mocks/handlers";
 import { createMockSigner } from "./mock-signer";
@@ -13,6 +14,7 @@ const api = createApiClient({ baseUrl: "http://localhost/api/xargos" });
 
 beforeAll(() => server.listen({ onUnhandledFrame: "error" }));
 beforeEach(() => server.resetHandlers(...createHandlers()));
+afterEach(() => server.events.removeAllListeners());
 afterAll(() => server.close());
 
 function renderDemo(signer: DemoSigner | null = createMockSigner({ latencyMs: 0 })) {
@@ -63,17 +65,28 @@ describe("useDemo", () => {
     const atUnmount = polls;
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(polls).toBe(atUnmount);
-    server.events.removeAllListeners();
   });
 
-  it("ignores the old shock poll after a reset", async () => {
+  it("does not let the old shock poll break a new run after a reset", async () => {
     const { result } = renderDemo();
     await untilBuilt(result);
+    // El poll del shock falla tarde: si no se abortara, su FAILED caería en el setup nuevo.
+    server.use(
+      http.get("*/api/xargos/demo/price-shock/:shockId", async () => {
+        await delay(100);
+        return HttpResponse.json({ error: { code: "INTERNAL", message: "late" } }, { status: 500 });
+      }),
+    );
 
     act(() => result.current.shock());
+    await waitFor(() =>
+      expect(result.current.state).toMatchObject({ status: "shocking", shockId: "shk_mock_1" }),
+    );
     act(() => result.current.reset());
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(result.current.state).toEqual({ status: "idle" });
+    act(() => result.current.start());
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    expect(result.current.state.status).toBe("setup");
   });
 
   it("fails clearly when there is no signer yet (local/staging before F6)", async () => {
