@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { ModeBadge } from "@/components/mode-badge";
 import { Providers } from "@/components/providers";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
@@ -37,7 +38,10 @@ export default function RootLayout({
           <div className="min-h-screen bg-background text-foreground">
             <header className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
               <span className="font-mono text-sm font-bold">xARGOS</span>
-              <ThemeToggle />
+              <div className="flex items-center gap-3">
+                <ModeBadge />
+                <ThemeToggle />
+              </div>
             </header>
             {children}
           </div>
