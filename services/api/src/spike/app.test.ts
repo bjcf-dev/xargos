@@ -7,7 +7,7 @@ const PAYER = "A3zwodWASq2rCTSwjiRvzrRMNKLEP7bMwC3azd4X5nDj";
 const PAY_TO = "3NxLt5rLgsT46ngFjUj2VQhsfhu1miEmARUTS8gN1MYw";
 const FEE_PAYER = "3qybJ9ApEBWun7xvbnrVJ6NfDpvRGTBbppfxaFENe6SC";
 
-function fakeFacilitator() {
+function fakeFacilitator(settleMode: "ok" | "fail" | "throw" = "ok") {
   const calls = { verify: 0, settle: 0 };
   const facilitator: FacilitatorClient = {
     verify: async () => {
@@ -16,6 +16,16 @@ function fakeFacilitator() {
     },
     settle: async () => {
       calls.settle++;
+      if (settleMode === "throw") throw new Error("rpc down");
+      if (settleMode === "fail") {
+        return {
+          success: false,
+          errorReason: "insufficient_funds",
+          transaction: "",
+          network: SOLANA_DEVNET_CAIP2,
+          payer: PAYER,
+        };
+      }
       return {
         success: true,
         transaction: "fake-signature",
@@ -92,6 +102,22 @@ describe("x402 middleware settlement (spike B2)", () => {
     expect(res.status).toBe(status);
     expect(calls).toEqual({ verify: 1, settle: 0 });
   });
+
+  it.each(["fail", "throw"] as const)(
+    "does NOT leak the handler body when settlement %ss",
+    async (mode) => {
+      const { facilitator, calls } = fakeFacilitator(mode);
+      const app = createSpikeApp({
+        facilitator,
+        payTo: PAY_TO,
+        work: () => Response.json({ transaction: "TX-READY-FOR-THE-AGENT" }),
+      });
+      const res = await pay(app);
+      expect(res.status).toBe(402);
+      expect(await res.text()).not.toContain("TX-READY-FOR-THE-AGENT");
+      expect(calls.settle).toBe(1);
+    },
+  );
 
   it("does NOT settle when the handler throws", async () => {
     const { facilitator, calls } = fakeFacilitator();
