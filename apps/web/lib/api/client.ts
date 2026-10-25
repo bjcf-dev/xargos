@@ -30,17 +30,23 @@ export type CallOptions = {
   signal?: AbortSignal;
 };
 
+export type BuildResult = {
+  data: BuildResponse;
+  /** Cabecera PAYMENT-RESPONSE de x402, intacta: el recibo del pago con la firma (F8). */
+  paymentResponse?: string;
+};
+
 export function createApiClient({
   // Se resuelve en cada llamada: así se usa el fetch vigente (p. ej. el que parchea MSW).
   fetch = (input, init) => globalThis.fetch(input, init),
   baseUrl = DEFAULT_BASE_URL,
 }: ApiClientOptions = {}) {
-  async function request<S extends z.ZodType>(
+  async function send<S extends z.ZodType>(
     schema: S,
     path: string,
     body: unknown,
     { signal }: CallOptions = {},
-  ): Promise<z.output<S>> {
+  ): Promise<{ data: z.output<S>; headers: Headers }> {
     let response: Response;
     try {
       response = await fetch(
@@ -91,13 +97,29 @@ export function createApiClient({
         details: parsed.error.issues,
       });
     }
-    return parsed.data;
+    return { data: parsed.data, headers: response.headers };
+  }
+
+  async function request<S extends z.ZodType>(
+    schema: S,
+    path: string,
+    body: unknown,
+    options?: CallOptions,
+  ): Promise<z.output<S>> {
+    return (await send(schema, path, body, options)).data;
   }
 
   return {
     listRecipes: (options?: CallOptions) => request(RecipeList, routes.recipes, undefined, options),
-    build: (recipeId: string, body: BuildRequest, options?: CallOptions) =>
-      request(BuildResponse, routes.build(recipeId), body, options),
+    build: async (
+      recipeId: string,
+      body: BuildRequest,
+      options?: CallOptions,
+    ): Promise<BuildResult> => {
+      const { data, headers } = await send(BuildResponse, routes.build(recipeId), body, options);
+      const paymentResponse = headers.get("PAYMENT-RESPONSE");
+      return paymentResponse ? { data, paymentResponse } : { data };
+    },
     startSetup: (body: DemoSetupRequest, options?: CallOptions) =>
       request(DemoSetupAccepted, routes.demoSetup, body, options),
     getSetupStatus: (agent: string, options?: CallOptions) =>

@@ -56,11 +56,26 @@ describe("createApiClient", () => {
     const api = createApiClient({ fetch, baseUrl: BASE });
     const request = { agent: AGENT, position: fixtureSetupReady.position ?? "" };
 
-    await expect(api.build(fixtureRecipe.id, request)).resolves.toEqual(fixtureBuildResponse);
+    await expect(api.build(fixtureRecipe.id, request)).resolves.toEqual({
+      data: fixtureBuildResponse,
+    });
     expect(calls[0]).toEqual({
       url: `${BASE}/recipes/${fixtureRecipe.id}/build`,
       method: "POST",
       body: request,
+    });
+  });
+
+  it("returns the x402 PAYMENT-RESPONSE receipt untouched with the build", async () => {
+    const receipt = "eyJzdWNjZXNzIjp0cnVlfQ";
+    const { fetch } = fakeFetch(() =>
+      json(fixtureBuildResponse, 200, { "PAYMENT-RESPONSE": receipt }),
+    );
+    const api = createApiClient({ fetch, baseUrl: BASE });
+
+    await expect(api.build(fixtureRecipe.id, { agent: AGENT, position: AGENT })).resolves.toEqual({
+      data: fixtureBuildResponse,
+      paymentResponse: receipt,
     });
   });
 
