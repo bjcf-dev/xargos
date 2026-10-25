@@ -2,12 +2,18 @@ import type { BuildResponse, DemoSetupStatus, PriceShockStatus, Recipe } from ".
 
 /**
  * Datos de ejemplo VÁLIDOS según el contrato, para los mocks MSW del front y los tests.
- * Las direcciones son ficticias (formato base58 válido, sin cuentas reales detrás).
+ * Las direcciones del agente, USDC y guard son ficticias (formato base58 válido, sin cuentas reales).
+ * Las fechas (`expiresAt`, `rebuildUntil`) son absolutas: los mocks y tests deben reescribirlas con now + Δ.
  */
 const AGENT = "AgentDemo1111111111111111111111111111111111";
+const AGENT_USDC_ATA = "AgentUsdcAta1111111111111111111111111111111";
 const USDC = "UsdcDemo11111111111111111111111111111111111";
 const GUARD = "GuardDemo111111111111111111111111111111111";
 const ORCA = "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc";
+// Programas reales de Solana, para que los enlaces al explorer no engañen.
+const COMPUTE_BUDGET = "ComputeBudget111111111111111111111111111111";
+const ASSOCIATED_TOKEN = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
+const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 
 export const fixtureRecipe: Recipe = {
   id: "exit-orca-lp-to-usdc",
@@ -26,7 +32,7 @@ export const fixtureBuildResponse: BuildResponse = {
   guard: {
     programId: GUARD,
     mint: USDC,
-    watchedAccount: AGENT,
+    watchedAccount: AGENT_USDC_ATA,
     minDelta: "9950000",
     snapshotIndex: 2,
     assertIndex: 7,
@@ -36,21 +42,21 @@ export const fixtureBuildResponse: BuildResponse = {
       index: 0,
       label: "Compute budget",
       protocol: "ComputeBudget",
-      programId: GUARD,
+      programId: COMPUTE_BUDGET,
       kind: "setup",
     },
     {
       index: 1,
       label: "Create token accounts",
-      protocol: "System",
-      programId: GUARD,
+      protocol: "AssociatedToken",
+      programId: ASSOCIATED_TOKEN,
       kind: "setup",
     },
     { index: 2, label: "Snapshot", protocol: "Guard", programId: GUARD, kind: "guard" },
     { index: 3, label: "Collect fees", protocol: "Orca", programId: ORCA, kind: "action" },
     { index: 4, label: "Withdraw liquidity", protocol: "Orca", programId: ORCA, kind: "action" },
     { index: 5, label: "Swap SOL → USDC", protocol: "Orca", programId: ORCA, kind: "action" },
-    { index: 6, label: "Close wSOL", protocol: "System", programId: GUARD, kind: "setup" },
+    { index: 6, label: "Close wSOL", protocol: "Token", programId: TOKEN_PROGRAM, kind: "setup" },
     {
       index: 7,
       label: "Assert received ≥ min",
