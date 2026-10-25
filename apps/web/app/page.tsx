@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { buttonVariants } from "@/components/ui/button";
 import { RecipeList } from "./recipe-list";
 
 export default function Home() {
@@ -8,6 +10,9 @@ export default function Home() {
         Multi-step DeFi recipes for AI agents, paid per request with x402 on Solana devnet. The
         transaction either delivers what was promised or does not execute at all.
       </p>
+      <Link href="/demo" className={buttonVariants({ className: "mt-6" })}>
+        Open the demo
+      </Link>
       <RecipeList />
     </main>
   );
