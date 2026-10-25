@@ -130,3 +130,10 @@ export const fixtureErrorAccessDenied: ErrorResponse = {
 export const fixtureErrorBuildExpired: ErrorResponse = {
   error: { code: "BUILD_EXPIRED", message: "The transaction expired before it was sent." },
 };
+
+export const fixtureErrorRebuildWindowClosed: ErrorResponse = {
+  error: {
+    code: "REBUILD_WINDOW_CLOSED",
+    message: "The free rebuild window has closed. Request a new build.",
+  },
+};
