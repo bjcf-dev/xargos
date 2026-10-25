@@ -36,26 +36,27 @@ describe("fixtures", () => {
 
 describe("fixtures of intermediate states and errors", () => {
   it.each([
-    "fixtureSetupQueued",
-    "fixtureSetupFundingSol",
-    "fixtureSetupFundingUsdc",
-    "fixtureSetupFailed",
-  ] as const)("%s is a valid DemoSetupStatus", (name) => {
-    expect(DemoSetupStatus.safeParse(fixtures[name]).success).toBe(true);
+    ["fixtureSetupQueued", fixtures.fixtureSetupQueued],
+    ["fixtureSetupFundingSol", fixtures.fixtureSetupFundingSol],
+    ["fixtureSetupFundingUsdc", fixtures.fixtureSetupFundingUsdc],
+    ["fixtureSetupFailed", fixtures.fixtureSetupFailed],
+  ])("%s is a valid DemoSetupStatus", (_name, fixture) => {
+    // parse() (not safeParse) so a failure says which field breaks the contract
+    expect(() => DemoSetupStatus.parse(fixture)).not.toThrow();
   });
 
-  it.each(["fixtureShockPending", "fixtureShockFailed"] as const)(
-    "%s is a valid PriceShockStatus",
-    (name) => {
-      expect(PriceShockStatus.safeParse(fixtures[name]).success).toBe(true);
-    },
-  );
+  it.each([
+    ["fixtureShockPending", fixtures.fixtureShockPending],
+    ["fixtureShockFailed", fixtures.fixtureShockFailed],
+  ])("%s is a valid PriceShockStatus", (_name, fixture) => {
+    expect(() => PriceShockStatus.parse(fixture)).not.toThrow();
+  });
 
   it.each([
-    ["fixtureErrorRateLimited", "RATE_LIMITED"],
-    ["fixtureErrorAccessDenied", "ACCESS_DENIED"],
-    ["fixtureErrorBuildExpired", "BUILD_EXPIRED"],
-  ] as const)("%s is a valid ErrorResponse with code %s", (name, code) => {
-    expect(ErrorResponse.parse(fixtures[name]).error.code).toBe(code);
+    ["fixtureErrorRateLimited", fixtures.fixtureErrorRateLimited, "RATE_LIMITED"],
+    ["fixtureErrorAccessDenied", fixtures.fixtureErrorAccessDenied, "ACCESS_DENIED"],
+    ["fixtureErrorBuildExpired", fixtures.fixtureErrorBuildExpired, "BUILD_EXPIRED"],
+  ])("%s is a valid ErrorResponse with code %s", (_name, fixture, code) => {
+    expect(ErrorResponse.parse(fixture).error.code).toBe(code);
   });
 });
