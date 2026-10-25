@@ -131,12 +131,27 @@ describe("demoReducer: setup → paying → built", () => {
     expect(demoReducer(failed, { type: "SETUP_STARTED", agent: AGENT }).status).toBe("setup");
   });
 
-  it.each<DemoState>([initialDemoState, setup("funding_sol"), paying, built])(
-    "resets to idle from %o",
-    (state) => {
-      expect(demoReducer(state, { type: "RESET" })).toEqual(initialDemoState);
+  it.each<DemoState>([
+    initialDemoState,
+    setup("funding_sol"),
+    paying,
+    built,
+    {
+      status: "error",
+      error: { code: "INTERNAL", message: "x" },
+      failedAt: "paying",
+      agent: AGENT,
     },
-  );
+    {
+      status: "reverted",
+      run,
+      signature: SIGNATURE,
+      failure: { instructionIndex: 7, guard: { received: 1n, min: 2n } },
+    },
+    { status: "expired", run },
+  ])("resets to idle from %o", (state) => {
+    expect(demoReducer(state, { type: "RESET" })).toEqual(initialDemoState);
+  });
 });
 
 describe("demoReducer: events that do not apply leave the state untouched", () => {
