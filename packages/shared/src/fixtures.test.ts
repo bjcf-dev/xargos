@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { DemoSetupStatus, PriceShockStatus } from "./contract";
+import { ErrorResponse } from "./errors";
 import * as fixtures from "./fixtures";
 
 const ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -29,5 +31,31 @@ describe("fixtures", () => {
     expect(candidates.length).toBeGreaterThan(5);
     const invalid = candidates.filter((text) => base58ByteLength(text) !== 32);
     expect(invalid).toEqual([]);
+  });
+});
+
+describe("fixtures of intermediate states and errors", () => {
+  it.each([
+    "fixtureSetupQueued",
+    "fixtureSetupFundingSol",
+    "fixtureSetupFundingUsdc",
+    "fixtureSetupFailed",
+  ] as const)("%s is a valid DemoSetupStatus", (name) => {
+    expect(DemoSetupStatus.safeParse(fixtures[name]).success).toBe(true);
+  });
+
+  it.each(["fixtureShockPending", "fixtureShockFailed"] as const)(
+    "%s is a valid PriceShockStatus",
+    (name) => {
+      expect(PriceShockStatus.safeParse(fixtures[name]).success).toBe(true);
+    },
+  );
+
+  it.each([
+    ["fixtureErrorRateLimited", "RATE_LIMITED"],
+    ["fixtureErrorAccessDenied", "ACCESS_DENIED"],
+    ["fixtureErrorBuildExpired", "BUILD_EXPIRED"],
+  ] as const)("%s is a valid ErrorResponse with code %s", (name, code) => {
+    expect(ErrorResponse.parse(fixtures[name]).error.code).toBe(code);
   });
 });

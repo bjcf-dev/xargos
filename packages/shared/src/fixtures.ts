@@ -1,4 +1,5 @@
 import type { BuildResponse, DemoSetupStatus, PriceShockStatus, Recipe } from "./contract";
+import type { ErrorResponse } from "./errors";
 
 /**
  * Datos de ejemplo VÁLIDOS según el contrato, para los mocks MSW del front y los tests.
@@ -87,3 +88,45 @@ export const fixtureGuardFailLogs: string[] = [
   "Program log: Instruction: AssertMinDelta",
   "Program log: GUARD_FAIL received=9100000 min=9950000",
 ];
+
+// Estados intermedios del setup (polling cada ~1,5 s): la UI pinta una pantalla por fase.
+export const fixtureSetupQueued: DemoSetupStatus = { agent: AGENT, phase: "queued" };
+
+export const fixtureSetupFundingSol: DemoSetupStatus = { agent: AGENT, phase: "funding_sol" };
+
+export const fixtureSetupFundingUsdc: DemoSetupStatus = {
+  agent: AGENT,
+  phase: "funding_usdc",
+  balances: { sol: "50000000", usdc: "0" },
+};
+
+export const fixtureSetupFailed: DemoSetupStatus = {
+  agent: AGENT,
+  phase: "failed",
+  error: { code: "SETUP_FAILED", message: "Could not fund the agent. Try again." },
+};
+
+// Price shock: pending mientras se confirma; failed si no llega a confirmarse.
+export const fixtureShockPending: PriceShockStatus = {
+  shockId: "shk_demo_0001",
+  status: "pending",
+};
+
+export const fixtureShockFailed: PriceShockStatus = {
+  shockId: "shk_demo_0001",
+  status: "failed",
+  error: { code: "SHOCK_FAILED", message: "The price shock did not confirm." },
+};
+
+// Respuestas de error del contrato (ErrorResponse) para los mocks de errores.
+export const fixtureErrorRateLimited: ErrorResponse = {
+  error: { code: "RATE_LIMITED", message: "Too many requests. Wait a moment and try again." },
+};
+
+export const fixtureErrorAccessDenied: ErrorResponse = {
+  error: { code: "ACCESS_DENIED", message: "Invalid demo access code." },
+};
+
+export const fixtureErrorBuildExpired: ErrorResponse = {
+  error: { code: "BUILD_EXPIRED", message: "The transaction expired before it was sent." },
+};
