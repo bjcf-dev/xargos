@@ -34,7 +34,9 @@ describe("mock handlers", () => {
 
     expect(build.recipeId).toBe(fixtureRecipe.id);
     expect(build.steps).toEqual(fixtureBuildResponse.steps);
-    expect(build.guard.watchedAccount).toBe(AGENT);
+    // El guard vigila la ATA de USDC del agente, no su wallet (contrato, #36).
+    expect(build.guard.watchedAccount).not.toBe(AGENT);
+    expect(build.guard.watchedAccount).toBe(fixtureBuildResponse.guard.watchedAccount);
     expect(build.watchAccounts).toEqual([AGENT]);
   });
 
