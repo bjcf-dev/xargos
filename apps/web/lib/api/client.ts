@@ -25,6 +25,11 @@ export type ApiClientOptions = {
   baseUrl?: string;
 };
 
+export type CallOptions = {
+  /** Para cancelar la petición en vuelo (p. ej. al desmontar la pantalla). */
+  signal?: AbortSignal;
+};
+
 export function createApiClient({
   // Se resuelve en cada llamada: así se usa el fetch vigente (p. ej. el que parchea MSW).
   fetch = (input, init) => globalThis.fetch(input, init),
@@ -33,21 +38,25 @@ export function createApiClient({
   async function request<S extends z.ZodType>(
     schema: S,
     path: string,
-    body?: unknown,
+    body: unknown,
+    { signal }: CallOptions = {},
   ): Promise<z.output<S>> {
     let response: Response;
     try {
       response = await fetch(
         `${baseUrl}${path}`,
         body === undefined
-          ? { method: "GET" }
+          ? { method: "GET", signal: signal ?? null }
           : {
               method: "POST",
               headers: { "content-type": "application/json" },
               body: JSON.stringify(body),
+              signal: signal ?? null,
             },
       );
     } catch (cause) {
+      // Cancelar no es un error de red: se propaga tal cual, como en pollUntil.
+      if (signal?.aborted) throw cause;
       throw new ApiClientError("INTERNAL", "Network error", { cause });
     }
 
@@ -86,15 +95,17 @@ export function createApiClient({
   }
 
   return {
-    listRecipes: () => request(RecipeList, routes.recipes),
-    build: (recipeId: string, body: BuildRequest) =>
-      request(BuildResponse, routes.build(recipeId), body),
-    startSetup: (body: DemoSetupRequest) => request(DemoSetupAccepted, routes.demoSetup, body),
-    getSetupStatus: (agent: string) => request(DemoSetupStatus, routes.demoSetupStatus(agent)),
-    startPriceShock: (body: PriceShockRequest) =>
-      request(PriceShockAccepted, routes.priceShock, body),
-    getPriceShockStatus: (shockId: string) =>
-      request(PriceShockStatus, routes.priceShockStatus(shockId)),
+    listRecipes: (options?: CallOptions) => request(RecipeList, routes.recipes, undefined, options),
+    build: (recipeId: string, body: BuildRequest, options?: CallOptions) =>
+      request(BuildResponse, routes.build(recipeId), body, options),
+    startSetup: (body: DemoSetupRequest, options?: CallOptions) =>
+      request(DemoSetupAccepted, routes.demoSetup, body, options),
+    getSetupStatus: (agent: string, options?: CallOptions) =>
+      request(DemoSetupStatus, routes.demoSetupStatus(agent), undefined, options),
+    startPriceShock: (body: PriceShockRequest, options?: CallOptions) =>
+      request(PriceShockAccepted, routes.priceShock, body, options),
+    getPriceShockStatus: (shockId: string, options?: CallOptions) =>
+      request(PriceShockStatus, routes.priceShockStatus(shockId), undefined, options),
   };
 }
 
