@@ -67,6 +67,19 @@ describe("demoReducer: setup → paying → built", () => {
     });
   });
 
+  it("turns a ready setup without a position into an error instead of waiting forever", () => {
+    const next = demoReducer(setup("funding_sol"), {
+      type: "SETUP_PROGRESS",
+      setup: { agent: AGENT, phase: "ready" },
+    });
+    expect(next).toEqual({
+      status: "error",
+      error: { code: "SETUP_FAILED", message: "Demo setup finished without a position" },
+      failedAt: "setup",
+      agent: AGENT,
+    });
+  });
+
   it("pays once the setup is ready with a position", () => {
     expect(demoReducer(setup("ready"), { type: "PAY" })).toEqual(paying);
   });
