@@ -2,6 +2,7 @@ import {
   type BuildRequest,
   type DemoSetupPhase,
   type DemoSetupStatus,
+  ERROR_HTTP,
   type ErrorCode,
   fixtureBuildResponse,
   fixtureRecipe,
@@ -26,8 +27,9 @@ const SETUP_PHASES: DemoSetupPhase[] = [
 const EXPIRES_IN_MS = 60_000;
 const REBUILD_WINDOW_MS = 120_000;
 
-const apiError = (status: number, code: ErrorCode, message: string) =>
-  HttpResponse.json({ error: { code, message } }, { status });
+/** Error del contrato con su status de ERROR_HTTP (fuente única en shared). */
+const apiError = (code: ErrorCode, message: string) =>
+  HttpResponse.json({ error: { code, message } }, { status: ERROR_HTTP[code].status });
 
 /**
  * Handlers MSW con las fixtures de @xargos/shared. Sin x402: el build responde
@@ -52,7 +54,7 @@ export function createHandlers({ latencyMs = 0 }: { latencyMs?: number } = {}) {
       async ({ params, request }) => {
         await wait();
         if (params.recipeId !== fixtureRecipe.id) {
-          return apiError(400, "VALIDATION_ERROR", `Unknown recipe "${params.recipeId}"`);
+          return apiError("VALIDATION_ERROR", `Unknown recipe "${params.recipeId}"`);
         }
         const { agent } = await request.json();
         const now = Date.now();
@@ -78,7 +80,7 @@ export function createHandlers({ latencyMs = 0 }: { latencyMs?: number } = {}) {
       await wait();
       const polls = setupPolls.get(params.agent);
       if (polls === undefined) {
-        return apiError(400, "VALIDATION_ERROR", "Setup was never started for this agent");
+        return apiError("VALIDATION_ERROR", "Setup was never started for this agent");
       }
       setupPolls.set(params.agent, polls + 1);
       const phase = SETUP_PHASES[Math.min(polls, SETUP_PHASES.length - 1)] ?? "ready";
@@ -101,7 +103,7 @@ export function createHandlers({ latencyMs = 0 }: { latencyMs?: number } = {}) {
       await wait();
       const polls = shockPolls.get(params.shockId);
       if (polls === undefined) {
-        return apiError(400, "VALIDATION_ERROR", `Unknown shock "${params.shockId}"`);
+        return apiError("VALIDATION_ERROR", `Unknown shock "${params.shockId}"`);
       }
       shockPolls.set(params.shockId, polls + 1);
       const status: PriceShockStatus =
