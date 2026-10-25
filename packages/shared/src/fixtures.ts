@@ -8,7 +8,7 @@ import type { BuildResponse, DemoSetupStatus, PriceShockStatus, Recipe } from ".
 const AGENT = "AgentDemo1111111111111111111111111111111111";
 const AGENT_USDC_ATA = "AgentUsdcAta1111111111111111111111111111111";
 const USDC = "UsdcDemo11111111111111111111111111111111111";
-const GUARD = "GuardDemo111111111111111111111111111111111";
+const GUARD = "GuardDemo1111111111111111111111111111111111";
 const ORCA = "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc";
 // Programas reales de Solana, para que los enlaces al explorer no engañen.
 const COMPUTE_BUDGET = "ComputeBudget111111111111111111111111111111";
@@ -71,7 +71,7 @@ export const fixtureBuildResponse: BuildResponse = {
 export const fixtureSetupReady: DemoSetupStatus = {
   agent: AGENT,
   phase: "ready",
-  position: "PositionDemo11111111111111111111111111111111",
+  position: "PositionDemo1111111111111111111111111111111",
   balances: { sol: "50000000", usdc: "0" },
 };
 
