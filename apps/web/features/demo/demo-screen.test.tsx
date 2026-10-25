@@ -1,4 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fixtureBuildResponse } from "@xargos/shared";
+import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createApiClient } from "@/lib/api/client";
@@ -51,4 +53,26 @@ describe("DemoScreen (mock mode)", () => {
     expect(await screen.findByText("Executed as promised")).toBeDefined();
     expect(screen.queryByText(/reverted/i)).toBeNull();
   });
+  it("marks the transaction expired once expiresAt passes and blocks signing", async () => {
+    server.use(
+      http.post("*/api/xargos/recipes/:recipeId/build", () =>
+        HttpResponse.json({
+          ...fixtureBuildResponse,
+          expiresAt: new Date(Date.now() + 1_500).toISOString(),
+          rebuildUntil: new Date(Date.now() + 60_000).toISOString(),
+        }),
+      ),
+    );
+    render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
+
+    await click(/start demo/i);
+    await click(/pay & build/i);
+    expect(await screen.findByText(/valid for \d+s/i)).toBeDefined();
+
+    expect(await screen.findByText("Expired", {}, { timeout: 4_000 })).toBeDefined();
+    expect(screen.getByRole("button", { name: /sign & send/i }).hasAttribute("disabled")).toBe(
+      true,
+    );
+    expect(screen.getByRole("button", { name: /start over/i })).toBeDefined();
+  }, 10_000);
 });
