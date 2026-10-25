@@ -58,6 +58,10 @@ export function demoReducer(state: DemoState, event: DemoEvent): DemoState {
       return { status: "paying", agent: state.agent, position: state.setup.position };
 
     case "BUILT":
+      // Rebuild gratis (D19): tx nueva, mismo recibo del primer pago.
+      if (state.status === "rebuilding") {
+        return { status: "built", run: { ...state.run, build: event.build } };
+      }
       if (state.status !== "paying") return state;
       return {
         status: "built",
@@ -106,6 +110,18 @@ export function demoReducer(state: DemoState, event: DemoEvent): DemoState {
         signature: event.signature,
         failure: event.failure,
       };
+
+    case "EXPIRED":
+      // El blockhash caduca antes de enviar: desde built o mientras se firma.
+      if (state.status !== "built" && state.status !== "signing") return state;
+      return { status: "expired", run: state.run };
+
+    case "REBUILD":
+      if (state.status !== "expired") return state;
+      if (event.now >= Date.parse(state.run.build.rebuildUntil)) {
+        return toError(state, { code: "REBUILD_WINDOW_CLOSED", message: "Rebuild window closed" });
+      }
+      return { status: "rebuilding", run: state.run };
 
     case "FAILED":
       return IN_FLIGHT.has(state.status) ? toError(state, event.error) : state;

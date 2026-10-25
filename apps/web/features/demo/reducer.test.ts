@@ -248,3 +248,52 @@ describe("demoReducer: price shock (demo B, D10) and signing", () => {
     });
   });
 });
+
+describe("demoReducer: expiry and free rebuild (D19)", () => {
+  const expired: DemoState = { status: "expired", run };
+  const rebuilding: DemoState = { status: "rebuilding", run };
+  const rebuildUntil = Date.parse(fixtureBuildResponse.rebuildUntil);
+
+  it.each<DemoState>([built, { status: "signing", run }])(
+    "expires when the blockhash runs out (from %o)",
+    (state) => {
+      expect(demoReducer(state, { type: "EXPIRED" })).toEqual(expired);
+    },
+  );
+
+  it("rebuilds for free while the window is open", () => {
+    expect(demoReducer(expired, { type: "REBUILD", now: rebuildUntil - 1 })).toEqual(rebuilding);
+  });
+
+  it("closes the window exactly at rebuildUntil", () => {
+    expect(demoReducer(expired, { type: "REBUILD", now: rebuildUntil })).toEqual({
+      status: "error",
+      error: { code: "REBUILD_WINDOW_CLOSED", message: "Rebuild window closed" },
+      failedAt: "expired",
+      agent: AGENT,
+    });
+  });
+
+  it("keeps the first payment's receipt on the rebuilt transaction", () => {
+    const fresh = { ...fixtureBuildResponse, transaction: "BQYHCA==" };
+    expect(demoReducer(rebuilding, { type: "BUILT", build: fresh })).toEqual({
+      status: "built",
+      run: { ...run, build: fresh },
+    });
+  });
+
+  it("turns a rejected rebuild into an error", () => {
+    const error = { code: "REBUILD_WINDOW_CLOSED", message: "Too late" } as const;
+    expect(demoReducer(rebuilding, { type: "FAILED", error })).toEqual({
+      status: "error",
+      error,
+      failedAt: "rebuilding",
+      agent: AGENT,
+    });
+  });
+
+  it("ignores an expiry once the transaction is confirmed", () => {
+    const confirmed: DemoState = { status: "confirmed", run, signature: SIGNATURE };
+    expect(demoReducer(confirmed, { type: "EXPIRED" })).toBe(confirmed);
+  });
+});
