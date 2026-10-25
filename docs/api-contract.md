@@ -36,7 +36,7 @@ type BuildRequest = { agent: string; position: string; buildId?: string };
 type Step = {
   index: number; // índice real de la instrucción en la tx
   label: string; // "Withdraw liquidity", "Swap SOL → USDC", "Guard"
-  protocol: string; // "Orca", "System", "Guard", "ComputeBudget"
+  protocol: string; // "Orca", "System", "Guard", "ComputeBudget", "AssociatedToken", "Token"
   programId: string;
   kind: "setup" | "action" | "guard";
 };
@@ -44,7 +44,7 @@ type Step = {
 type Guard = {
   programId: string;
   mint: string; // USDC devnet de Circle
-  watchedAccount: string; // cuenta USDC del agente
+  watchedAccount: string; // ATA de USDC del agente (la que lee el guard y el front para el saldo), NO la wallet
   minDelta: string; // mínimo a RECIBIR, unidades base
   snapshotIndex: number;
   assertIndex: number;

@@ -50,6 +50,7 @@ export type Step = z.infer<typeof Step>;
 export const Guard = z.object({
   programId: Address,
   mint: Address,
+  /** Cuenta de tokens (ATA) de USDC del agente: la que lee el guard y la que el front consulta para el saldo. NO es la wallet. */
   watchedAccount: Address,
   minDelta: BaseUnits,
   snapshotIndex: z.number().int().nonnegative(),
