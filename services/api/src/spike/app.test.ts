@@ -81,6 +81,18 @@ describe("x402 middleware settlement (spike B2)", () => {
     expect(calls).toEqual({ verify: 1, settle: 0 });
   });
 
+  it.each([400, 409])("does NOT settle when the handler answers %i", async (status) => {
+    const { facilitator, calls } = fakeFacilitator();
+    const app = createSpikeApp({
+      facilitator,
+      payTo: PAY_TO,
+      work: () => new Response("rejected", { status }),
+    });
+    const res = await pay(app);
+    expect(res.status).toBe(status);
+    expect(calls).toEqual({ verify: 1, settle: 0 });
+  });
+
   it("does NOT settle when the handler throws", async () => {
     const { facilitator, calls } = fakeFacilitator();
     const app = createSpikeApp({
