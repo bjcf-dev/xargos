@@ -62,6 +62,13 @@ export function demoReducer(state: DemoState, event: DemoEvent): DemoState {
           event.setup.error ?? { code: "SETUP_FAILED", message: "Demo setup failed" },
         );
       }
+      // `position` es opcional en el contrato: un ready sin ella no se podría pagar nunca.
+      if (event.setup.phase === "ready" && !event.setup.position) {
+        return toError(state, {
+          code: "SETUP_FAILED",
+          message: "Demo setup finished without a position",
+        });
+      }
       return { ...state, setup: event.setup };
     }
 
