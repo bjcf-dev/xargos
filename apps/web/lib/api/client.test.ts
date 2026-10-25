@@ -171,6 +171,21 @@ describe("createApiClient", () => {
     }
   });
 
+  it("passes the signal to fetch and rejects with AbortError when aborted", async () => {
+    // Como el fetch real: la petición queda en vuelo hasta que se cancela su señal.
+    const fetch = (_input: RequestInfo | URL, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+      });
+    const api = createApiClient({ fetch, baseUrl: BASE });
+    const controller = new AbortController();
+
+    const promise = api.getSetupStatus(AGENT, { signal: controller.signal });
+    controller.abort();
+
+    await expect(promise).rejects.toMatchObject({ name: "AbortError" });
+  });
+
   it("uses /api/xargos as the default base URL", async () => {
     const { fetch, calls } = fakeFetch(() => json([fixtureRecipe]));
     const api = createApiClient({ fetch });
