@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ApiError } from "./errors.js";
+import { ApiError } from "./errors";
 
 /**
  * Contrato de API v3 entre apps/web y services/api.

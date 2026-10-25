@@ -1,4 +1,4 @@
-import type { BuildResponse, DemoSetupStatus, PriceShockStatus, Recipe } from "./contract.js";
+import type { BuildResponse, DemoSetupStatus, PriceShockStatus, Recipe } from "./contract";
 
 /**
  * Datos de ejemplo VÁLIDOS según el contrato, para los mocks MSW del front y los tests.
