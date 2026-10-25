@@ -1,4 +1,4 @@
-import { fixtureBuildResponse, fixtureSetupReady } from "@xargos/shared";
+import { fixtureBuildResponse, fixtureSetupReady, fixtureShockConfirmed } from "@xargos/shared";
 import { describe, expect, it } from "vitest";
 import { demoReducer } from "./reducer";
 import { type DemoEvent, type DemoState, initialDemoState } from "./types";
@@ -13,6 +13,15 @@ const setup = (phase: "queued" | "funding_sol" | "ready"): DemoState => ({
   setup: phase === "ready" ? fixtureSetupReady : { agent: AGENT, phase },
 });
 const paying: DemoState = { status: "paying", agent: AGENT, position: POSITION };
+const run = {
+  agent: AGENT,
+  position: POSITION,
+  build: fixtureBuildResponse,
+  paymentResponse: RECEIPT,
+};
+const built: DemoState = { status: "built", run };
+const shocked = { ...fixtureShockConfirmed };
+const SIGNATURE = "5txSignatureForTheRecipe";
 
 describe("demoReducer: setup → paying → built", () => {
   it("starts the setup for the agent generated in the browser", () => {
@@ -139,5 +148,103 @@ describe("demoReducer: events that do not apply leave the state untouched", () =
 
   it.each(cases)("%s", (_name, state, event) => {
     expect(demoReducer(state, event)).toBe(state);
+  });
+});
+
+describe("demoReducer: price shock (demo B, D10) and signing", () => {
+  const shocking: DemoState = { status: "shocking", run, shockId: shocked.shockId };
+  const signing: DemoState = { status: "signing", run };
+
+  it("starts the price shock on a built transaction", () => {
+    expect(demoReducer(built, { type: "SHOCK_STARTED", shockId: shocked.shockId })).toEqual(
+      shocking,
+    );
+  });
+
+  it("goes back to built with the shock once it is confirmed", () => {
+    expect(demoReducer(shocking, { type: "SHOCK_SETTLED", shock: shocked })).toEqual({
+      status: "built",
+      run,
+      shock: shocked,
+    });
+  });
+
+  it("keeps waiting while the shock is still pending", () => {
+    const pending = { shockId: shocked.shockId, status: "pending" } as const;
+    expect(demoReducer(shocking, { type: "SHOCK_SETTLED", shock: pending })).toBe(shocking);
+  });
+
+  it("turns a failed shock into an error with the backend's code", () => {
+    const error = { code: "SHOCK_FAILED", message: "Did not confirm" } as const;
+    const next = demoReducer(shocking, {
+      type: "SHOCK_SETTLED",
+      shock: { shockId: shocked.shockId, status: "failed", error },
+    });
+    expect(next).toEqual({ status: "error", error, failedAt: "shocking", agent: AGENT });
+  });
+
+  it("falls back to SHOCK_FAILED when a failed shock carries no error", () => {
+    const next = demoReducer(shocking, {
+      type: "SHOCK_SETTLED",
+      shock: { shockId: shocked.shockId, status: "failed" },
+    });
+    expect(next).toMatchObject({
+      status: "error",
+      error: { code: "SHOCK_FAILED", message: "Price shock failed" },
+    });
+  });
+
+  it("ignores a late result from another shock", () => {
+    const other = { ...shocked, shockId: "shk_other" };
+    expect(demoReducer(shocking, { type: "SHOCK_SETTLED", shock: other })).toBe(shocking);
+  });
+
+  it("allows a single shock per build", () => {
+    const alreadyShocked: DemoState = { status: "built", run, shock: shocked };
+    expect(demoReducer(alreadyShocked, { type: "SHOCK_STARTED", shockId: "shk_2" })).toBe(
+      alreadyShocked,
+    );
+  });
+
+  it("signs a built transaction", () => {
+    expect(demoReducer(built, { type: "SIGN" })).toEqual(signing);
+  });
+
+  it("keeps the shock when signing after it (demo B)", () => {
+    expect(demoReducer({ status: "built", run, shock: shocked }, { type: "SIGN" })).toEqual({
+      status: "signing",
+      run,
+      shock: shocked,
+    });
+  });
+
+  it("confirms with the transaction signature", () => {
+    expect(demoReducer(signing, { type: "CONFIRMED", signature: SIGNATURE })).toEqual({
+      status: "confirmed",
+      run,
+      signature: SIGNATURE,
+    });
+  });
+
+  it.each([
+    ["the guard failed", { instructionIndex: 7, guard: { received: 9_100_000n, min: 9_950_000n } }],
+    ["another instruction failed (D15)", { instructionIndex: 3, guard: null }],
+  ] as const)("records a revert as the chain reports it: %s", (_case, failure) => {
+    expect(demoReducer(signing, { type: "REVERTED", signature: SIGNATURE, failure })).toEqual({
+      status: "reverted",
+      run,
+      signature: SIGNATURE,
+      failure,
+    });
+  });
+
+  it("turns a failure while signing into an error", () => {
+    const error = { code: "INTERNAL", message: "RPC down" } as const;
+    expect(demoReducer(signing, { type: "FAILED", error })).toEqual({
+      status: "error",
+      error,
+      failedAt: "signing",
+      agent: AGENT,
+    });
   });
 });
