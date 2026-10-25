@@ -1,11 +1,14 @@
 import { fixtureBuildResponse, fixtureSetupReady, fixtureShockConfirmed } from "@xargos/shared";
 import { describe, expect, it } from "vitest";
 import { demoReducer } from "./reducer";
-import { type DemoEvent, type DemoState, initialDemoState } from "./types";
+import { type DemoEvent, type DemoState, initialDemoState, type Run } from "./types";
 
 const AGENT = fixtureSetupReady.agent;
 const POSITION = fixtureSetupReady.position ?? "";
 const RECEIPT = "eyJzdWNjZXNzIjp0cnVlfQ";
+const SIGNATURE = "5txSignatureForTheRecipe";
+const EXPIRES_AT = Date.parse(fixtureBuildResponse.expiresAt);
+const REBUILD_UNTIL = Date.parse(fixtureBuildResponse.rebuildUntil);
 
 const setup = (phase: "queued" | "funding_sol" | "ready"): DemoState => ({
   status: "setup",
@@ -13,15 +16,16 @@ const setup = (phase: "queued" | "funding_sol" | "ready"): DemoState => ({
   setup: phase === "ready" ? fixtureSetupReady : { agent: AGENT, phase },
 });
 const paying: DemoState = { status: "paying", agent: AGENT, position: POSITION };
-const run = {
+const run: Run = {
   agent: AGENT,
   position: POSITION,
   build: fixtureBuildResponse,
   paymentResponse: RECEIPT,
 };
-const built: DemoState = { status: "built", run };
 const shocked = { ...fixtureShockConfirmed };
-const SIGNATURE = "5txSignatureForTheRecipe";
+const shockedRun: Run = { ...run, shock: shocked };
+const built: DemoState = { status: "built", run };
+const signing: DemoState = { status: "signing", run };
 
 describe("demoReducer: setup → paying → built", () => {
   it("starts the setup for the agent generated in the browser", () => {
@@ -73,30 +77,35 @@ describe("demoReducer: setup → paying → built", () => {
       build: fixtureBuildResponse,
       paymentResponse: RECEIPT,
     });
-    expect(next).toEqual({
-      status: "built",
-      run: {
-        agent: AGENT,
-        position: POSITION,
-        build: fixtureBuildResponse,
-        paymentResponse: RECEIPT,
-      },
-    });
+    expect(next).toEqual({ status: "built", run });
   });
 
   it("leaves paymentResponse out of the run when there is no receipt", () => {
     const next = demoReducer(paying, { type: "BUILT", build: fixtureBuildResponse });
+    expect(next.status).toBe("built");
     expect(next.status === "built" && "paymentResponse" in next.run).toBe(false);
   });
 
-  it("turns a rejected payment into an error that remembers the agent", () => {
+  it("turns a rejected payment into an error that keeps agent and position", () => {
     const error = { code: "PAYMENT_INVALID", message: "Insufficient amount" } as const;
     expect(demoReducer(paying, { type: "FAILED", error })).toEqual({
       status: "error",
       error,
       failedAt: "paying",
       agent: AGENT,
+      position: POSITION,
     });
+  });
+
+  it("pays again from an error without a new setup when the position is known", () => {
+    const failed: DemoState = {
+      status: "error",
+      error: { code: "PAYMENT_INVALID", message: "Insufficient amount" },
+      failedAt: "paying",
+      agent: AGENT,
+      position: POSITION,
+    };
+    expect(demoReducer(failed, { type: "PAY" })).toEqual(paying);
   });
 
   it("retries from scratch after an error", () => {
@@ -109,7 +118,7 @@ describe("demoReducer: setup → paying → built", () => {
     expect(demoReducer(failed, { type: "SETUP_STARTED", agent: AGENT }).status).toBe("setup");
   });
 
-  it.each<DemoState>([initialDemoState, setup("funding_sol"), paying])(
+  it.each<DemoState>([initialDemoState, setup("funding_sol"), paying, built])(
     "resets to idle from %o",
     (state) => {
       expect(demoReducer(state, { type: "RESET" })).toEqual(initialDemoState);
@@ -140,6 +149,16 @@ describe("demoReducer: events that do not apply leave the state untouched", () =
       { type: "PAY" },
     ],
     [
+      "Pay from an error that has no position",
+      {
+        status: "error",
+        error: { code: "RATE_LIMITED", message: "x" },
+        failedAt: "setup",
+        agent: AGENT,
+      },
+      { type: "PAY" },
+    ],
+    [
       "a failure while idle",
       initialDemoState,
       { type: "FAILED", error: { code: "INTERNAL", message: "x" } },
@@ -152,20 +171,38 @@ describe("demoReducer: events that do not apply leave the state untouched", () =
 });
 
 describe("demoReducer: price shock (demo B, D10) and signing", () => {
+  const requested: DemoState = { status: "shocking", run, shockId: null };
   const shocking: DemoState = { status: "shocking", run, shockId: shocked.shockId };
-  const signing: DemoState = { status: "signing", run };
 
-  it("starts the price shock on a built transaction", () => {
-    expect(demoReducer(built, { type: "SHOCK_STARTED", shockId: shocked.shockId })).toEqual(
+  it("enters shocking as soon as the shock is requested, before the 202", () => {
+    expect(demoReducer(built, { type: "SHOCK_REQUESTED" })).toEqual(requested);
+  });
+
+  it("ignores a second click while the shock request is in flight", () => {
+    expect(demoReducer(requested, { type: "SHOCK_REQUESTED" })).toBe(requested);
+  });
+
+  it("does not lose a failure of the shock request itself", () => {
+    const error = { code: "RATE_LIMITED", message: "Too many shocks" } as const;
+    expect(demoReducer(requested, { type: "FAILED", error })).toEqual({
+      status: "error",
+      error,
+      failedAt: "shocking",
+      agent: AGENT,
+      position: POSITION,
+    });
+  });
+
+  it("records the shockId once the backend accepts the shock", () => {
+    expect(demoReducer(requested, { type: "SHOCK_ACCEPTED", shockId: shocked.shockId })).toEqual(
       shocking,
     );
   });
 
-  it("goes back to built with the shock once it is confirmed", () => {
+  it("goes back to built with the shock in the run once it is confirmed", () => {
     expect(demoReducer(shocking, { type: "SHOCK_SETTLED", shock: shocked })).toEqual({
       status: "built",
-      run,
-      shock: shocked,
+      run: shockedRun,
     });
   });
 
@@ -174,13 +211,28 @@ describe("demoReducer: price shock (demo B, D10) and signing", () => {
     expect(demoReducer(shocking, { type: "SHOCK_SETTLED", shock: pending })).toBe(shocking);
   });
 
+  it("ignores a shock result before the shock was accepted", () => {
+    expect(demoReducer(requested, { type: "SHOCK_SETTLED", shock: shocked })).toBe(requested);
+  });
+
+  it("ignores a late result from another shock", () => {
+    const other = { ...shocked, shockId: "shk_other" };
+    expect(demoReducer(shocking, { type: "SHOCK_SETTLED", shock: other })).toBe(shocking);
+  });
+
   it("turns a failed shock into an error with the backend's code", () => {
     const error = { code: "SHOCK_FAILED", message: "Did not confirm" } as const;
     const next = demoReducer(shocking, {
       type: "SHOCK_SETTLED",
       shock: { shockId: shocked.shockId, status: "failed", error },
     });
-    expect(next).toEqual({ status: "error", error, failedAt: "shocking", agent: AGENT });
+    expect(next).toEqual({
+      status: "error",
+      error,
+      failedAt: "shocking",
+      agent: AGENT,
+      position: POSITION,
+    });
   });
 
   it("falls back to SHOCK_FAILED when a failed shock carries no error", () => {
@@ -194,28 +246,13 @@ describe("demoReducer: price shock (demo B, D10) and signing", () => {
     });
   });
 
-  it("ignores a late result from another shock", () => {
-    const other = { ...shocked, shockId: "shk_other" };
-    expect(demoReducer(shocking, { type: "SHOCK_SETTLED", shock: other })).toBe(shocking);
-  });
-
-  it("allows a single shock per build", () => {
-    const alreadyShocked: DemoState = { status: "built", run, shock: shocked };
-    expect(demoReducer(alreadyShocked, { type: "SHOCK_STARTED", shockId: "shk_2" })).toBe(
-      alreadyShocked,
-    );
+  it("allows a single shock per run", () => {
+    const alreadyShocked: DemoState = { status: "built", run: shockedRun };
+    expect(demoReducer(alreadyShocked, { type: "SHOCK_REQUESTED" })).toBe(alreadyShocked);
   });
 
   it("signs a built transaction", () => {
     expect(demoReducer(built, { type: "SIGN" })).toEqual(signing);
-  });
-
-  it("keeps the shock when signing after it (demo B)", () => {
-    expect(demoReducer({ status: "built", run, shock: shocked }, { type: "SIGN" })).toEqual({
-      status: "signing",
-      run,
-      shock: shocked,
-    });
   });
 
   it("confirms with the transaction signature", () => {
@@ -238,6 +275,15 @@ describe("demoReducer: price shock (demo B, D10) and signing", () => {
     });
   });
 
+  it("keeps the shock on the reverted run so demo B can show it", () => {
+    const failure = { instructionIndex: 7, guard: { received: 9_100_000n, min: 9_950_000n } };
+    const next = demoReducer(
+      { status: "signing", run: shockedRun },
+      { type: "REVERTED", signature: SIGNATURE, failure },
+    );
+    expect(next).toMatchObject({ status: "reverted", run: { shock: shocked } });
+  });
+
   it("turns a failure while signing into an error", () => {
     const error = { code: "INTERNAL", message: "RPC down" } as const;
     expect(demoReducer(signing, { type: "FAILED", error })).toEqual({
@@ -245,6 +291,7 @@ describe("demoReducer: price shock (demo B, D10) and signing", () => {
       error,
       failedAt: "signing",
       agent: AGENT,
+      position: POSITION,
     });
   });
 });
@@ -252,25 +299,29 @@ describe("demoReducer: price shock (demo B, D10) and signing", () => {
 describe("demoReducer: expiry and free rebuild (D19)", () => {
   const expired: DemoState = { status: "expired", run };
   const rebuilding: DemoState = { status: "rebuilding", run };
-  const rebuildUntil = Date.parse(fixtureBuildResponse.rebuildUntil);
 
-  it.each<DemoState>([built, { status: "signing", run }])(
-    "expires when the blockhash runs out (from %o)",
+  it.each<DemoState>([built, signing, { status: "shocking", run, shockId: shocked.shockId }])(
+    "expires once expiresAt has passed (from %o)",
     (state) => {
-      expect(demoReducer(state, { type: "EXPIRED" })).toEqual(expired);
+      expect(demoReducer(state, { type: "EXPIRED", now: EXPIRES_AT })).toEqual(expired);
     },
   );
 
+  it("ignores a stale expiry timer for an earlier transaction", () => {
+    expect(demoReducer(built, { type: "EXPIRED", now: EXPIRES_AT - 1 })).toBe(built);
+  });
+
   it("rebuilds for free while the window is open", () => {
-    expect(demoReducer(expired, { type: "REBUILD", now: rebuildUntil - 1 })).toEqual(rebuilding);
+    expect(demoReducer(expired, { type: "REBUILD", now: REBUILD_UNTIL - 1 })).toEqual(rebuilding);
   });
 
   it("closes the window exactly at rebuildUntil", () => {
-    expect(demoReducer(expired, { type: "REBUILD", now: rebuildUntil })).toEqual({
+    expect(demoReducer(expired, { type: "REBUILD", now: REBUILD_UNTIL })).toEqual({
       status: "error",
       error: { code: "REBUILD_WINDOW_CLOSED", message: "Rebuild window closed" },
       failedAt: "expired",
       agent: AGENT,
+      position: POSITION,
     });
   });
 
@@ -282,6 +333,17 @@ describe("demoReducer: expiry and free rebuild (D19)", () => {
     });
   });
 
+  it("keeps the shock through expiry and rebuild, so no second shock is allowed", () => {
+    const fresh = { ...fixtureBuildResponse, transaction: "BQYHCA==" };
+    let state: DemoState = { status: "signing", run: shockedRun };
+    state = demoReducer(state, { type: "EXPIRED", now: EXPIRES_AT });
+    state = demoReducer(state, { type: "REBUILD", now: REBUILD_UNTIL - 1 });
+    state = demoReducer(state, { type: "BUILT", build: fresh });
+
+    expect(state).toEqual({ status: "built", run: { ...shockedRun, build: fresh } });
+    expect(demoReducer(state, { type: "SHOCK_REQUESTED" })).toBe(state);
+  });
+
   it("turns a rejected rebuild into an error", () => {
     const error = { code: "REBUILD_WINDOW_CLOSED", message: "Too late" } as const;
     expect(demoReducer(rebuilding, { type: "FAILED", error })).toEqual({
@@ -289,11 +351,12 @@ describe("demoReducer: expiry and free rebuild (D19)", () => {
       error,
       failedAt: "rebuilding",
       agent: AGENT,
+      position: POSITION,
     });
   });
 
   it("ignores an expiry once the transaction is confirmed", () => {
     const confirmed: DemoState = { status: "confirmed", run, signature: SIGNATURE };
-    expect(demoReducer(confirmed, { type: "EXPIRED" })).toBe(confirmed);
+    expect(demoReducer(confirmed, { type: "EXPIRED", now: EXPIRES_AT })).toBe(confirmed);
   });
 });
