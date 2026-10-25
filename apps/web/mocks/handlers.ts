@@ -62,7 +62,6 @@ export function createHandlers({ latencyMs = 0 }: { latencyMs?: number } = {}) {
           buildId: `bld_mock_${builds}`,
           expiresAt: new Date(now + EXPIRES_IN_MS).toISOString(),
           rebuildUntil: new Date(now + REBUILD_WINDOW_MS).toISOString(),
-          guard: { ...fixtureBuildResponse.guard, watchedAccount: agent },
           watchAccounts: [agent],
         });
       },
