@@ -69,6 +69,44 @@ export function demoReducer(state: DemoState, event: DemoEvent): DemoState {
         },
       };
 
+    case "SHOCK_STARTED":
+      // Un solo shock por build: el segundo no tiene sentido en la demo B.
+      if (state.status !== "built" || state.shock) return state;
+      return { status: "shocking", run: state.run, shockId: event.shockId };
+
+    case "SHOCK_SETTLED": {
+      if (state.status !== "shocking" || event.shock.shockId !== state.shockId) return state;
+      if (event.shock.status === "pending") return state;
+      if (event.shock.status === "failed") {
+        return toError(
+          state,
+          event.shock.error ?? { code: "SHOCK_FAILED", message: "Price shock failed" },
+        );
+      }
+      return { status: "built", run: state.run, shock: event.shock };
+    }
+
+    case "SIGN":
+      if (state.status !== "built") return state;
+      return {
+        status: "signing",
+        run: state.run,
+        ...(state.shock ? { shock: state.shock } : {}),
+      };
+
+    case "CONFIRMED":
+      if (state.status !== "signing") return state;
+      return { status: "confirmed", run: state.run, signature: event.signature };
+
+    case "REVERTED":
+      if (state.status !== "signing") return state;
+      return {
+        status: "reverted",
+        run: state.run,
+        signature: event.signature,
+        failure: event.failure,
+      };
+
     case "FAILED":
       return IN_FLIGHT.has(state.status) ? toError(state, event.error) : state;
 
