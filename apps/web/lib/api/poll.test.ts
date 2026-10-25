@@ -58,4 +58,19 @@ describe("pollUntil", () => {
     await new Promise((r) => setTimeout(r, 30));
     expect(calls()).toBe(callsAtAbort);
   });
+
+  it("stops at once when the signal is aborted while a call is in flight", async () => {
+    const controller = new AbortController();
+    const fn = async () => {
+      // La pantalla se desmonta mientras la consulta está en vuelo.
+      controller.abort();
+      return "pending";
+    };
+    const started = Date.now();
+
+    await expect(
+      pollUntil(fn, () => false, { intervalMs: 2_000, signal: controller.signal }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(Date.now() - started).toBeLessThan(500);
+  });
 });
