@@ -166,8 +166,9 @@ export function DemoScreen({
 
           {live ? (
             <>
-              <TxAnatomy run={state.run} secondsLeft={left} />
+              {/* En orden: primero se paga (x402), luego la tx y su firma. */}
               <X402Timeline state={state} mode={mode} price={recipe.price} />
+              <TxAnatomy run={state.run} secondsLeft={left} />
               {state.status === "shocking" ? <Busy>Moving the pool price…</Busy> : null}
               {state.status === "signing" ? <Busy>Signing and sending…</Busy> : null}
               {state.status === "built" ? (
