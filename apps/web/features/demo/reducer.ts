@@ -10,25 +10,39 @@ const IN_FLIGHT = new Set<DemoState["status"]>([
   "rebuilding",
 ]);
 
-function agentOf(state: DemoState): string | undefined {
-  if ("agent" in state) return state.agent;
-  if ("run" in state) return state.run.agent;
-  return undefined;
+/** Agente y posición del estado actual, si los hay: el error los guarda para reintentar. */
+function contextOf(state: DemoState): { agent?: string; position?: string } {
+  if ("run" in state) return { agent: state.run.agent, position: state.run.position };
+  if (state.status === "paying") return { agent: state.agent, position: state.position };
+  if (state.status === "setup") {
+    return {
+      agent: state.agent,
+      ...(state.setup.position ? { position: state.setup.position } : {}),
+    };
+  }
+  if (state.status === "error") {
+    return {
+      ...(state.agent ? { agent: state.agent } : {}),
+      ...(state.position ? { position: state.position } : {}),
+    };
+  }
+  return {};
 }
 
 function toError(state: DemoState, error: DemoError): DemoState {
-  const agent = agentOf(state);
   return {
     status: "error",
     error: { code: error.code, message: error.message },
     failedAt: state.status,
-    ...(agent ? { agent } : {}),
+    ...contextOf(state),
   };
 }
 
 /**
  * Reducer puro de la demo. Un evento que no aplica al estado actual devuelve el
- * MISMO objeto: respuestas tardías, dobles clics y polls de otro agente se ignoran.
+ * MISMO objeto. Los polls de setup y shock se casan con su agente o shockId, y
+ * EXPIRED con el expiresAt del build actual. Los FAILED tardíos no llevan con qué
+ * casarlos: quien despacha (F4) debe abortar las peticiones en vuelo al hacer RESET.
  */
 export function demoReducer(state: DemoState, event: DemoEvent): DemoState {
   switch (event.type) {
@@ -52,13 +66,17 @@ export function demoReducer(state: DemoState, event: DemoEvent): DemoState {
     }
 
     case "PAY":
-      if (state.status !== "setup" || state.setup.phase !== "ready" || !state.setup.position) {
-        return state;
+      if (state.status === "setup" && state.setup.phase === "ready" && state.setup.position) {
+        return { status: "paying", agent: state.agent, position: state.setup.position };
       }
-      return { status: "paying", agent: state.agent, position: state.setup.position };
+      // Reintento sin repetir el setup: la posición del agente sigue ahí.
+      if (state.status === "error" && state.agent && state.position) {
+        return { status: "paying", agent: state.agent, position: state.position };
+      }
+      return state;
 
     case "BUILT":
-      // Rebuild gratis (D19): tx nueva, mismo recibo del primer pago.
+      // Rebuild gratis (D19): tx nueva, mismo recibo y mismo shock del run.
       if (state.status === "rebuilding") {
         return { status: "built", run: { ...state.run, build: event.build } };
       }
@@ -73,10 +91,14 @@ export function demoReducer(state: DemoState, event: DemoEvent): DemoState {
         },
       };
 
-    case "SHOCK_STARTED":
-      // Un solo shock por build: el segundo no tiene sentido en la demo B.
-      if (state.status !== "built" || state.shock) return state;
-      return { status: "shocking", run: state.run, shockId: event.shockId };
+    case "SHOCK_REQUESTED":
+      // Un solo shock por run (D10): ni doble clic ni otro tras un rebuild.
+      if (state.status !== "built" || state.run.shock) return state;
+      return { status: "shocking", run: state.run, shockId: null };
+
+    case "SHOCK_ACCEPTED":
+      if (state.status !== "shocking" || state.shockId !== null) return state;
+      return { ...state, shockId: event.shockId };
 
     case "SHOCK_SETTLED": {
       if (state.status !== "shocking" || event.shock.shockId !== state.shockId) return state;
@@ -87,16 +109,12 @@ export function demoReducer(state: DemoState, event: DemoEvent): DemoState {
           event.shock.error ?? { code: "SHOCK_FAILED", message: "Price shock failed" },
         );
       }
-      return { status: "built", run: state.run, shock: event.shock };
+      return { status: "built", run: { ...state.run, shock: event.shock } };
     }
 
     case "SIGN":
       if (state.status !== "built") return state;
-      return {
-        status: "signing",
-        run: state.run,
-        ...(state.shock ? { shock: state.shock } : {}),
-      };
+      return { status: "signing", run: state.run };
 
     case "CONFIRMED":
       if (state.status !== "signing") return state;
@@ -112,8 +130,12 @@ export function demoReducer(state: DemoState, event: DemoEvent): DemoState {
       };
 
     case "EXPIRED":
-      // El blockhash caduca antes de enviar: desde built o mientras se firma.
-      if (state.status !== "built" && state.status !== "signing") return state;
+      // El blockhash caduca antes de enviar. Solo cuenta si caduca la tx ACTUAL:
+      // un temporizador viejo (de antes de un rebuild) trae un now anterior.
+      if (state.status !== "built" && state.status !== "shocking" && state.status !== "signing") {
+        return state;
+      }
+      if (event.now < Date.parse(state.run.build.expiresAt)) return state;
       return { status: "expired", run: state.run };
 
     case "REBUILD":
