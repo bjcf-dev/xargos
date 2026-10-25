@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /**
  * Códigos de error comunes a backend y frontend.
- * La lista completa del contrato llega en la PR #1 (ver docs/api-contract.md).
+ * El contrato completo está en docs/api-contract.md.
  */
 export const ErrorCode = z.enum([
   "PAYMENT_REQUIRED",
