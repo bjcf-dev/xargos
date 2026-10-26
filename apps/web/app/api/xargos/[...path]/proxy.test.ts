@@ -1,0 +1,114 @@
+// @vitest-environment node
+import { ErrorResponse } from "@xargos/shared";
+import { describe, expect, it } from "vitest";
+import { createXargosProxy } from "./proxy";
+
+const WEB = "http://web.local/api/xargos";
+const BACK = "http://back.local";
+
+type Call = { url: string; method: string; headers: Headers; body: string | undefined };
+
+/** fetch falso: responde con `respond` y guarda cada petición. */
+function fakeFetch(
+  respond: (call: Call) => Response | Promise<Response> = () => new Response("{}"),
+) {
+  const calls: Call[] = [];
+  const fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const call: Call = {
+      url: String(input),
+      method: init?.method ?? "GET",
+      headers: new Headers(init?.headers),
+      body: init?.body ? new TextDecoder().decode(init.body as ArrayBuffer) : undefined,
+    };
+    calls.push(call);
+    return respond(call);
+  };
+  return { fetch: fetch as typeof globalThis.fetch, calls };
+}
+
+describe("createXargosProxy", () => {
+  it("forwards GET with query string", async () => {
+    const { fetch, calls } = fakeFetch(() => Response.json([{ id: "r1" }]));
+    const proxy = createXargosProxy({ backendUrl: BACK, fetch });
+
+    const res = await proxy(new Request(`${WEB}/recipes?x=1`), ["recipes"]);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe(`${BACK}/recipes?x=1`);
+    expect(calls[0]?.method).toBe("GET");
+    expect(calls[0]?.body).toBeUndefined();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([{ id: "r1" }]);
+  });
+
+  it("forwards POST body as is", async () => {
+    const { fetch, calls } = fakeFetch();
+    const proxy = createXargosProxy({ backendUrl: BACK, fetch });
+    const body = JSON.stringify({ agent: "A", position: "P" });
+
+    await proxy(new Request(`${WEB}/recipes/r1/build`, { method: "POST", body }), [
+      "recipes",
+      "r1",
+      "build",
+    ]);
+
+    expect(calls[0]?.url).toBe(`${BACK}/recipes/r1/build`);
+    expect(calls[0]?.method).toBe("POST");
+    expect(calls[0]?.body).toBe(body);
+  });
+
+  it("passes through backend status and body", async () => {
+    const error = { error: { code: "RATE_LIMITED", message: "Slow down." } };
+    const { fetch } = fakeFetch(() => Response.json(error, { status: 429 }));
+    const proxy = createXargosProxy({ backendUrl: BACK, fetch });
+
+    const res = await proxy(new Request(`${WEB}/demo/setup/A`), ["demo", "setup", "A"]);
+
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual(error);
+  });
+
+  it.each([
+    ["http://back.local/", "http://back.local/recipes"],
+    ["http://back.local/api/", "http://back.local/api/recipes"],
+    ["http://back.local/api", "http://back.local/api/recipes"],
+  ])("joins BACKEND_URL %s", async (backendUrl, expected) => {
+    const { fetch, calls } = fakeFetch();
+    const proxy = createXargosProxy({ backendUrl, fetch });
+
+    await proxy(new Request(`${WEB}/recipes`), ["recipes"]);
+
+    expect(calls[0]?.url).toBe(expected);
+  });
+
+  it("encodes each path segment", async () => {
+    const { fetch, calls } = fakeFetch();
+    const proxy = createXargosProxy({ backendUrl: BACK, fetch });
+
+    await proxy(new Request(`${WEB}/executions/a%2Fb`), ["executions", "a/b"]);
+
+    expect(calls[0]?.url).toBe(`${BACK}/executions/a%2Fb`);
+  });
+
+  it("answers 500 INTERNAL without BACKEND_URL", async () => {
+    const { fetch, calls } = fakeFetch();
+    const proxy = createXargosProxy({ backendUrl: undefined, fetch });
+
+    const res = await proxy(new Request(`${WEB}/recipes`), ["recipes"]);
+
+    expect(calls).toHaveLength(0);
+    expect(res.status).toBe(500);
+    expect(ErrorResponse.parse(await res.json()).error.code).toBe("INTERNAL");
+  });
+
+  it.each([[["admin"]], [[".."]], [[]]])("rejects unknown root %j", async (path) => {
+    const { fetch, calls } = fakeFetch();
+    const proxy = createXargosProxy({ backendUrl: BACK, fetch });
+
+    const res = await proxy(new Request(`${WEB}/${path.join("/")}`), path);
+
+    expect(calls).toHaveLength(0);
+    expect(res.status).toBe(400);
+    expect(ErrorResponse.parse(await res.json()).error.code).toBe("VALIDATION_ERROR");
+  });
+});
