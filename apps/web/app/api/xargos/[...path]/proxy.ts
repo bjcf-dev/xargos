@@ -23,9 +23,11 @@ const ALLOWED_ROOTS = new Set(["recipes", "demo", "executions"]);
  */
 export const FORWARDED_REQUEST_HEADERS = ["accept", "content-type", "payment-signature"] as const;
 export const FORWARDED_RESPONSE_HEADERS = [
+  "cache-control",
   "content-type",
   "payment-required",
   "payment-response",
+  "retry-after",
 ] as const;
 
 function pickHeaders(from: Headers, names: readonly string[]): Headers {
@@ -39,7 +41,11 @@ function pickHeaders(from: Headers, names: readonly string[]): Headers {
 
 function errorResponse(code: ErrorCode, message: string): Response {
   const body: ErrorResponse = { error: { code, message } };
-  return Response.json(body, { status: ERROR_HTTP[code].status });
+  // El contrato pide no-store en toda respuesta de error.
+  return Response.json(body, {
+    status: ERROR_HTTP[code].status,
+    headers: { "cache-control": "no-store" },
+  });
 }
 
 function upstreamUrl(backendUrl: string, path: string[], search: string): string {
@@ -75,7 +81,9 @@ export function createXargosProxy(config: ProxyConfig) {
 
   return async (request: Request, path: string[]): Promise<Response> => {
     if (!backendUrl) return errorResponse("INTERNAL", "Backend is not configured.");
-    if (!ALLOWED_ROOTS.has(path[0] ?? "")) {
+    // Next ya normaliza `..`; esto protege a quien llame al proxy por otro camino.
+    const unsafeSegment = path.some((s) => s === "" || s === "." || s === "..");
+    if (unsafeSegment || !ALLOWED_ROOTS.has(path[0] ?? "")) {
       return errorResponse("VALIDATION_ERROR", "Unknown API path.");
     }
 

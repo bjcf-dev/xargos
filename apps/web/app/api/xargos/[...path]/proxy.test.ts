@@ -290,3 +290,41 @@ describe("createXargosProxy backend failures", () => {
     expect(error.message).toMatch(/time/i);
   });
 });
+
+describe("createXargosProxy review fixes", () => {
+  it("returns Retry-After and Cache-Control from the backend", async () => {
+    const { fetch } = fakeFetch(() =>
+      Response.json(
+        { error: { code: "RATE_LIMITED", message: "Slow down." } },
+        { status: 429, headers: { "Retry-After": "30", "Cache-Control": "no-store" } },
+      ),
+    );
+    const proxy = createXargosProxy({ backendUrl: BACK, fetch });
+
+    const res = await proxy(new Request(`${WEB}/demo/setup/A`), ["demo", "setup", "A"]);
+
+    expect(res.headers.get("retry-after")).toBe("30");
+    expect(res.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("marks its own errors as no-store", async () => {
+    const proxy = createXargosProxy({ backendUrl: undefined });
+
+    const res = await proxy(new Request(`${WEB}/recipes`), ["recipes"]);
+
+    expect(res.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it.each([[["recipes", "..", "admin"]], [["recipes", ".", "r1"]], [["recipes", "", "r1"]]])(
+    "rejects dot or empty segment in %j",
+    async (path) => {
+      const { fetch, calls } = fakeFetch();
+      const proxy = createXargosProxy({ backendUrl: `${BACK}/api`, fetch });
+
+      const res = await proxy(new Request(`${WEB}/recipes`), path);
+
+      expect(calls).toHaveLength(0);
+      expect(res.status).toBe(400);
+    },
+  );
+});
