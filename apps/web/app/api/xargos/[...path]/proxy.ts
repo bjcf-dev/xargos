@@ -17,6 +17,26 @@ export const UPSTREAM_TIMEOUT_MS = 9_000;
 /** Primer segmento de las rutas del contrato; lo demás no sale hacia el backend. */
 const ALLOWED_ROOTS = new Set(["recipes", "demo", "executions"]);
 
+/**
+ * Cabeceras por lista blanca. Las de x402 pasan intactas; ni cookies ni `authorization`
+ * llegan al backend, y `content-encoding`/`content-length` no vuelven (fetch ya descomprimió).
+ */
+export const FORWARDED_REQUEST_HEADERS = ["accept", "content-type", "payment-signature"] as const;
+export const FORWARDED_RESPONSE_HEADERS = [
+  "content-type",
+  "payment-required",
+  "payment-response",
+] as const;
+
+function pickHeaders(from: Headers, names: readonly string[]): Headers {
+  const picked = new Headers();
+  for (const name of names) {
+    const value = from.get(name);
+    if (value !== null) picked.set(name, value);
+  }
+  return picked;
+}
+
 function errorResponse(code: ErrorCode, message: string): Response {
   const body: ErrorResponse = { error: { code, message } };
   return Response.json(body, { status: ERROR_HTTP[code].status });
@@ -40,12 +60,13 @@ export function createXargosProxy(config: ProxyConfig) {
     const hasBody = method !== "GET" && method !== "HEAD";
     const upstream = await doFetch(upstreamUrl(backendUrl, path, new URL(request.url).search), {
       method,
+      headers: pickHeaders(request.headers, FORWARDED_REQUEST_HEADERS),
       ...(hasBody ? { body: await request.arrayBuffer() } : {}),
     });
 
     return new Response(upstream.body, {
       status: upstream.status,
-      headers: upstream.headers,
+      headers: pickHeaders(upstream.headers, FORWARDED_RESPONSE_HEADERS),
     });
   };
 }

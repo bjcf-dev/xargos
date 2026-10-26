@@ -112,3 +112,90 @@ describe("createXargosProxy", () => {
     expect(ErrorResponse.parse(await res.json()).error.code).toBe("VALIDATION_ERROR");
   });
 });
+
+describe("createXargosProxy headers", () => {
+  it("forwards PAYMENT-SIGNATURE to the backend", async () => {
+    const { fetch, calls } = fakeFetch();
+    const proxy = createXargosProxy({ backendUrl: BACK, fetch });
+
+    await proxy(
+      new Request(`${WEB}/recipes/r1/build`, {
+        method: "POST",
+        body: "{}",
+        headers: { "PAYMENT-SIGNATURE": "abc", "Content-Type": "application/json" },
+      }),
+      ["recipes", "r1", "build"],
+    );
+
+    expect(calls[0]?.headers.get("payment-signature")).toBe("abc");
+    expect(calls[0]?.headers.get("content-type")).toBe("application/json");
+  });
+
+  it("returns PAYMENT-REQUIRED on 402 untouched", async () => {
+    const required = "eyJ4NDAyVmVyc2lvbiI6Mn0=";
+    const { fetch } = fakeFetch(() =>
+      Response.json({}, { status: 402, headers: { "PAYMENT-REQUIRED": required } }),
+    );
+    const proxy = createXargosProxy({ backendUrl: BACK, fetch });
+
+    const res = await proxy(new Request(`${WEB}/recipes/r1/build`, { method: "POST" }), [
+      "recipes",
+      "r1",
+      "build",
+    ]);
+
+    expect(res.status).toBe(402);
+    expect(res.headers.get("payment-required")).toBe(required);
+    expect(await res.json()).toEqual({});
+  });
+
+  it("returns PAYMENT-RESPONSE on success", async () => {
+    const { fetch } = fakeFetch(() =>
+      Response.json({}, { headers: { "PAYMENT-RESPONSE": "xyz" } }),
+    );
+    const proxy = createXargosProxy({ backendUrl: BACK, fetch });
+
+    const res = await proxy(new Request(`${WEB}/recipes/r1/build`, { method: "POST" }), [
+      "recipes",
+      "r1",
+      "build",
+    ]);
+
+    expect(res.headers.get("payment-response")).toBe("xyz");
+  });
+
+  it("does not forward cookies or authorization", async () => {
+    const { fetch, calls } = fakeFetch();
+    const proxy = createXargosProxy({ backendUrl: BACK, fetch });
+
+    await proxy(
+      new Request(`${WEB}/recipes`, { headers: { cookie: "s=1", authorization: "Bearer t" } }),
+      ["recipes"],
+    );
+
+    expect(calls[0]?.headers.has("cookie")).toBe(false);
+    expect(calls[0]?.headers.has("authorization")).toBe(false);
+  });
+
+  it("drops content-encoding and content-length from the backend", async () => {
+    const { fetch } = fakeFetch(
+      () =>
+        new Response("{}", {
+          headers: {
+            "content-type": "application/json",
+            "content-encoding": "gzip",
+            "content-length": "3",
+            "set-cookie": "b=2",
+          },
+        }),
+    );
+    const proxy = createXargosProxy({ backendUrl: BACK, fetch });
+
+    const res = await proxy(new Request(`${WEB}/recipes`), ["recipes"]);
+
+    expect(res.headers.get("content-type")).toBe("application/json");
+    expect(res.headers.has("content-encoding")).toBe(false);
+    expect(res.headers.has("content-length")).toBe(false);
+    expect(res.headers.has("set-cookie")).toBe(false);
+  });
+});
