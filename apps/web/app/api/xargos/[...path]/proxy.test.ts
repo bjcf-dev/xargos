@@ -8,6 +8,11 @@ const BACK = "http://back.local";
 
 type Call = { url: string; method: string; headers: Headers; body: string | undefined };
 
+function bodyText(body: BodyInit | null | undefined): string | undefined {
+  if (body == null) return undefined;
+  return typeof body === "string" ? body : new TextDecoder().decode(body as ArrayBuffer);
+}
+
 /** fetch falso: responde con `respond` y guarda cada petición. */
 function fakeFetch(
   respond: (call: Call) => Response | Promise<Response> = () => new Response("{}"),
@@ -18,7 +23,7 @@ function fakeFetch(
       url: String(input),
       method: init?.method ?? "GET",
       headers: new Headers(init?.headers),
-      body: init?.body ? new TextDecoder().decode(init.body as ArrayBuffer) : undefined,
+      body: bodyText(init?.body),
     };
     calls.push(call);
     return respond(call);
@@ -197,5 +202,91 @@ describe("createXargosProxy headers", () => {
     expect(res.headers.has("content-encoding")).toBe(false);
     expect(res.headers.has("content-length")).toBe(false);
     expect(res.headers.has("set-cookie")).toBe(false);
+  });
+});
+
+describe("createXargosProxy access code", () => {
+  const setup = (body: string) => new Request(`${WEB}/demo/setup`, { method: "POST", body });
+
+  it("adds accessCode to POST /demo/setup", async () => {
+    const { fetch, calls } = fakeFetch();
+    const proxy = createXargosProxy({ backendUrl: BACK, accessCode: "s3cret", fetch });
+
+    await proxy(setup(JSON.stringify({ agent: "A" })), ["demo", "setup"]);
+
+    expect(JSON.parse(calls[0]?.body ?? "")).toEqual({ agent: "A", accessCode: "s3cret" });
+  });
+
+  it("lets the server accessCode win over the client one", async () => {
+    const { fetch, calls } = fakeFetch();
+    const proxy = createXargosProxy({ backendUrl: BACK, accessCode: "s3cret", fetch });
+
+    await proxy(setup(JSON.stringify({ agent: "A", accessCode: "x" })), ["demo", "setup"]);
+
+    expect(JSON.parse(calls[0]?.body ?? "")).toEqual({ agent: "A", accessCode: "s3cret" });
+  });
+
+  it("leaves other routes and GET untouched", async () => {
+    const { fetch, calls } = fakeFetch();
+    const proxy = createXargosProxy({ backendUrl: BACK, accessCode: "s3cret", fetch });
+    const body = JSON.stringify({ agent: "A", position: "P" });
+
+    await proxy(new Request(`${WEB}/recipes/r1/build`, { method: "POST", body }), [
+      "recipes",
+      "r1",
+      "build",
+    ]);
+    await proxy(new Request(`${WEB}/demo/setup/A`), ["demo", "setup", "A"]);
+
+    expect(calls[0]?.body).toBe(body);
+    expect(calls[1]?.body).toBeUndefined();
+  });
+
+  it("leaves the body untouched without accessCode", async () => {
+    const { fetch, calls } = fakeFetch();
+    const proxy = createXargosProxy({ backendUrl: BACK, fetch });
+    const body = JSON.stringify({ agent: "A" });
+
+    await proxy(setup(body), ["demo", "setup"]);
+
+    expect(calls[0]?.body).toBe(body);
+  });
+
+  it("forwards a non-JSON body on /demo/setup as is", async () => {
+    const { fetch, calls } = fakeFetch();
+    const proxy = createXargosProxy({ backendUrl: BACK, accessCode: "s3cret", fetch });
+
+    await proxy(setup("not json"), ["demo", "setup"]);
+
+    expect(calls[0]?.body).toBe("not json");
+  });
+});
+
+describe("createXargosProxy backend failures", () => {
+  it("answers 500 INTERNAL when the backend is unreachable", async () => {
+    const fetch = (async () => {
+      throw new TypeError("fetch failed");
+    }) as typeof globalThis.fetch;
+    const proxy = createXargosProxy({ backendUrl: BACK, fetch });
+
+    const res = await proxy(new Request(`${WEB}/recipes`), ["recipes"]);
+
+    expect(res.status).toBe(500);
+    expect(ErrorResponse.parse(await res.json()).error.code).toBe("INTERNAL");
+  });
+
+  it("answers 500 INTERNAL when the backend is too slow", async () => {
+    const fetch = ((_input: RequestInfo | URL, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+      })) as typeof globalThis.fetch;
+    const proxy = createXargosProxy({ backendUrl: BACK, fetch, timeoutMs: 20 });
+
+    const res = await proxy(new Request(`${WEB}/recipes`), ["recipes"]);
+
+    expect(res.status).toBe(500);
+    const { error } = ErrorResponse.parse(await res.json());
+    expect(error.code).toBe("INTERNAL");
+    expect(error.message).toMatch(/time/i);
   });
 });

@@ -47,8 +47,31 @@ function upstreamUrl(backendUrl: string, path: string[], search: string): string
   return `${base}/${path.map(encodeURIComponent).join("/")}${search}`;
 }
 
+/** Solo POST /demo/setup con cuerpo JSON de objeto; si no, el cuerpo sale tal cual. */
+async function requestBody(
+  request: Request,
+  path: string[],
+  accessCode: string | undefined,
+): Promise<ArrayBuffer | string> {
+  const raw = await request.arrayBuffer();
+  const isSetup = request.method === "POST" && path.length === 2 && path.join("/") === "demo/setup";
+  if (!isSetup || !accessCode) return raw;
+  try {
+    const parsed: unknown = JSON.parse(new TextDecoder().decode(raw));
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return raw;
+    return JSON.stringify({ ...parsed, accessCode });
+  } catch {
+    return raw;
+  }
+}
+
 export function createXargosProxy(config: ProxyConfig) {
-  const { backendUrl, fetch: doFetch = globalThis.fetch } = config;
+  const {
+    backendUrl,
+    accessCode,
+    fetch: doFetch = globalThis.fetch,
+    timeoutMs = UPSTREAM_TIMEOUT_MS,
+  } = config;
 
   return async (request: Request, path: string[]): Promise<Response> => {
     if (!backendUrl) return errorResponse("INTERNAL", "Backend is not configured.");
@@ -58,11 +81,18 @@ export function createXargosProxy(config: ProxyConfig) {
 
     const method = request.method;
     const hasBody = method !== "GET" && method !== "HEAD";
-    const upstream = await doFetch(upstreamUrl(backendUrl, path, new URL(request.url).search), {
-      method,
-      headers: pickHeaders(request.headers, FORWARDED_REQUEST_HEADERS),
-      ...(hasBody ? { body: await request.arrayBuffer() } : {}),
-    });
+    let upstream: Response;
+    try {
+      upstream = await doFetch(upstreamUrl(backendUrl, path, new URL(request.url).search), {
+        method,
+        headers: pickHeaders(request.headers, FORWARDED_REQUEST_HEADERS),
+        signal: AbortSignal.timeout(timeoutMs),
+        ...(hasBody ? { body: await requestBody(request, path, accessCode) } : {}),
+      });
+    } catch (e) {
+      const timedOut = e instanceof DOMException && e.name === "TimeoutError";
+      return errorResponse("INTERNAL", timedOut ? "Backend timed out." : "Backend is unreachable.");
+    }
 
     return new Response(upstream.body, {
       status: upstream.status,
