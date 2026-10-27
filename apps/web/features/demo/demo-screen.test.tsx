@@ -172,6 +172,9 @@ describe("DemoScreen recipe loading", () => {
     render(<DemoScreen api={api} />);
 
     expect(await screen.findByText(/demo recipe is not available/i)).toBeDefined();
+    // No promete que se arregle solo: nombra el id que falta para poder revisar el backend.
+    expect(screen.getByText(/exit-orca-lp-to-usdc/)).toBeDefined();
+    expect(screen.queryByText(/in a moment/i)).toBeNull();
     await click(/try again/i);
     expect(await screen.findByRole("button", { name: /start demo/i })).toBeDefined();
   });
