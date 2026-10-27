@@ -11,7 +11,7 @@ import { api as defaultApi } from "@/lib/api";
 import type { ApiClient } from "@/lib/api/client";
 import { type ApiMode, apiMode } from "@/lib/api/mode";
 import { AgentCard } from "./agent-card";
-import { formatFee, secondsLeft } from "./copy";
+import { canShock, formatFee, secondsLeft } from "./copy";
 import { ResultCard } from "./result-card";
 import type { DemoSigner } from "./signer";
 import { TxAnatomy } from "./tx-anatomy";
@@ -177,7 +177,7 @@ export function DemoScreen({
                       Sign & send
                     </Button>
                     {!state.run.shock ? (
-                      <Button variant="outline" onClick={demo.shock} disabled={expired}>
+                      <Button variant="outline" onClick={demo.shock} disabled={!canShock(left)}>
                         Apply price shock first
                       </Button>
                     ) : null}
@@ -192,6 +192,12 @@ export function DemoScreen({
                     <p className="text-sm text-muted-foreground">
                       Demo B: the price shock moves the pool between the quote and the execution, as
                       an MEV bot or a fast market would.
+                    </p>
+                  ) : null}
+                  {!state.run.shock && !expired && !canShock(left) ? (
+                    <p className="text-sm text-muted-foreground">
+                      Not enough time left for the price shock. Sign now, or start over for a fresh
+                      transaction.
                     </p>
                   ) : null}
                   {expired ? (
