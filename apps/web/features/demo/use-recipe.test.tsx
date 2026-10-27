@@ -1,8 +1,8 @@
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { fixtureRecipe } from "@xargos/shared";
 import { delay, HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { type ApiClient, createApiClient } from "@/lib/api/client";
 import { createHandlers } from "@/mocks/handlers";
 import { DEMO_RECIPE_ID, useRecipe } from "./use-recipe";
@@ -14,6 +14,8 @@ const RECIPES = "*/api/xargos/recipes";
 
 beforeAll(() => server.listen({ onUnhandledFrame: "error" }));
 beforeEach(() => server.resetHandlers(...createHandlers()));
+// Sin `globals` en Vitest, Testing Library no desmonta los hooks entre tests.
+afterEach(cleanup);
 afterAll(() => server.close());
 
 const respondWith = (recipes: unknown[]) =>
@@ -91,6 +93,22 @@ describe("useRecipe", () => {
     act(() => result.current.retry());
     await waitFor(() => expect(result.current.status).toBe("ready"));
     expect(seen).not.toContain("error");
+  });
+
+  it("ignores a stale response that resolves after a retry", async () => {
+    // El api falso no respeta el abort: así se prueba la guarda de la rama de éxito.
+    const pending: Array<(recipes: unknown[]) => void> = [];
+    const manual = {
+      listRecipes: () => new Promise((resolve) => pending.push(resolve)),
+    } as unknown as ApiClient;
+    const { result } = renderHook(() => useRecipe(manual));
+
+    act(() => result.current.retry());
+    await waitFor(() => expect(pending).toHaveLength(2));
+    await act(async () => pending[1]?.([fixtureRecipe]));
+    await act(async () => pending[0]?.([{ ...fixtureRecipe, name: "Stale" }]));
+
+    expect(result.current).toMatchObject({ status: "ready", recipe: fixtureRecipe });
   });
 
   it("falls back to a generic message for non-Error failures", async () => {
