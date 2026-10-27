@@ -16,7 +16,7 @@ import { ResultCard } from "./result-card";
 import type { DemoSigner } from "./signer";
 import { TxAnatomy } from "./tx-anatomy";
 import { DEMO_AGENT, useDemo } from "./use-demo";
-import { useRecipe } from "./use-recipe";
+import { DEMO_RECIPE_ID, useRecipe } from "./use-recipe";
 import { X402Timeline } from "./x402-timeline";
 
 type DemoScreenProps = {
@@ -88,8 +88,11 @@ export function DemoScreen({
           </Alert>
         ) : (
           <Alert>
-            <AlertTitle>The demo recipe is not available right now</AlertTitle>
-            <AlertDescription>The backend did not list it. Try again in a moment.</AlertDescription>
+            <AlertTitle>The demo recipe is not available</AlertTitle>
+            <AlertDescription>
+              The backend does not list the demo recipe ({DEMO_RECIPE_ID}). Try again, or check that
+              the backend is up to date.
+            </AlertDescription>
           </Alert>
         )}
         <Button onClick={load.retry}>Try again</Button>
