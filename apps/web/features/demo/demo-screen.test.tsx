@@ -98,6 +98,7 @@ describe("DemoScreen (mock mode)", () => {
         true,
       );
       expect(screen.getByRole("button", { name: /start over/i })).toBeDefined();
+      expect(screen.queryByText(/not enough time left/i)).toBeNull();
     } finally {
       vi.useRealTimers();
     }
@@ -129,6 +130,29 @@ describe("DemoScreen (mock mode)", () => {
     expect(await screen.findByText("Signing arrives with F6")).toBeDefined();
     expect(screen.queryByRole("button", { name: /try again/i })).toBeNull();
     expect(screen.getByRole("button", { name: /start over/i })).toBeDefined();
+  });
+
+  it("blocks the price shock when the transaction is about to expire", async () => {
+    server.use(
+      http.post("*/api/xargos/recipes/:recipeId/build", () =>
+        HttpResponse.json({
+          ...fixtureBuildResponse,
+          expiresAt: new Date(Date.now() + 15_000).toISOString(),
+          rebuildUntil: new Date(Date.now() + 60_000).toISOString(),
+        }),
+      ),
+    );
+    render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
+
+    await click(/start demo/i);
+    await click(/pay & build/i);
+
+    expect(await screen.findByText(/not enough time left for the price shock/i)).toBeDefined();
+    const shock = screen.getByRole("button", { name: /apply price shock first/i });
+    expect(shock.hasAttribute("disabled")).toBe(true);
+    expect(screen.getByRole("button", { name: /sign & send/i }).hasAttribute("disabled")).toBe(
+      false,
+    );
   });
 });
 

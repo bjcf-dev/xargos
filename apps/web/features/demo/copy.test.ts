@@ -1,6 +1,7 @@
 import { fixtureBuildResponse, fixtureRecipe, fixtureSetupReady } from "@xargos/shared";
 import { describe, expect, it } from "vitest";
 import {
+  canShock,
   describeRevert,
   describeSpent,
   formatFee,
@@ -59,6 +60,18 @@ describe("secondsLeft", () => {
 
   it("never goes below zero", () => {
     expect(secondsLeft(expiresAt, Date.parse(expiresAt) + 500)).toBe(0);
+  });
+});
+
+describe("canShock", () => {
+  it("allows the shock with 20 seconds or more left", () => {
+    expect(canShock(20)).toBe(true);
+  });
+
+  it("blocks it below 20 seconds, at zero and without a transaction", () => {
+    expect(canShock(19)).toBe(false);
+    expect(canShock(0)).toBe(false);
+    expect(canShock(null)).toBe(false);
   });
 });
 

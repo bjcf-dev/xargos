@@ -24,6 +24,13 @@ export function secondsLeft(expiresAt: string, now: number): number {
   return Math.max(0, Math.floor((Date.parse(expiresAt) - now) / 1000));
 }
 
+/** El shock en devnet tarda varios segundos (polling cada ~1,5 s); por debajo, la tx caduca antes de firmar. */
+export const SHOCK_MIN_SECONDS = 20;
+
+export function canShock(secondsLeft: number | null): boolean {
+  return secondsLeft !== null && secondsLeft >= SHOCK_MIN_SECONDS;
+}
+
 export type RevertCopy = { title: string; detail: string; byGuard: boolean };
 
 /** D15: "guard" solo si la cadena dice que falló el guard; si no, el paso que falló. */
