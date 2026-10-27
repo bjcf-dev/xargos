@@ -1,6 +1,6 @@
 "use client";
 
-import type { DemoSetupStatus, Recipe } from "@xargos/shared";
+import type { DemoSetupStatus } from "@xargos/shared";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { ResultCard } from "./result-card";
 import type { DemoSigner } from "./signer";
 import { TxAnatomy } from "./tx-anatomy";
 import { DEMO_AGENT, useDemo } from "./use-demo";
+import { useRecipe } from "./use-recipe";
 import { X402Timeline } from "./x402-timeline";
 
 type DemoScreenProps = {
@@ -54,8 +55,8 @@ export function DemoScreen({
   pollIntervalMs,
   mode = apiMode,
 }: DemoScreenProps) {
-  const [recipe, setRecipe] = useState<Recipe | null>(null);
-  const [recipeError, setRecipeError] = useState<string | null>(null);
+  const load = useRecipe(api);
+  const recipe = load.status === "ready" ? load.recipe : null;
   const [lastSetup, setLastSetup] = useState<DemoSetupStatus | null>(null);
   const demo = useDemo({
     recipeId: recipe?.id ?? "",
@@ -64,19 +65,6 @@ export function DemoScreen({
     ...(pollIntervalMs ? { pollIntervalMs } : {}),
   });
   const { state } = demo;
-
-  useEffect(() => {
-    const controller = new AbortController();
-    api.listRecipes({ signal: controller.signal }).then(
-      (recipes) => setRecipe(recipes[0] ?? null),
-      (error: unknown) => {
-        if (!controller.signal.aborted) {
-          setRecipeError(error instanceof Error ? error.message : "Could not load the recipe");
-        }
-      },
-    );
-    return () => controller.abort();
-  }, [api]);
 
   // La máquina suelta el estado del setup al pagar; la tarjeta del agente lo conserva.
   useEffect(() => {
@@ -90,12 +78,22 @@ export function DemoScreen({
   const left = live ? secondsLeft(state.run.build.expiresAt, now) : null;
   const expired = left === 0;
 
-  if (recipeError) {
+  if (load.status === "error" || load.status === "missing") {
     return (
-      <Alert variant="destructive">
-        <AlertTitle>The recipe could not be loaded</AlertTitle>
-        <AlertDescription>{recipeError}</AlertDescription>
-      </Alert>
+      <div className="flex flex-col items-start gap-3">
+        {load.status === "error" ? (
+          <Alert variant="destructive">
+            <AlertTitle>The recipe could not be loaded</AlertTitle>
+            <AlertDescription>{load.message}</AlertDescription>
+          </Alert>
+        ) : (
+          <Alert>
+            <AlertTitle>The demo recipe is not available right now</AlertTitle>
+            <AlertDescription>The backend did not list it. Try again in a moment.</AlertDescription>
+          </Alert>
+        )}
+        <Button onClick={load.retry}>Try again</Button>
+      </div>
     );
   }
   if (!recipe) {

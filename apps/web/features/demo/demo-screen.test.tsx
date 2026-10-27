@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { fixtureBuildResponse } from "@xargos/shared";
+import { fixtureBuildResponse, fixtureRecipe } from "@xargos/shared";
 import { delay, HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -129,5 +129,41 @@ describe("DemoScreen (mock mode)", () => {
     expect(await screen.findByText("Signing arrives with F6")).toBeDefined();
     expect(screen.queryByRole("button", { name: /try again/i })).toBeNull();
     expect(screen.getByRole("button", { name: /start over/i })).toBeDefined();
+  });
+});
+
+describe("DemoScreen recipe loading", () => {
+  const RECIPES = "*/api/xargos/recipes";
+  const other = { ...fixtureRecipe, id: "other", name: "Other" };
+
+  it("shows the demo recipe even when another comes first", async () => {
+    server.use(http.get(RECIPES, () => HttpResponse.json([other, fixtureRecipe])));
+    render(<DemoScreen api={api} />);
+
+    expect(await screen.findByRole("heading", { name: fixtureRecipe.name })).toBeDefined();
+  });
+
+  it("explains when the demo recipe is not available and retries", async () => {
+    server.use(http.get(RECIPES, () => HttpResponse.json([]), { once: true }));
+    render(<DemoScreen api={api} />);
+
+    expect(await screen.findByText(/demo recipe is not available/i)).toBeDefined();
+    await click(/try again/i);
+    expect(await screen.findByRole("button", { name: /start demo/i })).toBeDefined();
+  });
+
+  it("offers a retry when the recipes fail to load", async () => {
+    server.use(
+      http.get(
+        RECIPES,
+        () => HttpResponse.json({ error: { code: "INTERNAL", message: "Down" } }, { status: 500 }),
+        { once: true },
+      ),
+    );
+    render(<DemoScreen api={api} />);
+
+    expect(await screen.findByText("The recipe could not be loaded")).toBeDefined();
+    await click(/try again/i);
+    expect(await screen.findByRole("button", { name: /start demo/i })).toBeDefined();
   });
 });
