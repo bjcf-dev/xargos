@@ -52,7 +52,10 @@ export function AgentCard({ state, agent, setup, mode }: AgentCardProps) {
     <Card className="self-start">
       <CardHeader>
         <CardTitle>{mode === "mock" ? "Simulated agent" : "Agent"}</CardTitle>
-        <CardDescription className="font-mono">{ellipsify(agent, 6)}</CardDescription>
+        <CardDescription className="font-mono">
+          {/* En mock la dirección es de las fixtures: que no parezca una cuenta real. */}
+          {mode === "mock" ? `Demo address · ${ellipsify(agent, 6)}` : ellipsify(agent, 6)}
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {complete ? (

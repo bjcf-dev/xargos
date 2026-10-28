@@ -5,10 +5,13 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApiClient } from "@/lib/api/client";
 import { createHandlers } from "@/mocks/handlers";
+import { AgentCard } from "./agent-card";
 import { mockPaymentNote } from "./copy";
 import { DemoScreen } from "./demo-screen";
 import { createMockSigner } from "./mock-signer";
 import { ResultCard } from "./result-card";
+import { initialDemoState } from "./types";
+import { DEMO_AGENT } from "./use-demo";
 
 const server = setupServer();
 const api = createApiClient({ baseUrl: "http://localhost/api/xargos" });
@@ -277,6 +280,18 @@ describe("DemoScreen (mock mode)", () => {
     expect(screen.getByRole("button", { name: /sign & send/i }).hasAttribute("disabled")).toBe(
       false,
     );
+  });
+});
+
+describe("AgentCard address", () => {
+  it("labels the agent address as a demo address in mock mode", () => {
+    render(<AgentCard state={initialDemoState} agent={DEMO_AGENT} setup={null} mode="mock" />);
+    expect(screen.getByText(/^Demo address · /)).toBeDefined();
+  });
+
+  it("shows the plain address outside mock mode", () => {
+    render(<AgentCard state={initialDemoState} agent={DEMO_AGENT} setup={null} mode="staging" />);
+    expect(screen.queryByText(/demo address/i)).toBeNull();
   });
 });
 
