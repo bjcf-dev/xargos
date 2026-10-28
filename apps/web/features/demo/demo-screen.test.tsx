@@ -114,6 +114,28 @@ describe("DemoScreen (mock mode)", () => {
     expect(screen.getByRole("button", { name: /price moves against/i })).toBeDefined();
   });
 
+  it("puts the next step right under the x402 payment", async () => {
+    render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
+    await click(/happy path/i);
+    await click(/pay & build/i);
+
+    const sign = await screen.findByRole("button", { name: /sign & send/i });
+    const anatomy = screen.getByText("Transaction anatomy");
+    expect(sign.compareDocumentPosition(anatomy) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("compacts the agent card on phones once the setup is done", async () => {
+    render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
+    await click(/happy path/i);
+    await click(/pay & build/i);
+    await screen.findByRole("button", { name: /sign & send/i });
+
+    expect(screen.getByText("Agent ready").closest("p")?.className).toContain("md:hidden");
+    const phases = screen.getByText("Queued").closest("ol")?.className ?? "";
+    expect(phases).toContain("hidden");
+    expect(phases).toContain("md:flex");
+  });
+
   it("keeps the x402 payment on screen above the result", async () => {
     render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
     await click(/happy path/i);
