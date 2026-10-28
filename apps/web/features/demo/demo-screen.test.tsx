@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { fixtureBuildResponse } from "@xargos/shared";
 import { delay, HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApiClient } from "@/lib/api/client";
 import { createHandlers } from "@/mocks/handlers";
 import { DemoScreen } from "./demo-screen";
@@ -71,27 +71,36 @@ describe("DemoScreen (mock mode)", () => {
     expect(await screen.findByText(/at least [\d.]+ demo USDC\./)).toBeDefined();
   });
   it("marks the transaction expired once expiresAt passes and blocks signing", async () => {
-    server.use(
-      http.post("*/api/xargos/recipes/:recipeId/build", () =>
-        HttpResponse.json({
-          ...fixtureBuildResponse,
-          expiresAt: new Date(Date.now() + 1_500).toISOString(),
-          rebuildUntil: new Date(Date.now() + 60_000).toISOString(),
-        }),
-      ),
-    );
-    render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
+    // Solo se falsea Date: el reloj salta sin esperar la caducidad real; MSW y waitFor siguen con timers reales.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      server.use(
+        http.post("*/api/xargos/recipes/:recipeId/build", () =>
+          HttpResponse.json({
+            ...fixtureBuildResponse,
+            expiresAt: new Date(Date.now() + 30_000).toISOString(),
+            rebuildUntil: new Date(Date.now() + 120_000).toISOString(),
+          }),
+        ),
+      );
+      render(
+        <DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />,
+      );
 
-    await click(/start demo/i);
-    await click(/pay & build/i);
-    expect(await screen.findByText(/valid for \d+s/i)).toBeDefined();
+      await click(/start demo/i);
+      await click(/pay & build/i);
+      expect(await screen.findByText("Valid for 30s")).toBeDefined();
 
-    expect(await screen.findByText("Expired", {}, { timeout: 4_000 })).toBeDefined();
-    expect(screen.getByRole("button", { name: /sign & send/i }).hasAttribute("disabled")).toBe(
-      true,
-    );
-    expect(screen.getByRole("button", { name: /start over/i })).toBeDefined();
-  }, 10_000);
+      vi.setSystemTime(Date.now() + 31_000);
+      expect(await screen.findByText("Expired", {}, { timeout: 2_000 })).toBeDefined();
+      expect(screen.getByRole("button", { name: /sign & send/i }).hasAttribute("disabled")).toBe(
+        true,
+      );
+      expect(screen.getByRole("button", { name: /start over/i })).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
   it("announces the step in progress to screen readers", async () => {
     server.use(
