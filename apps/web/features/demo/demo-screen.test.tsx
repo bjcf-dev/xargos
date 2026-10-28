@@ -54,6 +54,17 @@ describe("DemoScreen (mock mode)", () => {
     expect(screen.queryByText(/reverted/i)).toBeNull();
   });
 
+  it("keeps the x402 payment on screen above the result", async () => {
+    render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
+    await click(/start demo/i);
+    await click(/pay & build/i);
+    await click(/sign & send/i);
+
+    const result = await screen.findByText("Executed as promised");
+    const payment = screen.getByText("x402 payment");
+    expect(payment.compareDocumentPosition(result) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   // ADR 0003: lo del pool es un "demo USDC" propio; la comisión x402 sí es USDC de Circle.
   it("calls the pool token demo USDC and keeps x402 money in USDC", async () => {
     render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);

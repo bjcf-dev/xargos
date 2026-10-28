@@ -215,6 +215,7 @@ export function DemoScreen({
 
           {state.status === "confirmed" || state.status === "reverted" ? (
             <>
+              <X402Timeline state={state} mode={mode} price={recipe.price} />
               <ResultCard state={state} mode={mode} price={recipe.price} />
               <TxAnatomy
                 run={state.run}
