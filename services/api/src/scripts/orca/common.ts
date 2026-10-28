@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import {
+  setDefaultFunder,
   setPayerFromBytes,
   setPriorityFeeSetting,
   setRpc,
@@ -16,6 +17,10 @@ export const DEPLOYMENT = WhirlpoolDeployment.devnet;
 export const WSOL_MINT: Address = address("So11111111111111111111111111111111111111112");
 // Circle devnet USDC (ADR 0001).
 export const USDC_MINT: Address = address("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU");
+// Plan B of D11: our own "demo USDC" mint, created by create-demo-mint.ts (mint authority: facilitator).
+export const DEMO_USDC_MINT: Address = address(
+  process.env.DEMO_USDC_MINT || "D1PzuAbRJB1io3awJX2GDoiL1ihwK9Kt9yfciLrgJFss",
+);
 export const USDC_DECIMALS = 6;
 export const TICK_SPACING = 64;
 
@@ -34,5 +39,7 @@ export function loadKeyBytes(name: string): Uint8Array<ArrayBuffer> {
 export async function useFacilitator() {
   await setRpc(RPC_URL);
   setPriorityFeeSetting({ type: "none" });
-  return setPayerFromBytes(loadKeyBytes("facilitator"));
+  const payer = await setPayerFromBytes(loadKeyBytes("facilitator"));
+  setDefaultFunder(payer);
+  return payer;
 }
