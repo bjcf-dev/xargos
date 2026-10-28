@@ -166,7 +166,7 @@ export function DemoScreen({
           {state.status === "idle" ? (
             <Card>
               <CardHeader>
-                <CardTitle data-step-title tabIndex={-1} className="outline-none">
+                <CardTitle data-step-title tabIndex={-1}>
                   Run the recipe as an AI agent
                 </CardTitle>
                 <CardDescription>
@@ -202,7 +202,7 @@ export function DemoScreen({
           {state.status === "setup" ? (
             <Card>
               <CardHeader>
-                <CardTitle data-step-title tabIndex={-1} className="outline-none">
+                <CardTitle data-step-title tabIndex={-1}>
                   Preparing the agent
                 </CardTitle>
                 <CardDescription>
@@ -326,8 +326,8 @@ export function DemoScreen({
           {/* TODO(F11): nadie despacha EXPIRED ni REBUILD todavía; aquí irá "Rebuild for free". */}
           {state.status === "expired" || state.status === "rebuilding" ? (
             <>
-              <Alert variant="destructive">
-                <AlertTitle data-step-title tabIndex={-1} className="outline-none">
+              <Alert variant="destructive" role="presentation">
+                <AlertTitle data-step-title tabIndex={-1}>
                   The transaction expired before it was sent
                 </AlertTitle>
                 <AlertDescription>Start over to build a new one.</AlertDescription>

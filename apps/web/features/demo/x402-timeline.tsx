@@ -35,7 +35,7 @@ export function X402Timeline({
   return (
     <Card size="sm">
       <CardHeader>
-        <CardTitle data-step-title tabIndex={-1} className="outline-none">
+        <CardTitle data-step-title tabIndex={-1}>
           x402 payment
         </CardTitle>
         <CardDescription>

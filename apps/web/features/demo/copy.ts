@@ -82,11 +82,11 @@ export type HumanError = { title: string; hint: string };
 const HUMAN_ERRORS: Record<ErrorCode, HumanError | null> = {
   PAYMENT_REQUIRED: {
     title: "The payment was not completed",
-    hint: "The agent did not pay for the build. Try again.",
+    hint: "The agent did not pay for the build.",
   },
   PAYMENT_INVALID: {
     title: "The payment was rejected",
-    hint: "The x402 payment could not be verified. Try again.",
+    hint: "The x402 payment could not be verified.",
   },
   BUILD_FAILED: {
     title: "The transaction could not be built",
@@ -97,7 +97,7 @@ const HUMAN_ERRORS: Record<ErrorCode, HumanError | null> = {
     title: "The free rebuild window has closed",
     hint: "Start over to build and pay for a new transaction.",
   },
-  RATE_LIMITED: { title: "Too many demos right now", hint: "Wait a few minutes and start over." },
+  RATE_LIMITED: { title: "Too many demos right now", hint: "Wait a moment, then try again." },
   ACCESS_DENIED: {
     title: "This demo is not open right now",
     hint: "The demo refused access. Ask the xARGOS team.",
@@ -112,35 +112,37 @@ const HUMAN_ERRORS: Record<ErrorCode, HumanError | null> = {
   },
   SHOCK_FAILED: {
     title: "The price shock failed",
-    hint: "The pool price did not move. Start over to try again.",
+    hint: "The price shock could not be applied.",
   },
   // Nuestros propios errores (p. ej. "Signing arrives with F6"): el mensaje ya es para personas.
   INTERNAL: null,
 };
 
 export function humanError(error: DemoError): HumanError {
-  return HUMAN_ERRORS[error.code] ?? { title: "Something went wrong", hint: error.message };
+  return (
+    HUMAN_ERRORS[error.code] ?? {
+      title: "Something went wrong",
+      hint: error.message || "Try again in a moment, or start over.",
+    }
+  );
 }
 
 /**
- * Lo que anuncia la región aria-live del panel. Vacío donde ya habla Busy (role="status"),
- * para no anunciar dos veces lo mismo.
+ * Lo que anuncia la región aria-live del panel: solo lo que no dice ya el título que recibe el
+ * foco ni Busy (role="status"). Un solo canal por paso, para no oír lo mismo dos o tres veces.
  */
 export function stepAnnouncement(state: DemoState): string {
   switch (state.status) {
-    case "setup":
-      return "Preparing the agent";
     case "built":
+      // El foco cae en "x402 payment": la región dice que ya se puede firmar.
       return "Transaction ready to sign";
-    case "confirmed":
-      return "Executed as promised";
     case "reverted":
-      return describeRevert(state.run, state.failure).title;
+      return describeRevert(state.run, state.failure).detail;
     case "error":
-      return humanError(state.error).title;
+      return humanError(state.error).hint;
     case "expired":
     case "rebuilding":
-      return "The transaction expired before it was sent";
+      return "Start over to build a new one.";
     default:
       return "";
   }

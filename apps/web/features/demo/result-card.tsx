@@ -34,9 +34,9 @@ export function ResultCard({ state, mode, price }: ResultCardProps) {
   if (state.status === "confirmed") {
     const minimum = formatUnits(state.run.build.guard.minDelta, USDC_DECIMALS);
     return (
-      <Alert>
+      <Alert role="presentation">
         <CheckCircle2Icon />
-        <AlertTitle data-step-title tabIndex={-1} className="outline-none">
+        <AlertTitle data-step-title tabIndex={-1}>
           Executed as promised
         </AlertTitle>
         <AlertDescription>
@@ -58,9 +58,9 @@ export function ResultCard({ state, mode, price }: ResultCardProps) {
     const spent = describeSpent(price, null);
     return (
       // Un revert del guard es la garantía funcionando: no va en rojo (el rojo queda en el paso).
-      <Alert variant={revert.byGuard ? "default" : "destructive"}>
+      <Alert variant={revert.byGuard ? "default" : "destructive"} role="presentation">
         {revert.byGuard ? <ShieldCheckIcon /> : <XCircleIcon />}
-        <AlertTitle data-step-title tabIndex={-1} className="outline-none">
+        <AlertTitle data-step-title tabIndex={-1}>
           {revert.title}
         </AlertTitle>
         <AlertDescription>
@@ -101,9 +101,9 @@ export function ResultCard({ state, mode, price }: ResultCardProps) {
   // Errores para personas: la frase arriba y el código del contrato en pequeño, para soporte.
   const human = humanError(state.error);
   return (
-    <Alert variant="destructive">
+    <Alert variant="destructive" role="presentation">
       <AlertTriangleIcon />
-      <AlertTitle data-step-title tabIndex={-1} className="outline-none">
+      <AlertTitle data-step-title tabIndex={-1}>
         {human.title}
       </AlertTitle>
       <AlertDescription>

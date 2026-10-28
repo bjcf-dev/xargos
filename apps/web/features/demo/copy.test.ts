@@ -209,7 +209,7 @@ describe("humanError", () => {
   it("explains a known code in plain words and ignores the raw message", () => {
     expect(humanError({ code: "RATE_LIMITED", message: "429 from upstream" })).toEqual({
       title: "Too many demos right now",
-      hint: "Wait a few minutes and start over.",
+      hint: "Wait a moment, then try again.",
     });
   });
 
@@ -219,39 +219,56 @@ describe("humanError", () => {
       hint: "Signing arrives with F6",
     });
   });
+
+  it("never leaves the hint empty", () => {
+    expect(humanError({ code: "INTERNAL", message: "" }).hint).toBe(
+      "Try again in a moment, or start over.",
+    );
+  });
+
+  // No prometer lo que el código o la cadena no garantizan (D15; ERROR_HTTP: retryable false).
+  it("does not promise what it cannot know", () => {
+    expect(humanError({ code: "SHOCK_FAILED", message: "" }).hint).toBe(
+      "The price shock could not be applied.",
+    );
+    expect(humanError({ code: "PAYMENT_INVALID", message: "" }).hint).not.toMatch(/try again/i);
+    expect(humanError({ code: "PAYMENT_REQUIRED", message: "" }).hint).not.toMatch(/try again/i);
+  });
 });
 
+// Un solo canal por paso: el foco ya dice el título; la región solo dice lo que el título no dice.
 describe("stepAnnouncement", () => {
   it.each([
     ["idle", { status: "idle" }],
     ["paying", { status: "paying", agent: run.agent, position: run.position }],
     ["shocking", { status: "shocking", run, shockId: null }],
     ["signing", { status: "signing", run }],
-  ] as const)("stays silent while %s (Busy already announces it)", (_, state) => {
+    ["setup", { status: "setup", agent: run.agent, setup: fixtureSetupReady }],
+    ["confirmed", { status: "confirmed", run, signature: "sig" }],
+  ] as const)("stays silent while %s (Busy or the focused title says it)", (_, state) => {
     expect(stepAnnouncement(state)).toBe("");
   });
 
   it.each([
-    [
-      "setup",
-      { status: "setup", agent: run.agent, setup: fixtureSetupReady },
-      "Preparing the agent",
-    ],
     ["built", { status: "built", run }, "Transaction ready to sign"],
-    ["confirmed", { status: "confirmed", run, signature: "sig" }, "Executed as promised"],
-    ["expired", { status: "expired", run }, "The transaction expired before it was sent"],
+    ["expired", { status: "expired", run }, "Start over to build a new one."],
+    [
+      "error",
+      { status: "error", error: { code: "RATE_LIMITED", message: "x" }, failedAt: "paying" },
+      "Wait a moment, then try again.",
+    ],
   ] as const)("announces %s", (_, state, text) => {
     expect(stepAnnouncement(state)).toBe(text);
   });
 
-  it("announces a guard revert with its title", () => {
+  it("announces the detail of a guard revert, not its title again", () => {
     const state: DemoState = {
       status: "reverted",
       run,
       signature: "sig",
       failure: { instructionIndex: guard.assertIndex, guard: { received: 1n, min: 2n } },
     };
-    expect(stepAnnouncement(state)).toBe("The guard protected the agent");
+    expect(stepAnnouncement(state)).toBe(describeRevert(run, state.failure).detail);
   });
 });
 

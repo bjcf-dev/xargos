@@ -145,10 +145,17 @@ describe("DemoScreen (mock mode)", () => {
     render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
     await click(/happy path/i);
     await click(/pay & build/i);
+    await waitFor(() =>
+      expect(screen.getByTestId("step-announcement").textContent).toBe("Transaction ready to sign"),
+    );
     await click(/sign & send/i);
 
     await waitFor(() => expect(document.activeElement?.textContent).toBe("Executed as promised"));
-    expect(screen.getByTestId("step-announcement").textContent).toBe("Executed as promised");
+    // Un solo canal: ni la región ni un role="alert" repiten el título que ya tiene el foco.
+    expect(screen.getByTestId("step-announcement").textContent).toBe("");
+    expect(screen.queryByRole("alert")).toBeNull();
+    // El foco se ve con teclado (no se quita el outline).
+    expect(document.activeElement?.className ?? "").not.toContain("outline-none");
 
     await click(/start over/i);
     await waitFor(() =>
@@ -264,7 +271,11 @@ describe("DemoScreen (mock mode)", () => {
     await click(/pay & build/i);
     await click(/sign & send/i);
 
-    expect(await screen.findByText("Signing arrives with F6")).toBeDefined();
+    expect(
+      await screen.findByText("Signing arrives with F6", {
+        selector: '[data-slot="alert-description"] p',
+      }),
+    ).toBeDefined();
     // Errores para personas: título claro y el código en pequeño.
     expect(
       screen.getByText("Something went wrong", { selector: "[data-step-title]" }),
