@@ -2,6 +2,7 @@ import {
   closePositionInstructions,
   fetchConcentratedLiquidityPool,
   orderMints,
+  setNativeMintWrappingStrategy,
   swapInstructions,
   WhirlpoolDeployment,
 } from "@orca-so/whirlpools";
@@ -65,6 +66,8 @@ export function createExitOrcaLpRecipe(deps: ExitOrcaLpDeps): Recipe {
     },
 
     async build({ agent, position }: BuildContext): Promise<BuiltRecipe> {
+      // The default wraps SOL in throwaway keypairs the agent would have to co-sign; use its wSOL ATA.
+      setNativeMintWrappingStrategy("ata");
       const authority = createNoopSigner(agent); // the agent signs in its own wallet, never here
       const config = {
         authority,

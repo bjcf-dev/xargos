@@ -12,11 +12,14 @@
     "orca:create-pool": "tsx --env-file-if-exists=../../.env src/scripts/orca/create-pool.ts",
     "orca:open-position": "tsx --env-file-if-exists=../../.env src/scripts/orca/open-position.ts",
     "orca:swap": "tsx --env-file-if-exists=../../.env src/scripts/orca/swap.ts",
+    "orca:create-lookup-table": "tsx --env-file-if-exists=../../.env src/scripts/orca/create-lookup-table.ts",
+    "orca:init-snapshot": "tsx --env-file-if-exists=../../.env src/scripts/orca/init-snapshot.ts",
     "orca:build-recipe": "tsx --env-file-if-exists=../../.env src/scripts/orca/build-recipe.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
     "@orca-so/whirlpools": "8.0.1",
+    "@solana-program/address-lookup-table": "0.12.0",
     "@solana-program/system": "^0.12.0",
     "@solana-program/token": "^0.18.0",
     "@solana/kit": "^6.10.0",
