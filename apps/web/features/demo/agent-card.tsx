@@ -6,7 +6,6 @@ import { Spinner } from "@/components/ui/spinner";
 import type { ApiMode } from "@/lib/api/mode";
 import { formatUnits, SOL_DECIMALS, USDC_DECIMALS } from "@/lib/format";
 import { ellipsify } from "@/lib/solana/explorer";
-import { POOL_TOKEN } from "./copy";
 import type { DemoState } from "./types";
 
 const PHASES: { phase: DemoSetupPhase; label: string }[] = [
@@ -82,10 +81,11 @@ export function AgentCard({ state, agent, setup, mode }: AgentCardProps) {
           })}
         </ol>
         <Progress value={(done / PHASES.length) * 100} aria-label="Setup progress" />
+        {/* balances.usdc es el USDC de Circle con el que el agente paga el x402, no el demo USDC del pool. */}
         {setup?.balances ? (
           <p className="font-mono text-sm">
             {formatUnits(setup.balances.sol, SOL_DECIMALS)} SOL ·{" "}
-            {formatUnits(setup.balances.usdc, USDC_DECIMALS)} {POOL_TOKEN}
+            {formatUnits(setup.balances.usdc, USDC_DECIMALS)} USDC
           </p>
         ) : null}
       </CardContent>
