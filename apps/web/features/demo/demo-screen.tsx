@@ -1,7 +1,7 @@
 "use client";
 
 import type { DemoSetupStatus } from "@xargos/shared";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -74,6 +74,7 @@ export function DemoScreen({
   const [lastSetup, setLastSetup] = useState<DemoSetupStatus | null>(null);
   const [path, setPath] = useState<DemoPath | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const a11yId = useId();
   const firstStatus = useRef(true);
   const demo = useDemo({
     recipeId: recipe?.id ?? "",
@@ -106,6 +107,8 @@ export function DemoScreen({
   const now = useNow(live);
   const left = live ? secondsLeft(state.run.build.expiresAt, now) : null;
   const expired = left === 0;
+  // El shock está bloqueado por falta de tiempo: su aviso lo describe para el lector de pantalla.
+  const shockBlocked = live && !expired && !canShock(left);
 
   if (load.status === "error" || load.status === "missing") {
     return (
@@ -171,21 +174,27 @@ export function DemoScreen({
                   either delivers at least the guaranteed minimum or reverts entirely.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-col gap-4">
-                {(["A", "B"] as const).map((p) => (
-                  <div key={p} className="flex flex-col items-start gap-1">
-                    <Button
-                      variant={p === "A" ? "default" : "outline"}
-                      onClick={() => {
-                        setPath(p);
-                        demo.start();
-                      }}
-                    >
-                      {DEMO_PATHS[p].label}
-                    </Button>
-                    <p className="text-sm text-muted-foreground">{DEMO_PATHS[p].line}</p>
-                  </div>
-                ))}
+              <CardContent>
+                <fieldset aria-label="Choose a demo path" className="flex min-w-0 flex-col gap-4">
+                  {(["A", "B"] as const).map((p) => (
+                    <div key={p} className="flex flex-col items-start gap-1">
+                      <Button
+                        variant={p === "A" ? "default" : "outline"}
+                        aria-label={DEMO_PATHS[p].ariaLabel}
+                        aria-describedby={`${a11yId}-path-${p}`}
+                        onClick={() => {
+                          setPath(p);
+                          demo.start();
+                        }}
+                      >
+                        {DEMO_PATHS[p].label}
+                      </Button>
+                      <p id={`${a11yId}-path-${p}`} className="text-sm text-muted-foreground">
+                        {DEMO_PATHS[p].line}
+                      </p>
+                    </div>
+                  ))}
+                </fieldset>
               </CardContent>
             </Card>
           ) : null}
@@ -233,7 +242,11 @@ export function DemoScreen({
                   <fieldset aria-label="Next step" className="flex min-w-0 flex-wrap gap-2">
                     {path === "B" && !state.run.shock && canShock(left) ? (
                       <>
-                        <Button onClick={demo.shock} disabled={!canShock(left)}>
+                        <Button
+                          onClick={demo.shock}
+                          aria-describedby={shockBlocked ? `${a11yId}-shock-hint` : undefined}
+                          disabled={!canShock(left)}
+                        >
                           Apply price shock first
                         </Button>
                         <Button variant="outline" onClick={demo.sign} disabled={expired}>
@@ -246,7 +259,12 @@ export function DemoScreen({
                           Sign & send
                         </Button>
                         {!state.run.shock ? (
-                          <Button variant="outline" onClick={demo.shock} disabled={!canShock(left)}>
+                          <Button
+                            variant="outline"
+                            onClick={demo.shock}
+                            aria-describedby={shockBlocked ? `${a11yId}-shock-hint` : undefined}
+                            disabled={!canShock(left)}
+                          >
                             Apply price shock first
                           </Button>
                         ) : null}
@@ -266,7 +284,7 @@ export function DemoScreen({
                     </p>
                   ) : null}
                   {!state.run.shock && !expired && !canShock(left) ? (
-                    <p className="text-sm text-muted-foreground">
+                    <p id={`${a11yId}-shock-hint`} className="text-sm text-muted-foreground">
                       Not enough time left for the price shock. Sign now, or start over for a fresh
                       transaction.
                     </p>

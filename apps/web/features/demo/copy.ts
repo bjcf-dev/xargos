@@ -8,13 +8,16 @@ export const POOL_TOKEN = "demo USDC";
 
 /** Los dos caminos de la demo, elegidos desde el principio; la máquina de estados no cambia. */
 export type DemoPath = "A" | "B";
-export const DEMO_PATHS: Record<DemoPath, { label: string; line: string }> = {
+/** `ariaLabel` sin el "·", que algunos lectores de pantalla leen como "dot". */
+export const DEMO_PATHS: Record<DemoPath, { label: string; ariaLabel: string; line: string }> = {
   A: {
     label: "A · Happy path",
+    ariaLabel: "Path A: happy path",
     line: "The agent pays, signs and receives at least the guaranteed minimum.",
   },
   B: {
     label: "B · Price moves against the agent",
+    ariaLabel: "Path B: price moves against the agent",
     line: "The pool price drops before signing; the guard reverts the whole transaction if the agent would receive less than the minimum.",
   },
 };

@@ -74,6 +74,18 @@ describe("DemoScreen (mock mode)", () => {
     expect(screen.queryByText(/reverted/i)).toBeNull();
   });
 
+  it("describes each demo path", async () => {
+    render(<DemoScreen api={api} />);
+    await screen.findByRole("group", { name: "Choose a demo path" });
+
+    const pathA = screen.getByRole("button", { name: "Path A: happy path" });
+    const description = document.getElementById(pathA.getAttribute("aria-describedby") ?? "");
+    expect(description?.textContent).toContain("receives at least the guaranteed minimum");
+    expect(
+      screen.getByRole("button", { name: "Path B: price moves against the agent" }),
+    ).toBeDefined();
+  });
+
   it("path A leads with signing", async () => {
     render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
     await click(/happy path/i);
@@ -280,6 +292,8 @@ describe("DemoScreen (mock mode)", () => {
     expect(await screen.findByText(/not enough time left for the price shock/i)).toBeDefined();
     const shock = screen.getByRole("button", { name: /apply price shock first/i });
     expect(shock.hasAttribute("disabled")).toBe(true);
+    const hint = document.getElementById(shock.getAttribute("aria-describedby") ?? "");
+    expect(hint?.textContent).toContain("Not enough time left");
     expect(screen.getByRole("button", { name: /sign & send/i }).hasAttribute("disabled")).toBe(
       false,
     );
