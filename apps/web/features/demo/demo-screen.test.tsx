@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { fixtureBuildResponse } from "@xargos/shared";
-import { HttpResponse, http } from "msw";
+import { delay, HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createApiClient } from "@/lib/api/client";
@@ -92,6 +92,22 @@ describe("DemoScreen (mock mode)", () => {
     );
     expect(screen.getByRole("button", { name: /start over/i })).toBeDefined();
   }, 10_000);
+
+  it("announces the step in progress to screen readers", async () => {
+    server.use(
+      http.post("*/api/xargos/recipes/:recipeId/build", async () => {
+        await delay(100);
+        return HttpResponse.json(fixtureBuildResponse);
+      }),
+    );
+    render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
+
+    await click(/start demo/i);
+    await click(/pay & build/i);
+
+    const status = await screen.findByRole("status");
+    expect(status.textContent).toBe("Paying and building the transaction…");
+  });
 
   it("offers no retry once the payment is done, so nothing is charged twice", async () => {
     render(<DemoScreen api={api} signer={null} pollIntervalMs={1} />);
