@@ -25,3 +25,12 @@ anchor-spl = { version = "1.0.1", default-features = false, features = ["token",
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }
+
+[dev-dependencies]
+litesvm = "0.17"
+litesvm-token = "0.17"
+solana-clock = "4.0.0"
+solana-keypair = "3.1.2"
+solana-message = "4.6"
+solana-signer = "3.0.1"
+solana-transaction = "4.3"
