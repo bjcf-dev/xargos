@@ -3,6 +3,9 @@ import type { ApiMode } from "@/lib/api/mode";
 import { formatUnits, SOL_DECIMALS, USDC_DECIMALS } from "@/lib/format";
 import type { DemoState, RevertFailure, Run } from "./types";
 
+/** ADR 0003: el pool usa un USDC propio. Solo la comisión x402 es USDC de Circle. */
+export const POOL_TOKEN = "demo USDC";
+
 /** Lo que la UI enseña de cada paso: un setup que va después del snapshot es limpieza. */
 export type StepTag = "setup" | "action" | "guard" | "cleanup";
 
@@ -30,7 +33,7 @@ export function describeRevert(run: Run, failure: RevertFailure): RevertCopy {
     const min = formatUnits(failure.guard.min, USDC_DECIMALS);
     return {
       title: "Reverted by the guard",
-      detail: `The agent would have received ${received} USDC, below the ${min} USDC minimum.`,
+      detail: `The agent would have received ${received} ${POOL_TOKEN}, below the ${min} ${POOL_TOKEN} minimum.`,
       byGuard: true,
     };
   }

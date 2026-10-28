@@ -4,7 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { ApiMode } from "@/lib/api/mode";
 import { formatUnits, USDC_DECIMALS } from "@/lib/format";
 import { ellipsify, getExplorerUrl } from "@/lib/solana/explorer";
-import { describeRevert, describeSpent } from "./copy";
+import { describeRevert, describeSpent, POOL_TOKEN } from "./copy";
 import type { DemoState } from "./types";
 
 type ResultState = Extract<DemoState, { status: "confirmed" | "reverted" | "error" }>;
@@ -40,8 +40,8 @@ export function ResultCard({ state, mode, price }: ResultCardProps) {
         <AlertDescription>
           <p>
             {mode === "mock"
-              ? `Simulated confirmation. In devnet mode the guard only lets it land if the agent receives at least ${minimum} USDC.`
-              : `The guard checked that the agent received at least ${minimum} USDC.`}
+              ? `Simulated confirmation. In devnet mode the guard only lets it land if the agent receives at least ${minimum} ${POOL_TOKEN}.`
+              : `The guard checked that the agent received at least ${minimum} ${POOL_TOKEN}.`}
           </p>
           <p>
             <Signature signature={state.signature} mode={mode} />

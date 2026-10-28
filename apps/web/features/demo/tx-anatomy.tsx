@@ -11,7 +11,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { formatUnits, USDC_DECIMALS } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { type StepTag, slippageLabel, stepTag } from "./copy";
+import { POOL_TOKEN, type StepTag, slippageLabel, stepTag } from "./copy";
 import type { Run } from "./types";
 
 const TAG_VARIANT: Record<StepTag, "default" | "secondary" | "outline"> = {
@@ -40,8 +40,8 @@ export function TxAnatomy({ run, secondsLeft, failedIndex = null }: TxAnatomyPro
       <CardHeader>
         <CardTitle>Transaction anatomy</CardTitle>
         <CardDescription>
-          One v0 transaction. The guard snapshots the agent&apos;s USDC account first and checks it
-          last.
+          One v0 transaction. The guard snapshots the agent&apos;s {POOL_TOKEN} account first and
+          checks it last.
         </CardDescription>
         {secondsLeft !== null ? (
           <CardAction>
@@ -56,16 +56,20 @@ export function TxAnatomy({ run, secondsLeft, failedIndex = null }: TxAnatomyPro
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1">
             <span className="text-muted-foreground">Expected</span>
-            <span className="text-2xl font-semibold tabular-nums">{expected} USDC</span>
+            <span className="text-2xl font-semibold tabular-nums">
+              {expected} {POOL_TOKEN}
+            </span>
           </div>
           <div className="flex flex-col gap-1">
             <span className="text-muted-foreground">Guaranteed minimum</span>
-            <span className="text-2xl font-semibold tabular-nums">{minimum} USDC</span>
+            <span className="text-2xl font-semibold tabular-nums">
+              {minimum} {POOL_TOKEN}
+            </span>
           </div>
         </div>
         <p className="text-muted-foreground">
           Max slippage {slippageLabel(quote.slippageBps)}. If the agent receives less than {minimum}{" "}
-          USDC, the whole transaction reverts.
+          {POOL_TOKEN}, the whole transaction reverts.
         </p>
         {run.shock?.priceBefore && run.shock.priceAfter ? (
           <Badge variant="destructive">

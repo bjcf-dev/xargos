@@ -68,8 +68,9 @@ describe("describeRevert (D15)", () => {
       guard: { received: 9_100_000n, min: 9_950_000n },
     });
     expect(copy.byGuard).toBe(true);
-    expect(copy.detail).toContain("9.1 USDC");
-    expect(copy.detail).toContain("9.95");
+    // ADR 0003: el pool usa un USDC propio; solo la comisión x402 es USDC de Circle.
+    expect(copy.detail).toContain("9.1 demo USDC");
+    expect(copy.detail).toContain("9.95 demo USDC minimum");
   });
 
   it("names the failed step and never says guard when another instruction failed", () => {
