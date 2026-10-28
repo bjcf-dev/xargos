@@ -10,7 +10,8 @@
     "orca:balances": "tsx src/scripts/orca/balances.ts",
     "orca:create-demo-mint": "tsx src/scripts/orca/create-demo-mint.ts",
     "orca:create-pool": "tsx src/scripts/orca/create-pool.ts",
-    "orca:open-position": "tsx src/scripts/orca/open-position.ts"
+    "orca:open-position": "tsx src/scripts/orca/open-position.ts",
+    "orca:swap": "tsx src/scripts/orca/swap.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
