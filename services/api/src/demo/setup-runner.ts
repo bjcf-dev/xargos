@@ -14,7 +14,7 @@ export type SetupSteps = {
 
 export type Logger = { error(data: object, message: string): void };
 
-/** Runs the phases in order and records them in the job store. Never throws: a failure ends in `failed`. */
+/** Runs the setup and records the phases in the job store. Never throws: a failure ends in `failed`. */
 export async function runSetup(
   jobs: SetupJobs,
   steps: SetupSteps,
@@ -22,18 +22,25 @@ export async function runSetup(
   log: Logger = { error: () => {} },
 ): Promise<void> {
   try {
+    // The four on-chain steps do not depend on each other (the snapshot PDA only needs the agent
+    // and the mint), so they start together; the phases follow whichever finishes in order.
     jobs.update(agent, { phase: "funding_sol" });
-    await steps.fundSol(agent);
+    const sol = steps.fundSol(agent);
+    const usdc = steps.fundUsdc(agent);
+    const position = steps.openPosition(agent);
+    const snapshot = steps.initSnapshot(agent);
+    // If an earlier await throws, the rest must not end up as unhandled rejections.
+    for (const task of [sol, usdc, position, snapshot]) task.catch(() => {});
 
+    await sol;
     jobs.update(agent, { phase: "funding_usdc" });
-    await steps.fundUsdc(agent);
-
+    await usdc;
     jobs.update(agent, { phase: "opening_position" });
-    const { position } = await steps.openPosition(agent);
-    await steps.initSnapshot(agent);
+    const opened = await position;
+    await snapshot;
 
     const balances = await steps.balances(agent);
-    jobs.update(agent, { phase: "ready", position, balances });
+    jobs.update(agent, { phase: "ready", position: opened.position, balances });
   } catch (error) {
     // The cause goes to the log; the client only gets a generic message (no RPC details or keys).
     log.error({ agent, error: String(error) }, "demo setup failed");
