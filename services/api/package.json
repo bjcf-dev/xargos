@@ -7,12 +7,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "spike:live": "tsx src/spike/live.ts",
-    "orca:balances": "tsx src/scripts/orca/balances.ts",
-    "orca:create-demo-mint": "tsx src/scripts/orca/create-demo-mint.ts",
-    "orca:create-pool": "tsx src/scripts/orca/create-pool.ts",
-    "orca:open-position": "tsx src/scripts/orca/open-position.ts",
-    "orca:swap": "tsx src/scripts/orca/swap.ts",
-    "orca:build-recipe": "tsx src/scripts/orca/build-recipe.ts"
+    "orca:balances": "tsx --env-file-if-exists=../../.env src/scripts/orca/balances.ts",
+    "orca:create-demo-mint": "tsx --env-file-if-exists=../../.env src/scripts/orca/create-demo-mint.ts",
+    "orca:create-pool": "tsx --env-file-if-exists=../../.env src/scripts/orca/create-pool.ts",
+    "orca:open-position": "tsx --env-file-if-exists=../../.env src/scripts/orca/open-position.ts",
+    "orca:swap": "tsx --env-file-if-exists=../../.env src/scripts/orca/swap.ts",
+    "orca:build-recipe": "tsx --env-file-if-exists=../../.env src/scripts/orca/build-recipe.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
