@@ -1,4 +1,4 @@
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { fixtureRecipe } from "@xargos/shared";
 import { delay, HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
@@ -15,6 +15,8 @@ const api = createApiClient({ baseUrl: "http://localhost/api/xargos" });
 beforeAll(() => server.listen({ onUnhandledFrame: "error" }));
 beforeEach(() => server.resetHandlers(...createHandlers()));
 afterEach(() => server.events.removeAllListeners());
+// Sin `globals` en Vitest, Testing Library no desmonta los hooks: el desmontaje aborta lo que quede en marcha.
+afterEach(cleanup);
 afterAll(() => server.close());
 
 function renderDemo(signer: DemoSigner | null = createMockSigner({ latencyMs: 0 })) {
