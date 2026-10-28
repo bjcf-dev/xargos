@@ -5,6 +5,7 @@ import {
   describeRevert,
   describeSpent,
   formatFee,
+  mockPaymentNote,
   secondsLeft,
   slippageLabel,
   stepTag,
@@ -124,6 +125,14 @@ describe("describeRevert (D15)", () => {
 describe("formatFee", () => {
   it("formats the x402 recipe fee in USDC", () => {
     expect(formatFee(fixtureRecipe.price)).toBe("0.01 USDC");
+  });
+});
+
+describe("mockPaymentNote", () => {
+  it("says once what mock mode charges and what devnet would", () => {
+    expect(mockPaymentNote("0.01 USDC")).toBe(
+      "Simulated: mock mode charges nothing. In devnet mode the agent pays 0.01 USDC per request.",
+    );
   });
 });
 

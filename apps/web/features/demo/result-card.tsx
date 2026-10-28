@@ -4,7 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { ApiMode } from "@/lib/api/mode";
 import { formatUnits, USDC_DECIMALS } from "@/lib/format";
 import { ellipsify, getExplorerUrl } from "@/lib/solana/explorer";
-import { describeRevert, describeSpent, POOL_TOKEN } from "./copy";
+import { describeRevert, describeSpent, mockPaymentNote, POOL_TOKEN } from "./copy";
 import type { DemoState } from "./types";
 
 type ResultState = Extract<DemoState, { status: "confirmed" | "reverted" | "error" }>;
@@ -77,14 +77,14 @@ export function ResultCard({ state, mode, price }: ResultCardProps) {
               </dd>
             </dl>
           ) : null}
-          <p>
-            Spent: {spent.recipeFee} recipe fee (x402)
-            {mode === "mock" ? ", simulated" : ""} ·{" "}
-            {mode === "mock"
-              ? "no network fee in mock mode"
-              : (spent.networkFee ?? "network fee pending, read from the transaction")}
-            .
-          </p>
+          {mode === "mock" ? (
+            <p>{mockPaymentNote(spent.recipeFee)}</p>
+          ) : (
+            <p>
+              Spent: {spent.recipeFee} recipe fee (x402) ·{" "}
+              {spent.networkFee ?? "network fee pending, read from the transaction"}.
+            </p>
+          )}
           <p>Your position and funds are otherwise intact.</p>
           <p>
             <Signature signature={state.signature} mode={mode} />

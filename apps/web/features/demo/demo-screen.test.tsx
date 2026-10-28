@@ -5,6 +5,7 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApiClient } from "@/lib/api/client";
 import { createHandlers } from "@/mocks/handlers";
+import { mockPaymentNote } from "./copy";
 import { DemoScreen } from "./demo-screen";
 import { createMockSigner } from "./mock-signer";
 import { ResultCard } from "./result-card";
@@ -46,6 +47,9 @@ describe("DemoScreen (mock mode)", () => {
     const alert = screen.getByText("The guard protected the agent").closest('[data-slot="alert"]');
     expect(alert?.className).not.toContain("text-destructive");
     expect(screen.getByText("0.85 demo USDC")).toBeDefined();
+    // Un solo texto para el coste del pago en mock: la línea de tiempo y el resultado dicen lo mismo.
+    expect(screen.getAllByText(mockPaymentNote("0.01 USDC"))).toHaveLength(2);
+    expect(screen.queryByText(/spent:/i)).toBeNull();
     expect(screen.getAllByText(/0\.01 USDC/).length).toBeGreaterThan(0);
     noDevnetClaims();
   });

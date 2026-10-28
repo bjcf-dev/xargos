@@ -89,6 +89,11 @@ export function formatFee(price: Recipe["price"]): string {
   return `${formatUnits(price.amount, USDC_DECIMALS)} USDC`;
 }
 
+/** El coste del pago en mock, dicho una sola vez y igual en la línea de tiempo y en el resultado. */
+export function mockPaymentNote(fee: string): string {
+  return `Simulated: mock mode charges nothing. In devnet mode the agent pays ${fee} per request.`;
+}
+
 export type SpentCopy = { recipeFee: string; networkFee: string | null };
 
 /** D16: lo que sí se gastó aunque la tx revierta. La comisión de red llega con getTransaction (F10). */
