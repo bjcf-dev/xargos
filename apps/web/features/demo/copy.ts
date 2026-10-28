@@ -6,6 +6,19 @@ import type { DemoState, RevertFailure, Run } from "./types";
 /** ADR 0003: el pool usa un USDC propio. Solo la comisión x402 es USDC de Circle. */
 export const POOL_TOKEN = "demo USDC";
 
+/** Los dos caminos de la demo, elegidos desde el principio; la máquina de estados no cambia. */
+export type DemoPath = "A" | "B";
+export const DEMO_PATHS: Record<DemoPath, { label: string; line: string }> = {
+  A: {
+    label: "A · Happy path",
+    line: "The agent pays, signs and receives at least the guaranteed minimum.",
+  },
+  B: {
+    label: "B · Price moves against the agent",
+    line: "The pool price drops before signing, so the guard reverts the whole transaction.",
+  },
+};
+
 /** Lo que la UI enseña de cada paso: un setup que va después del snapshot es limpieza. */
 export type StepTag = "setup" | "action" | "guard" | "cleanup";
 

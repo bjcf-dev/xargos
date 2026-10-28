@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { fixtureBuildResponse, fixtureRecipe } from "@xargos/shared";
 import { delay, HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
@@ -23,13 +23,15 @@ const click = async (name: RegExp) => {
   await waitFor(() => expect(button.hasAttribute("disabled")).toBe(false));
   fireEvent.click(button);
 };
+const actions = () =>
+  within(screen.getByRole("group", { name: "Next step" })).getAllByRole("button");
 const noDevnetClaims = () => expect(document.body.textContent ?? "").not.toMatch(/on devnet/i);
 
 describe("DemoScreen (mock mode)", () => {
   it("walks demo B to a guard revert that states what was spent", async () => {
     render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
 
-    await click(/start demo/i);
+    await click(/price moves against/i);
     noDevnetClaims();
     await click(/pay & build/i);
     expect(await screen.findByText(/guaranteed minimum/i)).toBeDefined();
@@ -51,7 +53,7 @@ describe("DemoScreen (mock mode)", () => {
   it("walks demo A to a confirmation", async () => {
     render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
 
-    await click(/start demo/i);
+    await click(/happy path/i);
     await click(/pay & build/i);
     await click(/sign & send/i);
 
@@ -59,9 +61,40 @@ describe("DemoScreen (mock mode)", () => {
     expect(screen.queryByText(/reverted/i)).toBeNull();
   });
 
+  it("path A leads with signing", async () => {
+    render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
+    await click(/happy path/i);
+    await click(/pay & build/i);
+
+    await screen.findByText(/guaranteed minimum/i);
+    expect(actions()[0]?.textContent).toMatch(/sign & send/i);
+  });
+
+  it("path B leads with the price shock, then signing", async () => {
+    render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
+    await click(/price moves against/i);
+    await click(/pay & build/i);
+
+    await screen.findByText(/guaranteed minimum/i);
+    expect(actions()[0]?.textContent).toMatch(/apply price shock first/i);
+    await click(/apply price shock first/i);
+    await screen.findByText(/150\.00 → 141\.00/);
+    expect(actions()[0]?.textContent).toMatch(/sign & send/i);
+  });
+
+  it("start over brings back both paths", async () => {
+    render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
+    await click(/price moves against/i);
+    await click(/pay & build/i);
+    await click(/start over/i);
+
+    expect(await screen.findByRole("button", { name: /happy path/i })).toBeDefined();
+    expect(screen.getByRole("button", { name: /price moves against/i })).toBeDefined();
+  });
+
   it("keeps the x402 payment on screen above the result", async () => {
     render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
-    await click(/start demo/i);
+    await click(/happy path/i);
     await click(/pay & build/i);
     await click(/sign & send/i);
 
@@ -74,7 +107,7 @@ describe("DemoScreen (mock mode)", () => {
   it("calls the pool token demo USDC and keeps x402 money in USDC", async () => {
     render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
 
-    await click(/start demo/i);
+    await click(/happy path/i);
     await click(/pay & build/i);
     expect(await screen.findByText(/guaranteed minimum/i)).toBeDefined();
 
@@ -104,7 +137,7 @@ describe("DemoScreen (mock mode)", () => {
         <DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />,
       );
 
-      await click(/start demo/i);
+      await click(/happy path/i);
       await click(/pay & build/i);
       expect(await screen.findByText("Valid for 30s")).toBeDefined();
 
@@ -129,7 +162,7 @@ describe("DemoScreen (mock mode)", () => {
     );
     render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
 
-    await click(/start demo/i);
+    await click(/happy path/i);
     await click(/pay & build/i);
 
     const status = await screen.findByRole("status");
@@ -139,7 +172,7 @@ describe("DemoScreen (mock mode)", () => {
   it("offers no retry once the payment is done, so nothing is charged twice", async () => {
     render(<DemoScreen api={api} signer={null} pollIntervalMs={1} />);
 
-    await click(/start demo/i);
+    await click(/happy path/i);
     await click(/pay & build/i);
     await click(/sign & send/i);
 
@@ -160,7 +193,7 @@ describe("DemoScreen (mock mode)", () => {
     );
     render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
 
-    await click(/start demo/i);
+    await click(/happy path/i);
     await click(/pay & build/i);
 
     expect(await screen.findByText(/not enough time left for the price shock/i)).toBeDefined();
@@ -215,7 +248,7 @@ describe("DemoScreen recipe loading", () => {
     expect(screen.getByText(/exit-orca-lp-to-usdc/)).toBeDefined();
     expect(screen.queryByText(/in a moment/i)).toBeNull();
     await click(/try again/i);
-    expect(await screen.findByRole("button", { name: /start demo/i })).toBeDefined();
+    expect(await screen.findByRole("button", { name: /happy path/i })).toBeDefined();
   });
 
   it("offers a retry when the recipes fail to load", async () => {
@@ -230,6 +263,6 @@ describe("DemoScreen recipe loading", () => {
 
     expect(await screen.findByText("The recipe could not be loaded")).toBeDefined();
     await click(/try again/i);
-    expect(await screen.findByRole("button", { name: /start demo/i })).toBeDefined();
+    expect(await screen.findByRole("button", { name: /happy path/i })).toBeDefined();
   });
 });

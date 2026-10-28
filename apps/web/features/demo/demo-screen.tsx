@@ -4,14 +4,21 @@ import type { DemoSetupStatus } from "@xargos/shared";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { api as defaultApi } from "@/lib/api";
 import type { ApiClient } from "@/lib/api/client";
 import { type ApiMode, apiMode } from "@/lib/api/mode";
 import { AgentCard } from "./agent-card";
-import { canShock, formatFee, secondsLeft } from "./copy";
+import { canShock, DEMO_PATHS, type DemoPath, formatFee, secondsLeft } from "./copy";
 import { ResultCard } from "./result-card";
 import type { DemoSigner } from "./signer";
 import { TxAnatomy } from "./tx-anatomy";
@@ -58,6 +65,7 @@ export function DemoScreen({
   const load = useRecipe(api);
   const recipe = load.status === "ready" ? load.recipe : null;
   const [lastSetup, setLastSetup] = useState<DemoSetupStatus | null>(null);
+  const [path, setPath] = useState<DemoPath | null>(null);
   const demo = useDemo({
     recipeId: recipe?.id ?? "",
     api,
@@ -105,7 +113,13 @@ export function DemoScreen({
 
   const fee = formatFee(recipe.price);
   const startOver = (
-    <Button variant="outline" onClick={demo.reset}>
+    <Button
+      variant="outline"
+      onClick={() => {
+        setPath(null);
+        demo.reset();
+      }}
+    >
       Start over
     </Button>
   );
@@ -131,9 +145,22 @@ export function DemoScreen({
                   either delivers at least the guaranteed minimum or reverts entirely.
                 </CardDescription>
               </CardHeader>
-              <CardFooter>
-                <Button onClick={demo.start}>Start demo</Button>
-              </CardFooter>
+              <CardContent className="flex flex-col gap-4">
+                {(["A", "B"] as const).map((p) => (
+                  <div key={p} className="flex flex-col items-start gap-1">
+                    <Button
+                      variant={p === "A" ? "default" : "outline"}
+                      onClick={() => {
+                        setPath(p);
+                        demo.start();
+                      }}
+                    >
+                      {DEMO_PATHS[p].label}
+                    </Button>
+                    <p className="text-sm text-muted-foreground">{DEMO_PATHS[p].line}</p>
+                  </div>
+                ))}
+              </CardContent>
             </Card>
           ) : null}
 
@@ -175,17 +202,31 @@ export function DemoScreen({
               {state.status === "signing" ? <Busy>Signing and sending…</Busy> : null}
               {state.status === "built" ? (
                 <div className="flex flex-col gap-3">
-                  <div className="flex flex-wrap gap-2">
-                    <Button onClick={demo.sign} disabled={expired}>
-                      Sign & send
-                    </Button>
-                    {!state.run.shock ? (
-                      <Button variant="outline" onClick={demo.shock} disabled={!canShock(left)}>
-                        Apply price shock first
-                      </Button>
-                    ) : null}
+                  {/* En el camino B, el shock va primero hasta que se aplica; luego, firmar. */}
+                  <fieldset aria-label="Next step" className="flex min-w-0 flex-wrap gap-2">
+                    {path === "B" && !state.run.shock ? (
+                      <>
+                        <Button onClick={demo.shock} disabled={!canShock(left)}>
+                          Apply price shock first
+                        </Button>
+                        <Button variant="outline" onClick={demo.sign} disabled={expired}>
+                          Sign & send
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button onClick={demo.sign} disabled={expired}>
+                          Sign & send
+                        </Button>
+                        {!state.run.shock ? (
+                          <Button variant="outline" onClick={demo.shock} disabled={!canShock(left)}>
+                            Apply price shock first
+                          </Button>
+                        ) : null}
+                      </>
+                    )}
                     {startOver}
-                  </div>
+                  </fieldset>
                   <p className="text-sm text-muted-foreground">
                     {mode === "mock"
                       ? "Mock mode simulates the signature. In devnet mode the agent's key signs it in your browser; xARGOS never sees it."
