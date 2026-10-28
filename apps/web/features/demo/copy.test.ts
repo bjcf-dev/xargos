@@ -11,6 +11,7 @@ import {
   secondsLeft,
   shockTrend,
   slippageLabel,
+  stepAnnouncement,
   stepTag,
   x402Timeline,
 } from "./copy";
@@ -200,6 +201,40 @@ describe("describeSpent (D16)", () => {
 
   it("formats the network fee in SOL once known", () => {
     expect(describeSpent(fixtureRecipe.price, 5000n).networkFee).toBe("0.000005 SOL");
+  });
+});
+
+describe("stepAnnouncement", () => {
+  it.each([
+    ["idle", { status: "idle" }],
+    ["paying", { status: "paying", agent: run.agent, position: run.position }],
+    ["shocking", { status: "shocking", run, shockId: null }],
+    ["signing", { status: "signing", run }],
+  ] as const)("stays silent while %s (Busy already announces it)", (_, state) => {
+    expect(stepAnnouncement(state)).toBe("");
+  });
+
+  it.each([
+    [
+      "setup",
+      { status: "setup", agent: run.agent, setup: fixtureSetupReady },
+      "Preparing the agent",
+    ],
+    ["built", { status: "built", run }, "Transaction ready to sign"],
+    ["confirmed", { status: "confirmed", run, signature: "sig" }, "Executed as promised"],
+    ["expired", { status: "expired", run }, "The transaction expired before it was sent"],
+  ] as const)("announces %s", (_, state, text) => {
+    expect(stepAnnouncement(state)).toBe(text);
+  });
+
+  it("announces a guard revert with its title", () => {
+    const state: DemoState = {
+      status: "reverted",
+      run,
+      signature: "sig",
+      failure: { instructionIndex: guard.assertIndex, guard: { received: 1n, min: 2n } },
+    };
+    expect(stepAnnouncement(state)).toBe("The guard protected the agent");
   });
 });
 

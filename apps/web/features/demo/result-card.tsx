@@ -36,7 +36,9 @@ export function ResultCard({ state, mode, price }: ResultCardProps) {
     return (
       <Alert>
         <CheckCircle2Icon />
-        <AlertTitle>Executed as promised</AlertTitle>
+        <AlertTitle data-step-title tabIndex={-1} className="outline-none">
+          Executed as promised
+        </AlertTitle>
         <AlertDescription>
           <p>
             {mode === "mock"
@@ -58,7 +60,9 @@ export function ResultCard({ state, mode, price }: ResultCardProps) {
       // Un revert del guard es la garantía funcionando: no va en rojo (el rojo queda en el paso).
       <Alert variant={revert.byGuard ? "default" : "destructive"}>
         {revert.byGuard ? <ShieldCheckIcon /> : <XCircleIcon />}
-        <AlertTitle>{revert.title}</AlertTitle>
+        <AlertTitle data-step-title tabIndex={-1} className="outline-none">
+          {revert.title}
+        </AlertTitle>
         <AlertDescription>
           <p>{revert.detail}</p>
           {revert.figures ? (
@@ -97,7 +101,9 @@ export function ResultCard({ state, mode, price }: ResultCardProps) {
   return (
     <Alert variant="destructive">
       <AlertTriangleIcon />
-      <AlertTitle>{state.error.message}</AlertTitle>
+      <AlertTitle data-step-title tabIndex={-1} className="outline-none">
+        {state.error.message}
+      </AlertTitle>
       <AlertDescription>
         <p className="font-mono">{state.error.code}</p>
       </AlertDescription>

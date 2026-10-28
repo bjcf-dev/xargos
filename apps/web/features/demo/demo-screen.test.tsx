@@ -42,9 +42,13 @@ describe("DemoScreen (mock mode)", () => {
     expect(await screen.findByText("SOL/demo USDC 150.00 → 141.00 (-6%)")).toBeDefined();
     await click(/sign & send/i);
 
-    expect(await screen.findByText("The guard protected the agent")).toBeDefined();
+    expect(
+      await screen.findByText("The guard protected the agent", { selector: "[data-step-title]" }),
+    ).toBeDefined();
     // Protección, no error: el rojo queda solo en el paso que falló.
-    const alert = screen.getByText("The guard protected the agent").closest('[data-slot="alert"]');
+    const alert = screen
+      .getByText("The guard protected the agent", { selector: "[data-step-title]" })
+      .closest('[data-slot="alert"]');
     expect(alert?.className).not.toContain("text-destructive");
     expect(screen.getByText("0.85 demo USDC")).toBeDefined();
     // Un solo texto para el coste del pago en mock: la línea de tiempo y el resultado dicen lo mismo.
@@ -61,7 +65,9 @@ describe("DemoScreen (mock mode)", () => {
     await click(/pay & build/i);
     await click(/sign & send/i);
 
-    expect(await screen.findByText("Executed as promised")).toBeDefined();
+    expect(
+      await screen.findByText("Executed as promised", { selector: "[data-step-title]" }),
+    ).toBeDefined();
     expect(screen.queryByText(/reverted/i)).toBeNull();
   });
 
@@ -114,6 +120,27 @@ describe("DemoScreen (mock mode)", () => {
     expect(screen.getByRole("button", { name: /price moves against/i })).toBeDefined();
   });
 
+  it("does not move the focus on the first render", async () => {
+    render(<DemoScreen api={api} />);
+    await screen.findByRole("button", { name: /happy path/i });
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it("announces the step and moves the focus to its title", async () => {
+    render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
+    await click(/happy path/i);
+    await click(/pay & build/i);
+    await click(/sign & send/i);
+
+    await waitFor(() => expect(document.activeElement?.textContent).toBe("Executed as promised"));
+    expect(screen.getByTestId("step-announcement").textContent).toBe("Executed as promised");
+
+    await click(/start over/i);
+    await waitFor(() =>
+      expect(document.activeElement?.textContent).toBe("Run the recipe as an AI agent"),
+    );
+  });
+
   it("puts the next step right under the x402 payment", async () => {
     render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
     await click(/happy path/i);
@@ -142,7 +169,9 @@ describe("DemoScreen (mock mode)", () => {
     await click(/pay & build/i);
     await click(/sign & send/i);
 
-    const result = await screen.findByText("Executed as promised");
+    const result = await screen.findByText("Executed as promised", {
+      selector: "[data-step-title]",
+    });
     const payment = screen.getByText("x402 payment");
     expect(payment.compareDocumentPosition(result) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
@@ -220,7 +249,9 @@ describe("DemoScreen (mock mode)", () => {
     await click(/pay & build/i);
     await click(/sign & send/i);
 
-    expect(await screen.findByText("Signing arrives with F6")).toBeDefined();
+    expect(
+      await screen.findByText("Signing arrives with F6", { selector: "[data-step-title]" }),
+    ).toBeDefined();
     expect(screen.queryByRole("button", { name: /try again/i })).toBeNull();
     expect(screen.getByRole("button", { name: /start over/i })).toBeDefined();
   });

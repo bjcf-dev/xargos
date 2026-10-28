@@ -73,6 +73,30 @@ export function shockTrend(priceBefore: string, priceAfter: string): "up" | "dow
   return after < before ? "down" : "up";
 }
 
+/**
+ * Lo que anuncia la región aria-live del panel. Vacío donde ya habla Busy (role="status"),
+ * para no anunciar dos veces lo mismo.
+ */
+export function stepAnnouncement(state: DemoState): string {
+  switch (state.status) {
+    case "setup":
+      return "Preparing the agent";
+    case "built":
+      return "Transaction ready to sign";
+    case "confirmed":
+      return "Executed as promised";
+    case "reverted":
+      return describeRevert(state.run, state.failure).title;
+    case "error":
+      return state.error.message;
+    case "expired":
+    case "rebuilding":
+      return "The transaction expired before it was sent";
+    default:
+      return "";
+  }
+}
+
 export type RevertCopy = {
   title: string;
   detail: string;

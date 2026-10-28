@@ -1,7 +1,7 @@
 "use client";
 
 import type { DemoSetupStatus } from "@xargos/shared";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +18,14 @@ import { api as defaultApi } from "@/lib/api";
 import type { ApiClient } from "@/lib/api/client";
 import { type ApiMode, apiMode } from "@/lib/api/mode";
 import { AgentCard } from "./agent-card";
-import { canShock, DEMO_PATHS, type DemoPath, formatFee, secondsLeft } from "./copy";
+import {
+  canShock,
+  DEMO_PATHS,
+  type DemoPath,
+  formatFee,
+  secondsLeft,
+  stepAnnouncement,
+} from "./copy";
 import { ResultCard } from "./result-card";
 import type { DemoSigner } from "./signer";
 import { TxAnatomy } from "./tx-anatomy";
@@ -66,6 +73,8 @@ export function DemoScreen({
   const recipe = load.status === "ready" ? load.recipe : null;
   const [lastSetup, setLastSetup] = useState<DemoSetupStatus | null>(null);
   const [path, setPath] = useState<DemoPath | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const firstStatus = useRef(true);
   const demo = useDemo({
     recipeId: recipe?.id ?? "",
     api,
@@ -79,6 +88,18 @@ export function DemoScreen({
     if (state.status === "setup") setLastSetup(state.setup);
     if (state.status === "idle") setLastSetup(null);
   }, [state]);
+
+  // Cada paso nuevo lleva el foco a su título (el último marcado: el resultado gana al x402 de
+  // encima). En el primer render no, para no robar el foco al entrar en la página.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: el efecto se dispara por el cambio de paso.
+  useEffect(() => {
+    if (firstStatus.current) {
+      firstStatus.current = false;
+      return;
+    }
+    const titles = panelRef.current?.querySelectorAll<HTMLElement>("[data-step-title]");
+    titles?.[titles.length - 1]?.focus();
+  }, [state.status]);
 
   const live =
     state.status === "built" || state.status === "shocking" || state.status === "signing";
@@ -135,11 +156,16 @@ export function DemoScreen({
       <div className="grid gap-6 md:grid-cols-[18rem_1fr]">
         <AgentCard state={state} agent={DEMO_AGENT} setup={lastSetup} mode={mode} />
 
-        <div className="flex min-w-0 flex-col gap-4">
+        <div ref={panelRef} className="flex min-w-0 flex-col gap-4">
+          <p data-testid="step-announcement" className="sr-only" aria-live="polite">
+            {stepAnnouncement(state)}
+          </p>
           {state.status === "idle" ? (
             <Card>
               <CardHeader>
-                <CardTitle>Run the recipe as an AI agent</CardTitle>
+                <CardTitle data-step-title tabIndex={-1} className="outline-none">
+                  Run the recipe as an AI agent
+                </CardTitle>
                 <CardDescription>
                   A demo agent pays for this recipe with x402 and gets one transaction to sign. It
                   either delivers at least the guaranteed minimum or reverts entirely.
@@ -167,7 +193,9 @@ export function DemoScreen({
           {state.status === "setup" ? (
             <Card>
               <CardHeader>
-                <CardTitle>Preparing the agent</CardTitle>
+                <CardTitle data-step-title tabIndex={-1} className="outline-none">
+                  Preparing the agent
+                </CardTitle>
                 <CardDescription>
                   {mode === "mock"
                     ? "Simulated setup: no devnet accounts are created."
@@ -281,7 +309,9 @@ export function DemoScreen({
           {state.status === "expired" || state.status === "rebuilding" ? (
             <>
               <Alert variant="destructive">
-                <AlertTitle>The transaction expired before it was sent</AlertTitle>
+                <AlertTitle data-step-title tabIndex={-1} className="outline-none">
+                  The transaction expired before it was sent
+                </AlertTitle>
                 <AlertDescription>Start over to build a new one.</AlertDescription>
               </Alert>
               <div className="flex gap-2">{startOver}</div>
