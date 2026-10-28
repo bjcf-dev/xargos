@@ -32,8 +32,7 @@ pub fn handle_assert_min_delta(ctx: Context<AssertMinDelta>, min_delta: u64) -> 
         .accounts
         .agent_token_account
         .amount
-        .checked_sub(snapshot.amount)
-        .unwrap_or(0);
+        .saturating_sub(snapshot.amount);
 
     if received < min_delta {
         // The UI reads this exact line to tell a guard revert from any other failure (D15).
