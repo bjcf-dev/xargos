@@ -4,6 +4,14 @@ import { runSetup, type SetupSteps } from "./setup-runner";
 
 const AGENT = "AgentDemo1111111111111111111111111111111111";
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
 function fakeSteps(overrides: Partial<SetupSteps> = {}): SetupSteps {
   return {
     fundSol: async () => {},
@@ -16,22 +24,30 @@ function fakeSteps(overrides: Partial<SetupSteps> = {}): SetupSteps {
 }
 
 describe("runSetup", () => {
-  it("goes through the phases in order and ends ready with position and balances", async () => {
+  it("advances the phases as the steps finish and ends ready with position and balances", async () => {
     const jobs = new SetupJobs();
     jobs.create(AGENT);
-    const phases: string[] = [];
-    const steps = fakeSteps({
-      fundSol: async () => void phases.push(jobs.get(AGENT)?.phase ?? ""),
-      fundUsdc: async () => void phases.push(jobs.get(AGENT)?.phase ?? ""),
-      openPosition: async () => {
-        phases.push(jobs.get(AGENT)?.phase ?? "");
-        return { position: "PositionMint" };
-      },
-    });
+    const sol = deferred<void>();
+    const usdc = deferred<void>();
+    const position = deferred<{ position: string }>();
+    const run = runSetup(
+      jobs,
+      fakeSteps({
+        fundSol: () => sol.promise,
+        fundUsdc: () => usdc.promise,
+        openPosition: () => position.promise,
+      }),
+      AGENT,
+    );
 
-    await runSetup(jobs, steps, AGENT);
+    expect(jobs.get(AGENT)?.phase).toBe("funding_sol");
+    sol.resolve();
+    await vi.waitFor(() => expect(jobs.get(AGENT)?.phase).toBe("funding_usdc"));
+    usdc.resolve();
+    await vi.waitFor(() => expect(jobs.get(AGENT)?.phase).toBe("opening_position"));
+    position.resolve({ position: "PositionMint" });
+    await run;
 
-    expect(phases).toEqual(["funding_sol", "funding_usdc", "opening_position"]);
     expect(jobs.get(AGENT)).toEqual({
       agent: AGENT,
       phase: "ready",
@@ -40,22 +56,35 @@ describe("runSetup", () => {
     });
   });
 
-  it("initializes the snapshot only after the position exists", async () => {
+  it("starts all the on-chain steps together instead of one after another", async () => {
     const jobs = new SetupJobs();
     jobs.create(AGENT);
-    const order: string[] = [];
-    await runSetup(
+    const started: string[] = [];
+    const never = new Promise<never>(() => {});
+    void runSetup(
       jobs,
       fakeSteps({
-        openPosition: async () => {
-          order.push("position");
-          return { position: "P" };
+        fundSol: () => {
+          started.push("sol");
+          return never;
         },
-        initSnapshot: async () => void order.push("snapshot"),
+        fundUsdc: () => {
+          started.push("usdc");
+          return never;
+        },
+        openPosition: () => {
+          started.push("position");
+          return never;
+        },
+        initSnapshot: () => {
+          started.push("snapshot");
+          return never;
+        },
       }),
       AGENT,
     );
-    expect(order).toEqual(["position", "snapshot"]);
+    await Promise.resolve();
+    expect(started).toEqual(["sol", "usdc", "position", "snapshot"]);
   });
 
   it("ends failed with a generic SETUP_FAILED and logs the real cause", async () => {
@@ -81,20 +110,18 @@ describe("runSetup", () => {
     expect(log.error).toHaveBeenCalledOnce();
   });
 
-  it("does not open a position when funding failed", async () => {
+  it("ends failed when the snapshot step fails, even if the others finished", async () => {
     const jobs = new SetupJobs();
     jobs.create(AGENT);
-    const openPosition = vi.fn(async () => ({ position: "P" }));
     await runSetup(
       jobs,
       fakeSteps({
-        fundSol: async () => {
-          throw new Error("no funds");
+        initSnapshot: async () => {
+          throw new Error("snapshot failed");
         },
-        openPosition,
       }),
       AGENT,
     );
-    expect(openPosition).not.toHaveBeenCalled();
+    expect(jobs.get(AGENT)?.phase).toBe("failed");
   });
 });
