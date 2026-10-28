@@ -4,12 +4,14 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { rootNodeFromAnchor } from "@codama/nodes-from-anchor";
 import { renderVisitor } from "@codama/renderers-js";
-import { createFromRoot } from "codama";
+import { createFromRoot, updateAccountsVisitor } from "codama";
 
 const idl = JSON.parse(
   readFileSync(fileURLToPath(new URL("../idl/guard.json", import.meta.url)), "utf8"),
 );
 const codama = createFromRoot(rootNodeFromAnchor(idl));
-const out = fileURLToPath(new URL("../src/generated", import.meta.url));
-await codama.accept(renderVisitor(out, { deleteFolderBeforeRendering: true, formatCode: false }));
+// The instruction `snapshot` and the account `Snapshot` would both export SNAPSHOT_DISCRIMINATOR.
+codama.update(updateAccountsVisitor({ snapshot: { name: "snapshotState" } }));
+const out = fileURLToPath(new URL("..", import.meta.url));
+await codama.accept(renderVisitor(out, { syncPackageJson: false, formatCode: false }));
 console.log(`Generated guard client in ${out}`);
