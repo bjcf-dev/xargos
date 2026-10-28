@@ -75,4 +75,16 @@ describe("DemoScreen (mock mode)", () => {
     );
     expect(screen.getByRole("button", { name: /start over/i })).toBeDefined();
   }, 10_000);
+
+  it("offers no retry once the payment is done, so nothing is charged twice", async () => {
+    render(<DemoScreen api={api} signer={null} pollIntervalMs={1} />);
+
+    await click(/start demo/i);
+    await click(/pay & build/i);
+    await click(/sign & send/i);
+
+    expect(await screen.findByText("Signing arrives with F6")).toBeDefined();
+    expect(screen.queryByRole("button", { name: /try again/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /start over/i })).toBeDefined();
+  });
 });
