@@ -20,4 +20,8 @@ pub mod guard {
     pub fn snapshot(ctx: Context<TakeSnapshot>) -> Result<()> {
         instructions::snapshot::handle_snapshot(ctx)
     }
+
+    pub fn assert_min_delta(ctx: Context<AssertMinDelta>, min_delta: u64) -> Result<()> {
+        instructions::assert_min_delta::handle_assert_min_delta(ctx, min_delta)
+    }
 }
