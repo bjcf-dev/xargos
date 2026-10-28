@@ -18,6 +18,13 @@ function toDemoError(error: unknown): DemoError {
   return { code: "INTERNAL", message: error instanceof Error ? error.message : "Unexpected error" };
 }
 
+/** Despacha solo mientras la acción sigue viva: lo que resuelva tras un abort no toca el estado. */
+function unlessAborted(dispatch: Dispatch<DemoEvent>, signal: AbortSignal): Dispatch<DemoEvent> {
+  return (event) => {
+    if (!signal.aborted) dispatch(event);
+  };
+}
+
 /** Ejecuta un paso: un error de API pasa a FAILED; si se abortó, no se despacha nada. */
 async function step(
   dispatch: Dispatch<DemoEvent>,
@@ -35,9 +42,10 @@ async function step(
 export function runSetup(
   { api, pollIntervalMs = 1_500 }: RunnerDeps,
   agent: string,
-  dispatch: Dispatch<DemoEvent>,
+  rawDispatch: Dispatch<DemoEvent>,
   signal: AbortSignal,
 ): Promise<void> {
+  const dispatch = unlessAborted(rawDispatch, signal);
   dispatch({ type: "SETUP_STARTED", agent });
   return step(dispatch, signal, async () => {
     await api.startSetup({ agent }, { signal });
@@ -57,9 +65,10 @@ export function runPay(
   { api, recipeId }: RunnerDeps,
   agent: string,
   position: string,
-  dispatch: Dispatch<DemoEvent>,
+  rawDispatch: Dispatch<DemoEvent>,
   signal: AbortSignal,
 ): Promise<void> {
+  const dispatch = unlessAborted(rawDispatch, signal);
   dispatch({ type: "PAY" });
   return step(dispatch, signal, async () => {
     const { data, paymentResponse } = await api.build(recipeId, { agent, position }, { signal });
@@ -70,9 +79,10 @@ export function runPay(
 export function runShock(
   { api, pollIntervalMs = 1_500 }: RunnerDeps,
   agent: string,
-  dispatch: Dispatch<DemoEvent>,
+  rawDispatch: Dispatch<DemoEvent>,
   signal: AbortSignal,
 ): Promise<void> {
+  const dispatch = unlessAborted(rawDispatch, signal);
   dispatch({ type: "SHOCK_REQUESTED" });
   return step(dispatch, signal, async () => {
     const { shockId } = await api.startPriceShock({ agent }, { signal });
@@ -92,9 +102,10 @@ export function runShock(
 export function runSign(
   { signer }: RunnerDeps,
   run: Run,
-  dispatch: Dispatch<DemoEvent>,
+  rawDispatch: Dispatch<DemoEvent>,
   signal: AbortSignal,
 ): Promise<void> {
+  const dispatch = unlessAborted(rawDispatch, signal);
   dispatch({ type: "SIGN" });
   return step(dispatch, signal, async () => {
     const result = await signer(run, signal);

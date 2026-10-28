@@ -1,12 +1,18 @@
 // @vitest-environment node
-import { fixtureBuildResponse, fixtureRecipe, fixtureSetupReady } from "@xargos/shared";
+import {
+  fixtureBuildResponse,
+  fixtureRecipe,
+  fixtureSetupReady,
+  fixtureShockConfirmed,
+} from "@xargos/shared";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { createApiClient } from "@/lib/api/client";
+import { type ApiClient, createApiClient } from "@/lib/api/client";
 import { createHandlers } from "@/mocks/handlers";
 import { createMockSigner } from "./mock-signer";
 import { type RunnerDeps, runPay, runSetup, runShock, runSign } from "./runner";
+import type { DemoSigner } from "./signer";
 import type { DemoEvent, Run } from "./types";
 
 const AGENT = fixtureSetupReady.agent;
@@ -96,5 +102,79 @@ describe("runner", () => {
     await runSetup(deps, AGENT, dispatch, controller.signal);
 
     expect(events.map((e) => e.type)).toEqual(["SETUP_STARTED", "SETUP_PROGRESS"]);
+  });
+});
+
+// El firmante real (F6) no está obligado a rechazar al abortar: lo que resuelva tarde no se despacha.
+describe("runner with work that ignores the abort", () => {
+  /** Aborta y aun así resuelve, como una llamada que no respeta la señal. */
+  function abortsThenResolves<T>(controller: AbortController, value: T) {
+    return async () => {
+      controller.abort();
+      return value;
+    };
+  }
+
+  it("drops a setup status that resolves after the abort", async () => {
+    const controller = new AbortController();
+    const api: ApiClient = {
+      ...deps.api,
+      startSetup: async () => ({ agent: AGENT }),
+      getSetupStatus: abortsThenResolves(controller, fixtureSetupReady),
+    };
+    const { events, dispatch } = recorder();
+    await runSetup({ ...deps, api }, AGENT, dispatch, controller.signal);
+
+    expect(events.map((e) => e.type)).toEqual(["SETUP_STARTED"]);
+  });
+
+  it("drops a build that resolves after the abort", async () => {
+    const controller = new AbortController();
+    const api: ApiClient = {
+      ...deps.api,
+      build: abortsThenResolves(controller, { data: fixtureBuildResponse }),
+    };
+    const { events, dispatch } = recorder();
+    await runPay({ ...deps, api }, AGENT, POSITION, dispatch, controller.signal);
+
+    expect(events.map((e) => e.type)).toEqual(["PAY"]);
+  });
+
+  it("drops an accepted shock that resolves after the abort", async () => {
+    const controller = new AbortController();
+    const api: ApiClient = {
+      ...deps.api,
+      startPriceShock: abortsThenResolves(controller, { shockId: "shk_late" }),
+    };
+    const { events, dispatch } = recorder();
+    await runShock({ ...deps, api }, AGENT, dispatch, controller.signal);
+
+    expect(events.map((e) => e.type)).toEqual(["SHOCK_REQUESTED"]);
+  });
+
+  it("drops a shock status that resolves after the abort", async () => {
+    const controller = new AbortController();
+    const api: ApiClient = {
+      ...deps.api,
+      startPriceShock: async () => ({ shockId: "shk_late" }),
+      getPriceShockStatus: abortsThenResolves(controller, fixtureShockConfirmed),
+    };
+    const { events, dispatch } = recorder();
+    await runShock({ ...deps, api }, AGENT, dispatch, controller.signal);
+
+    expect(events.map((e) => e.type)).toEqual(["SHOCK_REQUESTED", "SHOCK_ACCEPTED"]);
+  });
+
+  it("drops a signature that resolves after the abort", async () => {
+    const controller = new AbortController();
+    const signer: DemoSigner = abortsThenResolves(controller, {
+      outcome: "confirmed",
+      signature: "late",
+    });
+    const run: Run = { agent: AGENT, position: POSITION, build: fixtureBuildResponse };
+    const { events, dispatch } = recorder();
+    await runSign({ ...deps, signer }, run, dispatch, controller.signal);
+
+    expect(events.map((e) => e.type)).toEqual(["SIGN"]);
   });
 });
