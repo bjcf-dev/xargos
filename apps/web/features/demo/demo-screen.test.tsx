@@ -55,14 +55,15 @@ describe("DemoScreen (mock mode)", () => {
   });
 
   // ADR 0003: lo del pool es un "demo USDC" propio; la comisión x402 sí es USDC de Circle.
-  it("calls the pool token demo USDC and keeps the x402 fee in USDC", async () => {
+  it("calls the pool token demo USDC and keeps x402 money in USDC", async () => {
     render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
 
     await click(/start demo/i);
     await click(/pay & build/i);
     expect(await screen.findByText(/guaranteed minimum/i)).toBeDefined();
 
-    expect(screen.getByText(/SOL · [\d.]+ demo USDC$/)).toBeDefined();
+    // El saldo del agente es el USDC de Circle con el que paga el x402 (#52: balances.usdc).
+    expect(screen.getByText(/SOL · [\d.]+ USDC$/)).toBeDefined();
     expect(screen.getAllByText(/^[\d.]+ demo USDC$/)).toHaveLength(2);
     expect(screen.getByText(/than [\d.]+ demo USDC, the whole transaction reverts/)).toBeDefined();
     expect(screen.getByText("0.01 USDC per request, paid with x402.")).toBeDefined();
