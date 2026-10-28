@@ -228,6 +228,7 @@ export function DemoScreen({
             </>
           ) : null}
 
+          {/* TODO(F11): nadie despacha EXPIRED ni REBUILD todavía; aquí irá "Rebuild for free". */}
           {state.status === "expired" || state.status === "rebuilding" ? (
             <>
               <Alert variant="destructive">
