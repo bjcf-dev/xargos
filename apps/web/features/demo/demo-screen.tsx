@@ -37,9 +37,10 @@ function useNow(active: boolean): number {
   return now;
 }
 
+/** role="status" (aria-live polite): el lector de pantalla anuncia el paso en curso. */
 function Busy({ children }: { children: string }) {
   return (
-    <p className="flex items-center gap-2 text-sm text-muted-foreground">
+    <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
       <Spinner aria-hidden />
       {children}
     </p>
