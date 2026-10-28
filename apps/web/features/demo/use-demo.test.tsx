@@ -102,13 +102,34 @@ describe("useDemo", () => {
     );
   });
 
-  it("retries the payment without a new setup when the position is known", async () => {
+  it("retries the payment without a new setup when the payment failed", async () => {
+    server.use(
+      http.post(
+        "*/api/xargos/recipes/:recipeId/build",
+        () => HttpResponse.json({ error: { code: "INTERNAL", message: "Down" } }, { status: 500 }),
+        { once: true },
+      ),
+    );
+    const { result } = renderDemo();
+    act(() => result.current.start());
+    await waitFor(() => expect(result.current.state).toMatchObject({ setup: { phase: "ready" } }));
+    act(() => result.current.pay());
+    await waitFor(() => expect(result.current.state).toMatchObject({ failedAt: "paying" }));
+
+    expect(result.current.canRetry).toBe(true);
+    act(() => result.current.retry());
+    expect(result.current.state.status).toBe("paying");
+  });
+
+  // Con x402 real (F8), volver a pagar tras un fallo de la firma o del shock cobraría dos veces.
+  it("does not pay again when the failure came after the payment", async () => {
     const { result } = renderDemo(null);
     await untilBuilt(result);
     act(() => result.current.sign());
-    await waitFor(() => expect(result.current.state.status).toBe("error"));
+    await waitFor(() => expect(result.current.state).toMatchObject({ failedAt: "signing" }));
 
+    expect(result.current.canRetry).toBe(false);
     act(() => result.current.retry());
-    expect(result.current.state.status).toBe("paying");
+    expect(result.current.state.status).toBe("error");
   });
 });

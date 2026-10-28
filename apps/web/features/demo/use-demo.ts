@@ -7,6 +7,7 @@ import { apiMode } from "@/lib/api/mode";
 import { createMockSigner } from "./mock-signer";
 import { type RunnerDeps, runPay, runSetup, runShock, runSign } from "./runner";
 import type { DemoSigner } from "./signer";
+import type { DemoStatus } from "./types";
 import { useDemoMachine } from "./use-demo-machine";
 
 /** TODO(F6): keypair generado en el navegador (D13); hasta entonces, el agente de las fixtures. */
@@ -15,6 +16,9 @@ export const DEMO_AGENT = fixtureSetupReady.agent;
 /** Fuera de mock no hay firma hasta F6: falla con un error claro en vez de romper la página. */
 const noSigner: DemoSigner = () =>
   Promise.reject(new ApiClientError("INTERNAL", "Signing arrives with F6"));
+
+/** Solo se reintenta el setup o el pago: tras un fallo posterior, volver a pagar cobraría dos veces (x402). */
+const RETRYABLE: ReadonlySet<DemoStatus> = new Set(["setup", "paying"]);
 
 type UseDemoOptions = {
   recipeId: string;
@@ -68,9 +72,11 @@ export function useDemo({ recipeId, api = defaultApi, signer, pollIntervalMs }: 
     if (state.status === "built") void runSign(deps, state.run, dispatch, begin());
   }
 
+  const canRetry = state.status === "error" && RETRYABLE.has(state.failedAt);
+
   /** Vuelve a pagar si se conoce la posición; si no, repite el setup. */
   function retry() {
-    if (state.status !== "error") return;
+    if (state.status !== "error" || !canRetry) return;
     if (state.position) pay();
     else start();
   }
@@ -81,5 +87,5 @@ export function useDemo({ recipeId, api = defaultApi, signer, pollIntervalMs }: 
     dispatch({ type: "RESET" });
   }
 
-  return { state, start, pay, shock, sign, retry, reset };
+  return { state, start, pay, shock, sign, retry, canRetry, reset };
 }

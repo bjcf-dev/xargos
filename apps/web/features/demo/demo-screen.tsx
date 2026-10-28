@@ -221,7 +221,7 @@ export function DemoScreen({
             <>
               <ResultCard state={state} mode={mode} price={recipe.price} />
               <div className="flex gap-2">
-                <Button onClick={demo.retry}>Try again</Button>
+                {demo.canRetry ? <Button onClick={demo.retry}>Try again</Button> : null}
                 {startOver}
               </div>
             </>
