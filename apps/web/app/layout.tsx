@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { ModeBadge } from "@/components/mode-badge";
 import { Providers } from "@/components/providers";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { SiteHeader } from "@/components/site-header";
 import { cn } from "@/lib/utils";
 
 const geist = Geist({
@@ -36,13 +35,7 @@ export default function RootLayout({
       <body className="antialiased">
         <Providers>
           <div className="min-h-screen bg-background text-foreground">
-            <header className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-              <span className="font-mono text-sm font-bold">xARGOS</span>
-              <div className="flex items-center gap-3">
-                <ModeBadge />
-                <ThemeToggle />
-              </div>
-            </header>
+            <SiteHeader />
             {children}
           </div>
         </Providers>
