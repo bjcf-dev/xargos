@@ -31,28 +31,44 @@ export function canShock(secondsLeft: number | null): boolean {
   return secondsLeft !== null && secondsLeft >= SHOCK_MIN_SECONDS;
 }
 
-export type RevertCopy = { title: string; detail: string; byGuard: boolean };
+/** Cifras del revert del guard, ya formateadas y sin unidad. */
+export type RevertFigures = { received: string; minimum: string; shortfall: string };
+
+export type RevertCopy = {
+  title: string;
+  detail: string;
+  byGuard: boolean;
+  figures: RevertFigures | null;
+};
 
 /** D15: "guard" solo si la cadena dice que falló el guard; si no, el paso que falló. */
 export function describeRevert(run: Run, failure: RevertFailure): RevertCopy {
   if (failure.guard) {
-    const received = formatUnits(failure.guard.received, USDC_DECIMALS);
-    const min = formatUnits(failure.guard.min, USDC_DECIMALS);
+    // Lo recibido lo mide la cadena (GUARD_FAIL); el mínimo es el que prometió el build.
+    const received = failure.guard.received;
+    const minimum = BigInt(run.build.guard.minDelta);
+    const shortfall = minimum > received ? minimum - received : 0n;
+    const figures = {
+      received: formatUnits(received, USDC_DECIMALS),
+      minimum: formatUnits(minimum, USDC_DECIMALS),
+      shortfall: formatUnits(shortfall, USDC_DECIMALS),
+    };
     return {
-      title: "Reverted by the guard",
-      detail: `The agent would have received ${received} ${POOL_TOKEN}, below the ${min} ${POOL_TOKEN} minimum.`,
+      title: "The guard protected the agent",
+      detail: `The agent would have received ${figures.received} ${POOL_TOKEN}, below the ${figures.minimum} ${POOL_TOKEN} minimum, so the whole transaction was rolled back.`,
       byGuard: true,
+      figures,
     };
   }
   const detail = "The whole transaction was rolled back, so no step took effect.";
   if (failure.instructionIndex === null) {
-    return { title: "The transaction failed on-chain", detail, byGuard: false };
+    return { title: "The transaction failed on-chain", detail, byGuard: false, figures: null };
   }
   const step = run.build.steps.find((s) => s.index === failure.instructionIndex);
   const title = step
     ? `Step ${step.index} · ${step.label} (${step.protocol}) failed`
     : `Instruction ${failure.instructionIndex} failed`;
-  return { title, detail, byGuard: false };
+  return { title, detail, byGuard: false, figures: null };
 }
 
 /** Comisión de la receta, cobrada con x402 en USDC de Circle. */

@@ -7,6 +7,7 @@ import { createApiClient } from "@/lib/api/client";
 import { createHandlers } from "@/mocks/handlers";
 import { DemoScreen } from "./demo-screen";
 import { createMockSigner } from "./mock-signer";
+import { ResultCard } from "./result-card";
 
 const server = setupServer();
 const api = createApiClient({ baseUrl: "http://localhost/api/xargos" });
@@ -38,7 +39,11 @@ describe("DemoScreen (mock mode)", () => {
     expect(await screen.findByText(/price 150\.00 → 141\.00/i)).toBeDefined();
     await click(/sign & send/i);
 
-    expect(await screen.findByText("Reverted by the guard")).toBeDefined();
+    expect(await screen.findByText("The guard protected the agent")).toBeDefined();
+    // Protección, no error: el rojo queda solo en el paso que falló.
+    const alert = screen.getByText("The guard protected the agent").closest('[data-slot="alert"]');
+    expect(alert?.className).not.toContain("text-destructive");
+    expect(screen.getByText("0.85 demo USDC")).toBeDefined();
     expect(screen.getAllByText(/0\.01 USDC/).length).toBeGreaterThan(0);
     noDevnetClaims();
   });
@@ -164,6 +169,29 @@ describe("DemoScreen (mock mode)", () => {
     expect(screen.getByRole("button", { name: /sign & send/i }).hasAttribute("disabled")).toBe(
       false,
     );
+  });
+});
+
+// D15: un revert que no es del guard sigue en rojo, nombra el paso y no habla de "guard".
+describe("ResultCard for a revert outside the guard", () => {
+  it("stays red, names the step and never mentions the guard", () => {
+    render(
+      <ResultCard
+        state={{
+          status: "reverted",
+          run: { agent: "agent", position: "position", build: fixtureBuildResponse },
+          signature: "sig",
+          failure: { instructionIndex: 3, guard: null },
+        }}
+        mode="mock"
+        price={fixtureRecipe.price}
+      />,
+    );
+
+    const title = screen.getByText(/Step 3 · Collect fees/);
+    expect(title.closest('[data-slot="alert"]')?.className).toContain("text-destructive");
+    expect(document.body.textContent).not.toMatch(/guard/i);
+    expect(screen.queryByText(/loss avoided/i)).toBeNull();
   });
 });
 

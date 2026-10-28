@@ -1,5 +1,5 @@
 import type { Recipe } from "@xargos/shared";
-import { AlertTriangleIcon, CheckCircle2Icon, ShieldAlertIcon, XCircleIcon } from "lucide-react";
+import { AlertTriangleIcon, CheckCircle2Icon, ShieldCheckIcon, XCircleIcon } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { ApiMode } from "@/lib/api/mode";
 import { formatUnits, USDC_DECIMALS } from "@/lib/format";
@@ -55,11 +55,28 @@ export function ResultCard({ state, mode, price }: ResultCardProps) {
     const revert = describeRevert(state.run, state.failure);
     const spent = describeSpent(price, null);
     return (
-      <Alert variant="destructive">
-        {revert.byGuard ? <ShieldAlertIcon /> : <XCircleIcon />}
+      // Un revert del guard es la garantía funcionando: no va en rojo (el rojo queda en el paso).
+      <Alert variant={revert.byGuard ? "default" : "destructive"}>
+        {revert.byGuard ? <ShieldCheckIcon /> : <XCircleIcon />}
         <AlertTitle>{revert.title}</AlertTitle>
         <AlertDescription>
           <p>{revert.detail}</p>
+          {revert.figures ? (
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5">
+              <dt>Would have received</dt>
+              <dd className="font-mono tabular-nums">
+                {revert.figures.received} {POOL_TOKEN}
+              </dd>
+              <dt>Guaranteed minimum</dt>
+              <dd className="font-mono tabular-nums">
+                {revert.figures.minimum} {POOL_TOKEN}
+              </dd>
+              <dt>Loss avoided</dt>
+              <dd className="font-mono tabular-nums">
+                {revert.figures.shortfall} {POOL_TOKEN}
+              </dd>
+            </dl>
+          ) : null}
           <p>
             Spent: {spent.recipeFee} recipe fee (x402)
             {mode === "mock" ? ", simulated" : ""} ·{" "}

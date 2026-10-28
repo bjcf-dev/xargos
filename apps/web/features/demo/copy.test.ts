@@ -87,11 +87,30 @@ describe("describeRevert (D15)", () => {
     expect(copy.detail).toContain("9.95 demo USDC minimum");
   });
 
+  it("tells a guard revert as protection, with what it stopped", () => {
+    const copy = describeRevert(run, {
+      instructionIndex: guard.assertIndex,
+      guard: { received: 9_100_000n, min: 9_950_000n },
+    });
+    expect(copy.title).toBe("The guard protected the agent");
+    expect(copy.figures).toEqual({ received: "9.1", minimum: "9.95", shortfall: "0.85" });
+    expect(copy.detail).toContain("9.95 demo USDC");
+  });
+
+  it("never reports a negative loss avoided", () => {
+    const copy = describeRevert(run, {
+      instructionIndex: guard.assertIndex,
+      guard: { received: 10_000_000n, min: 9_950_000n },
+    });
+    expect(copy.figures?.shortfall).toBe("0");
+  });
+
   it("names the failed step and never says guard when another instruction failed", () => {
     const copy = describeRevert(run, { instructionIndex: 3, guard: null });
     expect(copy.byGuard).toBe(false);
     expect(copy.title).toContain("Step 3");
     expect(copy.title).toContain("Collect fees");
+    expect(copy.figures).toBeNull();
     expect(`${copy.title} ${copy.detail}`).not.toMatch(/guard/i);
   });
 
