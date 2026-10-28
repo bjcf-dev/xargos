@@ -62,7 +62,7 @@ export function ResultCard({ state, mode, price }: ResultCardProps) {
         <AlertDescription>
           <p>{revert.detail}</p>
           {revert.figures ? (
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5">
+            <dl className="my-1 grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5">
               <dt>Would have received</dt>
               <dd className="font-mono tabular-nums">
                 {revert.figures.received} {POOL_TOKEN}
