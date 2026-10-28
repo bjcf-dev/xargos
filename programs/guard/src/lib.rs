@@ -1,3 +1,4 @@
+pub mod error;
 pub mod instructions;
 pub mod state;
 
@@ -13,6 +14,10 @@ pub mod guard {
     use super::*;
 
     pub fn init_snapshot(ctx: Context<InitSnapshot>) -> Result<()> {
-        instructions::init_snapshot::handler(ctx)
+        instructions::init_snapshot::handle_init_snapshot(ctx)
+    }
+
+    pub fn snapshot(ctx: Context<TakeSnapshot>) -> Result<()> {
+        instructions::snapshot::handle_snapshot(ctx)
     }
 }

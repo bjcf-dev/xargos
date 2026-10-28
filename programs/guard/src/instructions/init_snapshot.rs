@@ -22,7 +22,7 @@ pub struct InitSnapshot<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<InitSnapshot>) -> Result<()> {
+pub fn handle_init_snapshot(ctx: Context<InitSnapshot>) -> Result<()> {
     let snapshot = &mut ctx.accounts.snapshot;
     snapshot.agent = ctx.accounts.agent.key();
     snapshot.mint = ctx.accounts.mint.key();
