@@ -9,7 +9,8 @@
     "spike:live": "tsx src/spike/live.ts",
     "orca:balances": "tsx src/scripts/orca/balances.ts",
     "orca:create-demo-mint": "tsx src/scripts/orca/create-demo-mint.ts",
-    "orca:create-pool": "tsx src/scripts/orca/create-pool.ts"
+    "orca:create-pool": "tsx src/scripts/orca/create-pool.ts",
+    "orca:open-position": "tsx src/scripts/orca/open-position.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
