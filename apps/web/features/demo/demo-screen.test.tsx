@@ -53,6 +53,23 @@ describe("DemoScreen (mock mode)", () => {
     expect(await screen.findByText("Executed as promised")).toBeDefined();
     expect(screen.queryByText(/reverted/i)).toBeNull();
   });
+
+  // ADR 0003: lo del pool es un "demo USDC" propio; la comisión x402 sí es USDC de Circle.
+  it("calls the pool token demo USDC and keeps the x402 fee in USDC", async () => {
+    render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
+
+    await click(/start demo/i);
+    await click(/pay & build/i);
+    expect(await screen.findByText(/guaranteed minimum/i)).toBeDefined();
+
+    expect(screen.getByText(/SOL · [\d.]+ demo USDC$/)).toBeDefined();
+    expect(screen.getAllByText(/^[\d.]+ demo USDC$/)).toHaveLength(2);
+    expect(screen.getByText(/than [\d.]+ demo USDC, the whole transaction reverts/)).toBeDefined();
+    expect(screen.getByText("0.01 USDC per request, paid with x402.")).toBeDefined();
+
+    await click(/sign & send/i);
+    expect(await screen.findByText(/at least [\d.]+ demo USDC\./)).toBeDefined();
+  });
   it("marks the transaction expired once expiresAt passes and blocks signing", async () => {
     server.use(
       http.post("*/api/xargos/recipes/:recipeId/build", () =>
