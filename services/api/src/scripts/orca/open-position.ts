@@ -11,8 +11,9 @@ if (!POOL) throw new Error("set WHIRLPOOL_ADDRESS (see .env.example)");
 const LOWER_PRICE = 100;
 const UPPER_PRICE = 250;
 // Upper bounds on what the position may take; the SDK deposits the max liquidity that fits both.
-const MAX_SOL = 1_000_000_000n; // 1 SOL in lamports
-const MAX_DEMO_USDC = 300_000_000n; // 300 demo USDC
+// POSITION_SOL (lamports) sizes the position; demo USDC is capped at 300 per SOL.
+const MAX_SOL = BigInt(process.env.POSITION_SOL ?? 1_000_000_000);
+const MAX_DEMO_USDC = (MAX_SOL * 300_000_000n) / 1_000_000_000n;
 
 await useFacilitator();
 const { positionMint, initializationCost, callback } = await openConcentratedPosition(

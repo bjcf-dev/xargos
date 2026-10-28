@@ -1,6 +1,7 @@
 import {
   appendTransactionMessageInstructions,
   compileTransaction,
+  compressTransactionMessageUsingAddressLookupTables,
   createTransactionMessage,
   getBase64EncodedWireTransaction,
   pipe,
@@ -11,6 +12,7 @@ import {
 } from "@solana/kit";
 import { BuildResponse } from "@xargos/shared";
 import type { BuildContext, Recipe } from "../recipes/types";
+import type { LookupTables } from "./lookup-table";
 
 /** Largest serialized transaction Solana accepts (lesson 16). */
 export const MAX_TRANSACTION_BYTES = 1232;
@@ -24,6 +26,8 @@ export type BuildParams = {
   buildId: string;
   rpc: Rpc<SolanaRpcApi>;
   now?: Date;
+  /** Needed when the recipe does not fit in 1232 bytes (lesson 16). */
+  lookupTables?: LookupTables;
 };
 
 /** Builds the unsigned v0 transaction for a recipe and validates the whole response against the contract. */
@@ -33,6 +37,7 @@ export async function buildResponse({
   buildId,
   rpc,
   now = new Date(),
+  lookupTables,
 }: BuildParams) {
   const built = await recipe.build(context);
   const { value: blockhash } = await rpc.getLatestBlockhash({ commitment: "confirmed" }).send();
@@ -46,6 +51,7 @@ export async function buildResponse({
         built.steps.map((s) => s.instruction),
         m,
       ),
+    (m) => (lookupTables ? compressTransactionMessageUsingAddressLookupTables(m, lookupTables) : m),
   );
   const transaction = getBase64EncodedWireTransaction(compileTransaction(message));
 
