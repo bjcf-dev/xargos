@@ -47,6 +47,21 @@ export function canShock(secondsLeft: number | null): boolean {
 /** Cifras del revert del guard, ya formateadas y sin unidad. */
 export type RevertFigures = { received: string; minimum: string; shortfall: string };
 
+const SHOCK_CHANGE = new Intl.NumberFormat("en-US", {
+  style: "percent",
+  maximumFractionDigits: 1,
+  signDisplay: "exceptZero",
+});
+
+/** El shock con su par y su variación; sin porcentaje si algún precio no sirve para calcularlo. */
+export function describeShock(priceBefore: string, priceAfter: string): string {
+  const pair = `SOL/${POOL_TOKEN} ${priceBefore} → ${priceAfter}`;
+  const before = Number(priceBefore);
+  const after = Number(priceAfter);
+  if (!Number.isFinite(before) || !Number.isFinite(after) || before <= 0) return pair;
+  return `${pair} (${SHOCK_CHANGE.format((after - before) / before)})`;
+}
+
 export type RevertCopy = {
   title: string;
   detail: string;

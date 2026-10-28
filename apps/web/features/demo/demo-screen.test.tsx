@@ -39,7 +39,7 @@ describe("DemoScreen (mock mode)", () => {
     noDevnetClaims();
 
     await click(/apply price shock first/i);
-    expect(await screen.findByText(/price 150\.00 → 141\.00/i)).toBeDefined();
+    expect(await screen.findByText("SOL/demo USDC 150.00 → 141.00 (-6%)")).toBeDefined();
     await click(/sign & send/i);
 
     expect(await screen.findByText("The guard protected the agent")).toBeDefined();

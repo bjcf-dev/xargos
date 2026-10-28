@@ -1,4 +1,10 @@
-import { ShieldCheckIcon, TimerIcon, TrendingDownIcon, XCircleIcon } from "lucide-react";
+import {
+  ShieldCheckIcon,
+  TimerIcon,
+  TrendingDownIcon,
+  TrendingUpIcon,
+  XCircleIcon,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -11,7 +17,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { formatUnits, USDC_DECIMALS } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { POOL_TOKEN, type StepTag, slippageLabel, stepTag } from "./copy";
+import { describeShock, POOL_TOKEN, type StepTag, slippageLabel, stepTag } from "./copy";
 import type { Run } from "./types";
 
 const TAG_VARIANT: Record<StepTag, "default" | "secondary" | "outline"> = {
@@ -73,8 +79,12 @@ export function TxAnatomy({ run, secondsLeft, failedIndex = null }: TxAnatomyPro
         </p>
         {run.shock?.priceBefore && run.shock.priceAfter ? (
           <Badge variant="destructive">
-            <TrendingDownIcon data-icon="inline-start" />
-            Price {run.shock.priceBefore} → {run.shock.priceAfter}
+            {Number(run.shock.priceAfter) < Number(run.shock.priceBefore) ? (
+              <TrendingDownIcon data-icon="inline-start" />
+            ) : (
+              <TrendingUpIcon data-icon="inline-start" />
+            )}
+            {describeShock(run.shock.priceBefore, run.shock.priceAfter)}
           </Badge>
         ) : null}
         <Separator />

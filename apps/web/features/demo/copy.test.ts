@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   canShock,
   describeRevert,
+  describeShock,
   describeSpent,
   formatFee,
   mockPaymentNote,
@@ -125,6 +126,18 @@ describe("describeRevert (D15)", () => {
 describe("formatFee", () => {
   it("formats the x402 recipe fee in USDC", () => {
     expect(formatFee(fixtureRecipe.price)).toBe("0.01 USDC");
+  });
+});
+
+describe("describeShock", () => {
+  it("names the pair and the change", () => {
+    expect(describeShock("150.00", "141.00")).toBe("SOL/demo USDC 150.00 → 141.00 (-6%)");
+    expect(describeShock("150.00", "155.00")).toBe("SOL/demo USDC 150.00 → 155.00 (+3.3%)");
+  });
+
+  it("leaves the change out when a price is not usable", () => {
+    expect(describeShock("abc", "141.00")).toBe("SOL/demo USDC abc → 141.00");
+    expect(describeShock("0", "1")).toBe("SOL/demo USDC 0 → 1");
   });
 });
 
