@@ -36,10 +36,20 @@ describe("stepTag", () => {
     [0, "setup"],
     [2, "guard"],
     [3, "action"],
-    [6, "cleanup"],
+    [6, "setup"],
     [7, "guard"],
   ] as const)("tags step %i as %s", (index, tag) => {
     expect(stepTag(step(index), guard)).toBe(tag);
+  });
+
+  it("tags a setup after the assert as cleanup", () => {
+    const late = { ...step(0), index: guard.assertIndex + 1 };
+    expect(stepTag(late, guard)).toBe("cleanup");
+  });
+
+  it("keeps token setup between snapshot and assert as setup (real tx of PR #51)", () => {
+    const real = { ...guard, snapshotIndex: 0, assertIndex: 10 };
+    expect(stepTag({ ...step(0), index: 1 }, real)).toBe("setup");
   });
 });
 

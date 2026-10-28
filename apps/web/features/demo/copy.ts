@@ -19,11 +19,14 @@ export const DEMO_PATHS: Record<DemoPath, { label: string; line: string }> = {
   },
 };
 
-/** Lo que la UI enseña de cada paso: un setup que va después del snapshot es limpieza. */
+/**
+ * Lo que la UI enseña de cada paso. Un setup solo es limpieza si va después del assert: entre
+ * el snapshot y el assert van las cuentas de tokens que prepara la receta (tx real de la #51).
+ */
 export type StepTag = "setup" | "action" | "guard" | "cleanup";
 
 export function stepTag(step: Step, guard: Guard): StepTag {
-  if (step.kind === "setup" && step.index > guard.snapshotIndex) return "cleanup";
+  if (step.kind === "setup" && step.index > guard.assertIndex) return "cleanup";
   return step.kind;
 }
 
