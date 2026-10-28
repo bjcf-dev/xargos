@@ -7,6 +7,7 @@ import {
   describeShock,
   describeSpent,
   formatFee,
+  humanError,
   mockPaymentNote,
   secondsLeft,
   shockTrend,
@@ -201,6 +202,22 @@ describe("describeSpent (D16)", () => {
 
   it("formats the network fee in SOL once known", () => {
     expect(describeSpent(fixtureRecipe.price, 5000n).networkFee).toBe("0.000005 SOL");
+  });
+});
+
+describe("humanError", () => {
+  it("explains a known code in plain words and ignores the raw message", () => {
+    expect(humanError({ code: "RATE_LIMITED", message: "429 from upstream" })).toEqual({
+      title: "Too many demos right now",
+      hint: "Wait a few minutes and start over.",
+    });
+  });
+
+  it("keeps our own message for INTERNAL errors", () => {
+    expect(humanError({ code: "INTERNAL", message: "Signing arrives with F6" })).toEqual({
+      title: "Something went wrong",
+      hint: "Signing arrives with F6",
+    });
   });
 });
 

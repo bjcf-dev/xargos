@@ -1,7 +1,7 @@
-import type { Guard, Recipe, Step } from "@xargos/shared";
+import type { ErrorCode, Guard, Recipe, Step } from "@xargos/shared";
 import type { ApiMode } from "@/lib/api/mode";
 import { formatUnits, SOL_DECIMALS, USDC_DECIMALS } from "@/lib/format";
-import type { DemoState, RevertFailure, Run } from "./types";
+import type { DemoError, DemoState, RevertFailure, Run } from "./types";
 
 /** ADR 0003: el pool usa un USDC propio. Solo la comisión x402 es USDC de Circle. */
 export const POOL_TOKEN = "demo USDC";
@@ -73,6 +73,52 @@ export function shockTrend(priceBefore: string, priceAfter: string): "up" | "dow
   return after < before ? "down" : "up";
 }
 
+export type HumanError = { title: string; hint: string };
+
+/** Frases para personas por código. Es un Record: un código nuevo sin texto no compila. */
+const HUMAN_ERRORS: Record<ErrorCode, HumanError | null> = {
+  PAYMENT_REQUIRED: {
+    title: "The payment was not completed",
+    hint: "The agent did not pay for the build. Try again.",
+  },
+  PAYMENT_INVALID: {
+    title: "The payment was rejected",
+    hint: "The x402 payment could not be verified. Try again.",
+  },
+  BUILD_FAILED: {
+    title: "The transaction could not be built",
+    hint: "The backend could not prepare the recipe. Try again in a moment.",
+  },
+  BUILD_EXPIRED: { title: "The transaction expired", hint: "Start over to build a new one." },
+  REBUILD_WINDOW_CLOSED: {
+    title: "The free rebuild window has closed",
+    hint: "Start over to build and pay for a new transaction.",
+  },
+  RATE_LIMITED: { title: "Too many demos right now", hint: "Wait a few minutes and start over." },
+  ACCESS_DENIED: {
+    title: "This demo is not open right now",
+    hint: "The demo refused access. Ask the xARGOS team.",
+  },
+  VALIDATION_ERROR: {
+    title: "The request was not valid",
+    hint: "Start over. If it keeps happening, the demo may need an update.",
+  },
+  SETUP_FAILED: {
+    title: "The agent could not be prepared",
+    hint: "Setting up the demo agent on devnet failed. Try again in a moment.",
+  },
+  SHOCK_FAILED: {
+    title: "The price shock failed",
+    hint: "The pool price did not move. Start over to try again.",
+  },
+  // Nuestros propios errores (p. ej. "Signing arrives with F6"): el mensaje ya es para personas.
+  INTERNAL: null,
+};
+
+export function humanError(error: DemoError): HumanError {
+  return HUMAN_ERRORS[error.code] ?? { title: "Something went wrong", hint: error.message };
+}
+
 /**
  * Lo que anuncia la región aria-live del panel. Vacío donde ya habla Busy (role="status"),
  * para no anunciar dos veces lo mismo.
@@ -88,7 +134,7 @@ export function stepAnnouncement(state: DemoState): string {
     case "reverted":
       return describeRevert(state.run, state.failure).title;
     case "error":
-      return state.error.message;
+      return humanError(state.error).title;
     case "expired":
     case "rebuilding":
       return "The transaction expired before it was sent";

@@ -4,7 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { ApiMode } from "@/lib/api/mode";
 import { formatUnits, USDC_DECIMALS } from "@/lib/format";
 import { ellipsify, getExplorerUrl } from "@/lib/solana/explorer";
-import { describeRevert, describeSpent, mockPaymentNote, POOL_TOKEN } from "./copy";
+import { describeRevert, describeSpent, humanError, mockPaymentNote, POOL_TOKEN } from "./copy";
 import type { DemoState } from "./types";
 
 type ResultState = Extract<DemoState, { status: "confirmed" | "reverted" | "error" }>;
@@ -98,14 +98,17 @@ export function ResultCard({ state, mode, price }: ResultCardProps) {
     );
   }
 
+  // Errores para personas: la frase arriba y el código del contrato en pequeño, para soporte.
+  const human = humanError(state.error);
   return (
     <Alert variant="destructive">
       <AlertTriangleIcon />
       <AlertTitle data-step-title tabIndex={-1} className="outline-none">
-        {state.error.message}
+        {human.title}
       </AlertTitle>
       <AlertDescription>
-        <p className="font-mono">{state.error.code}</p>
+        <p>{human.hint}</p>
+        <p className="font-mono text-xs text-muted-foreground">{state.error.code}</p>
       </AlertDescription>
     </Alert>
   );

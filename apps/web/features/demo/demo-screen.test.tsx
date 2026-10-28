@@ -252,9 +252,12 @@ describe("DemoScreen (mock mode)", () => {
     await click(/pay & build/i);
     await click(/sign & send/i);
 
+    expect(await screen.findByText("Signing arrives with F6")).toBeDefined();
+    // Errores para personas: título claro y el código en pequeño.
     expect(
-      await screen.findByText("Signing arrives with F6", { selector: "[data-step-title]" }),
+      screen.getByText("Something went wrong", { selector: "[data-step-title]" }),
     ).toBeDefined();
+    expect(screen.getByText("INTERNAL").className).toContain("text-xs");
     expect(screen.queryByRole("button", { name: /try again/i })).toBeNull();
     expect(screen.getByRole("button", { name: /start over/i })).toBeDefined();
   });
