@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   describeRevert,
   describeSpent,
+  formatFee,
   secondsLeft,
   slippageLabel,
   stepTag,
@@ -85,6 +86,12 @@ describe("describeRevert (D15)", () => {
     const copy = describeRevert(run, { instructionIndex: null, guard: null });
     expect(copy.title).toBe("The transaction failed on-chain");
     expect(`${copy.title} ${copy.detail}`).not.toMatch(/guard/i);
+  });
+});
+
+describe("formatFee", () => {
+  it("formats the x402 recipe fee in USDC", () => {
+    expect(formatFee(fixtureRecipe.price)).toBe("0.01 USDC");
   });
 });
 

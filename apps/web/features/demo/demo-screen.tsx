@@ -11,7 +11,7 @@ import { api as defaultApi } from "@/lib/api";
 import type { ApiClient } from "@/lib/api/client";
 import { type ApiMode, apiMode } from "@/lib/api/mode";
 import { AgentCard } from "./agent-card";
-import { describeSpent, secondsLeft } from "./copy";
+import { formatFee, secondsLeft } from "./copy";
 import { ResultCard } from "./result-card";
 import type { DemoSigner } from "./signer";
 import { TxAnatomy } from "./tx-anatomy";
@@ -102,7 +102,7 @@ export function DemoScreen({
     return <Skeleton className="h-64 w-full" />;
   }
 
-  const fee = describeSpent(recipe.price, null).recipeFee;
+  const fee = formatFee(recipe.price);
   const startOver = (
     <Button variant="outline" onClick={demo.reset}>
       Start over

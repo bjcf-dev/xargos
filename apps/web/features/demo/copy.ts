@@ -48,6 +48,11 @@ export function describeRevert(run: Run, failure: RevertFailure): RevertCopy {
   return { title, detail, byGuard: false };
 }
 
+/** Comisión de la receta, cobrada con x402 en USDC de Circle. */
+export function formatFee(price: Recipe["price"]): string {
+  return `${formatUnits(price.amount, USDC_DECIMALS)} USDC`;
+}
+
 export type SpentCopy = { recipeFee: string; networkFee: string | null };
 
 /** D16: lo que sí se gastó aunque la tx revierta. La comisión de red llega con getTransaction (F10). */
@@ -56,7 +61,7 @@ export function describeSpent(
   networkFeeLamports: bigint | null,
 ): SpentCopy {
   return {
-    recipeFee: `${formatUnits(price.amount, USDC_DECIMALS)} USDC`,
+    recipeFee: formatFee(price),
     networkFee:
       networkFeeLamports === null ? null : `${formatUnits(networkFeeLamports, SOL_DECIMALS)} SOL`,
   };
