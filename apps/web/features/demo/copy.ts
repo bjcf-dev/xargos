@@ -15,7 +15,7 @@ export const DEMO_PATHS: Record<DemoPath, { label: string; line: string }> = {
   },
   B: {
     label: "B · Price moves against the agent",
-    line: "The pool price drops before signing, so the guard reverts the whole transaction.",
+    line: "The pool price drops before signing; the guard reverts the whole transaction if the agent would receive less than the minimum.",
   },
 };
 

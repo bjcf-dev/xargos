@@ -2,6 +2,7 @@ import { fixtureBuildResponse, fixtureRecipe, fixtureSetupReady } from "@xargos/
 import { describe, expect, it } from "vitest";
 import {
   canShock,
+  DEMO_PATHS,
   describeRevert,
   describeShock,
   describeSpent,
@@ -148,6 +149,13 @@ describe("describeShock", () => {
   it("leaves the change out when a price is not usable", () => {
     expect(describeShock("abc", "141.00")).toBe("SOL/demo USDC abc → 141.00");
     expect(describeShock("0", "1")).toBe("SOL/demo USDC 0 → 1");
+  });
+});
+
+describe("DEMO_PATHS", () => {
+  // D15 y D10: el camino B no promete el revert; solo la cadena dice si el guard revirtió.
+  it("does not promise a revert before the chain says so", () => {
+    expect(DEMO_PATHS.B.line).toMatch(/if the agent would receive less than the minimum/);
   });
 });
 

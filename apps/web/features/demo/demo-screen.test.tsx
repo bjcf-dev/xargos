@@ -86,6 +86,24 @@ describe("DemoScreen (mock mode)", () => {
     expect(actions()[0]?.textContent).toMatch(/sign & send/i);
   });
 
+  it("path B leads with signing when there is no time left for the shock", async () => {
+    server.use(
+      http.post("*/api/xargos/recipes/:recipeId/build", () =>
+        HttpResponse.json({
+          ...fixtureBuildResponse,
+          expiresAt: new Date(Date.now() + 15_000).toISOString(),
+          rebuildUntil: new Date(Date.now() + 60_000).toISOString(),
+        }),
+      ),
+    );
+    render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
+    await click(/price moves against/i);
+    await click(/pay & build/i);
+
+    expect(await screen.findByText(/not enough time left for the price shock/i)).toBeDefined();
+    expect(actions()[0]?.textContent).toMatch(/sign & send/i);
+  });
+
   it("start over brings back both paths", async () => {
     render(<DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />);
     await click(/price moves against/i);

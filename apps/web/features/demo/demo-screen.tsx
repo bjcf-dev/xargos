@@ -202,9 +202,9 @@ export function DemoScreen({
               {state.status === "signing" ? <Busy>Signing and sending…</Busy> : null}
               {state.status === "built" ? (
                 <div className="flex flex-col gap-3">
-                  {/* En el camino B, el shock va primero hasta que se aplica; luego, firmar. */}
+                  {/* En el camino B, el shock va primero mientras se pueda lanzar; si no, firmar. */}
                   <fieldset aria-label="Next step" className="flex min-w-0 flex-wrap gap-2">
-                    {path === "B" && !state.run.shock ? (
+                    {path === "B" && !state.run.shock && canShock(left) ? (
                       <>
                         <Button onClick={demo.shock} disabled={!canShock(left)}>
                           Apply price shock first
