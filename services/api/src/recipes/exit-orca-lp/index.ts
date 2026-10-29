@@ -6,13 +6,7 @@ import {
   swapInstructions,
   WhirlpoolDeployment,
 } from "@orca-so/whirlpools";
-import {
-  type Address,
-  createNoopSigner,
-  type Instruction,
-  type Rpc,
-  type SolanaRpcApi,
-} from "@solana/kit";
+import { type Address, createNoopSigner, type Rpc, type SolanaRpcApi } from "@solana/kit";
 import { findAssociatedTokenPda, TOKEN_PROGRAM_ADDRESS } from "@solana-program/token";
 import {
   findSnapshotStatePda,
@@ -25,11 +19,12 @@ import {
   minDelta,
   STEP_SLIPPAGE_BPS,
 } from "../../quote/min-delta";
+import { POOL_TICK_SPACING, WSOL_MINT } from "../../solana/constants";
 import type { BuildContext, BuiltRecipe, Recipe, RecipeStep } from "../types";
+import { tagStep } from "./steps";
 
-export const EXIT_ORCA_LP_ID = "exit-orca-lp";
-const WHIRLPOOL_PROGRAM = WhirlpoolDeployment.devnet.programId;
-const WSOL_MINT = "So11111111111111111111111111111111111111112" as Address;
+/** Same id as the contract fixture (packages/shared), which the front looks up. */
+export const EXIT_ORCA_LP_ID = "exit-orca-lp-to-usdc";
 
 export type ExitOrcaLpDeps = {
   rpc: Rpc<SolanaRpcApi>;
@@ -43,29 +38,22 @@ export type ExitOrcaLpDeps = {
   priceMint: Address;
 };
 
-/** Tags each SDK instruction by the program that runs it: token plumbing is setup, Orca is the action. */
-function tag(
-  instructions: Instruction[],
-  action: { label: string; protocol: string },
-): RecipeStep[] {
-  return instructions.map((instruction) =>
-    instruction.programAddress === WHIRLPOOL_PROGRAM
-      ? { instruction, kind: "action", ...action }
-      : { instruction, kind: "setup", label: "Prepare token accounts", protocol: "SPL Token" },
-  );
-}
-
 export function createExitOrcaLpRecipe(deps: ExitOrcaLpDeps): Recipe {
   return {
     info: {
       id: EXIT_ORCA_LP_ID,
-      name: "Exit Orca LP to USDC",
+      name: "Exit Orca LP → USDC",
       description:
-        "Closes your Orca LP position and leaves everything in USDC. Reverts if you receive less than the guaranteed minimum.",
+        "Withdraw liquidity, collect fees and swap everything to demo USDC, guarded on-chain. Reverts if you receive less than the guaranteed minimum.",
       price: { amount: deps.priceAmount, mint: deps.priceMint },
     },
 
     async build({ agent, position }: BuildContext): Promise<BuiltRecipe> {
+      // The steps have no minimum of their own: the guard is the only one (D10). A price shock between
+      // build and signing moves what the position pays out, and that must be caught by the guard.
+      // Note: the swap spends `solOut` SOL from the agent's wallet after the wSOL account is closed. If
+      // a shock makes the position return less SOL than estimated, the agent covers the difference
+      // from its own SOL, which the guard (it only watches the demo USDC) does not see.
       // The default wraps SOL in throwaway keypairs the agent would have to co-sign; use its wSOL ATA.
       setNativeMintWrappingStrategy("ata");
       const authority = createNoopSigner(agent); // the agent signs in its own wallet, never here
@@ -81,7 +69,7 @@ export function createExitOrcaLpRecipe(deps: ExitOrcaLpDeps): Recipe {
         deps.rpc,
         mintA,
         mintB,
-        64,
+        POOL_TICK_SPACING,
         WhirlpoolDeployment.devnet,
       );
       if (!pool.initialized || pool.address !== deps.whirlpool) {
@@ -123,18 +111,22 @@ export function createExitOrcaLpRecipe(deps: ExitOrcaLpDeps): Recipe {
             { agentTokenAccount: watchedAccount, snapshot },
             guardConfig,
           ),
-          label: "Record the USDC balance",
+          label: "Record the demo USDC balance",
           protocol: "xARGOS guard",
           kind: "guard",
         },
-        ...tag(close.instructions, { label: "Close the LP position", protocol: "Orca Whirlpools" }),
-        ...tag(swap.instructions, { label: "Swap SOL to USDC", protocol: "Orca Whirlpools" }),
+        ...close.instructions.map((instruction) =>
+          tagStep(instruction, { label: "Close the LP position", protocol: "Orca Whirlpools" }),
+        ),
+        ...swap.instructions.map((instruction) =>
+          tagStep(instruction, { label: "Swap SOL to demo USDC", protocol: "Orca Whirlpools" }),
+        ),
         {
           instruction: getAssertMinDeltaInstruction(
             { agentTokenAccount: watchedAccount, snapshot, minDelta: min },
             guardConfig,
           ),
-          label: "Check the minimum USDC received",
+          label: "Check the minimum demo USDC received",
           protocol: "xARGOS guard",
           kind: "guard",
         },
