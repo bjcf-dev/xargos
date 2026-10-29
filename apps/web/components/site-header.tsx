@@ -12,7 +12,7 @@ export function SiteHeader() {
       <div className="flex items-center gap-3">
         <Link
           href="/failed-payments"
-          className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+          className="hidden text-sm text-muted-foreground underline-offset-4 hover:underline sm:inline"
         >
           Failed payments
         </Link>

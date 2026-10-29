@@ -17,8 +17,20 @@ export default function FailedPaymentsPage() {
         An agent pays for each recipe with x402 and gets one transaction to sign. When something
         goes wrong, this is what happens to its money.
       </p>
-      <div className="mt-6 overflow-x-auto">
-        <table className="w-full min-w-[36rem] border-collapse text-left text-sm">
+      {/* En el móvil, una tarjeta por caso: tres columnas no caben en 390 px. */}
+      <ul className="mt-6 flex flex-col gap-4 md:hidden">
+        {FAILED_PAYMENT_CASES.map((row) => (
+          <li key={row.case} className="rounded-lg border p-4 text-sm">
+            <h2 className="font-medium">{row.case}</h2>
+            <p className="mt-1 text-muted-foreground">{row.response}</p>
+            <p className="mt-2">
+              <span className="font-medium">Charged:</span> {row.charged}
+            </p>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-6 hidden md:block">
+        <table className="w-full border-collapse text-left text-sm">
           <thead>
             <tr className="border-b">
               <th scope="col" className="py-2 pr-4 font-medium">
