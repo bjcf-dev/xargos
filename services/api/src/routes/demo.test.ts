@@ -64,12 +64,34 @@ describe("POST /demo/setup", () => {
     expect((await post({ agent: AGENT, accessCode: "secret-code" })).status).toBe(202);
   });
 
-  it("rate limits by IP with RATE_LIMITED", async () => {
+  it("rate limits with RATE_LIMITED", async () => {
     const { post } = setup({ limit: 1 });
-    expect((await post({ agent: AGENT }, { "x-forwarded-for": "1.2.3.4" })).status).toBe(202);
-    const res = await post({ agent: AGENT }, { "x-forwarded-for": "1.2.3.4" });
+    expect((await post({ agent: AGENT })).status).toBe(202);
+    const res = await post({ agent: AGENT });
     expect(res.status).toBe(429);
     expect((await errorBody(res)).error.code).toBe("RATE_LIMITED");
+  });
+
+  it("ignores x-forwarded-for, which the client can forge to dodge the limit", async () => {
+    const { post } = setup({ limit: 1 });
+    expect((await post({ agent: AGENT }, { "x-forwarded-for": "1.1.1.1" })).status).toBe(202);
+    expect((await post({ agent: AGENT }, { "x-forwarded-for": "2.2.2.2" })).status).toBe(429);
+  });
+
+  it("counts the proxy's client IP header only when the access code is valid", async () => {
+    const { post } = setup({ accessCode: "secret-code", limit: 1 });
+    const withCode = { agent: AGENT, accessCode: "secret-code" };
+    expect((await post(withCode, { "x-xargos-client-ip": "9.9.9.9" })).status).toBe(202);
+    // another browser behind the same proxy has its own bucket...
+    expect((await post(withCode, { "x-xargos-client-ip": "8.8.8.8" })).status).toBe(202);
+    // ...and the first one is limited
+    expect((await post(withCode, { "x-xargos-client-ip": "9.9.9.9" })).status).toBe(429);
+  });
+
+  it("does not trust the proxy header when no access code is configured", async () => {
+    const { post } = setup({ limit: 1 });
+    expect((await post({ agent: AGENT }, { "x-xargos-client-ip": "9.9.9.9" })).status).toBe(202);
+    expect((await post({ agent: AGENT }, { "x-xargos-client-ip": "8.8.8.8" })).status).toBe(429);
   });
 
   it("answers RATE_LIMITED when the demo is full", async () => {
@@ -83,6 +105,32 @@ describe("POST /demo/setup", () => {
     await post({ agent: AGENT });
     await post({ agent: AGENT });
     await vi.waitFor(() => expect(fundSol).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe("retrying a failed setup", () => {
+  it("runs it again for the same agent and ends ready", async () => {
+    let attempt = 0;
+    const { app, post } = setup({
+      steps: steps({
+        fundSol: async () => {
+          attempt += 1;
+          if (attempt === 1) throw new Error("first attempt fails");
+        },
+      }),
+    });
+    await post({ agent: AGENT });
+    await vi.waitFor(async () => {
+      const body = DemoSetupStatus.parse(await (await app.request(`/demo/setup/${AGENT}`)).json());
+      expect(body.phase).toBe("failed");
+    });
+
+    expect((await post({ agent: AGENT })).status).toBe(202);
+    await vi.waitFor(async () => {
+      const body = DemoSetupStatus.parse(await (await app.request(`/demo/setup/${AGENT}`)).json());
+      expect(body.phase).toBe("ready");
+    });
+    expect(attempt).toBe(2);
   });
 });
 
