@@ -10,6 +10,10 @@ import {
   getBase64Decoder,
   getTransactionEncoder,
   pipe,
+  SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE,
+  SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR,
+  SOLANA_ERROR__TRANSACTION_ERROR__BLOCKHASH_NOT_FOUND,
+  SolanaError,
   setTransactionMessageFeePayerSigner,
   setTransactionMessageLifetimeUsingBlockhash,
 } from "@solana/kit";
@@ -46,21 +50,44 @@ beforeAll(async () => {
 
 type FakeOptions = {
   simulationErr?: unknown;
+  /** Lo que lanza cada método del RPC; statuses: cuántas veces seguidas lanza ("always" = siempre). */
+  throws?: {
+    simulate?: unknown;
+    send?: unknown;
+    statuses?: { error: unknown; times: number | "always" };
+  };
   statuses?: Array<{ confirmationStatus: string; err: unknown } | null>;
   meta?: { err: unknown; logMessages: string[] };
 };
 
-function fakeRpc({ simulationErr = null, statuses, meta }: FakeOptions = {}) {
+function fakeRpc({ simulationErr = null, statuses, meta, throws = {} }: FakeOptions = {}) {
   const sent: Array<{ wire: string; config: unknown }> = [];
   const queue = statuses ?? [{ confirmationStatus: "confirmed", err: null }];
   const reply = <T>(value: T) => ({ send: async () => value });
+  const fail = (error: unknown) => ({
+    send: async () => {
+      throw error;
+    },
+  });
+  let statusFailures = 0;
   const rpc = {
-    simulateTransaction: () => reply({ value: { err: simulationErr, logs: ["sim log"] } }),
+    simulateTransaction: () =>
+      throws.simulate
+        ? fail(throws.simulate)
+        : reply({ value: { err: simulationErr, logs: ["sim log"] } }),
     sendTransaction: (wire: string, config: unknown) => {
+      if (throws.send) return fail(throws.send);
       sent.push({ wire, config });
       return reply("sig-from-rpc");
     },
-    getSignatureStatuses: () => reply({ value: [queue.length > 1 ? queue.shift() : queue[0]] }),
+    getSignatureStatuses: () => {
+      const t = throws.statuses;
+      if (t && (t.times === "always" || statusFailures < t.times)) {
+        statusFailures += 1;
+        return fail(t.error);
+      }
+      return reply({ value: [queue.length > 1 ? queue.shift() : queue[0]] });
+    },
     getTransaction: () => reply({ meta: meta ?? { err: null, logMessages: ["Program log: ok"] } }),
   } as unknown as SendRpc;
   return { rpc, sent };
@@ -127,6 +154,65 @@ describe("signAndSend", () => {
     const pending = signAndSend({ rpc, ...base(), signal: controller.signal, timeoutMs: 5_000 });
     controller.abort();
     await expect(pending).rejects.toThrow();
+  });
+});
+
+const httpError = (statusCode: number) =>
+  new SolanaError(SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR, {
+    headers: new Headers(),
+    message: "HTTP error",
+    statusCode,
+  });
+
+describe("signAndSend when the rpc fails", () => {
+  it("keeps polling after a transient error and returns the confirmed result", async () => {
+    const { rpc } = fakeRpc({ throws: { statuses: { error: httpError(502), times: 1 } } });
+    const result = await signAndSend({ rpc, ...base() });
+    expect(result.err).toBeNull();
+  });
+
+  it("keeps the signature when the result cannot be read", async () => {
+    const { rpc, sent } = fakeRpc({
+      throws: { statuses: { error: httpError(502), times: "always" } },
+    });
+    const error = (await signAndSend({ rpc, ...base(), timeoutMs: 20 }).catch(
+      (e: unknown) => e,
+    )) as ApiClientError;
+    expect(sent).toHaveLength(1);
+    expect(error).toBeInstanceOf(ApiClientError);
+    expect(error.details).toMatchObject({ signature: expect.any(String) });
+    expect(error.message).toContain((error.details as { signature: string }).signature);
+  });
+
+  it("maps a blockhash that expires at send to BUILD_EXPIRED", async () => {
+    const preflight = new SolanaError(
+      SOLANA_ERROR__JSON_RPC__SERVER_ERROR_SEND_TRANSACTION_PREFLIGHT_FAILURE,
+      { cause: new SolanaError(SOLANA_ERROR__TRANSACTION_ERROR__BLOCKHASH_NOT_FOUND) } as never,
+    );
+    const { rpc } = fakeRpc({ throws: { send: preflight } });
+    const error = (await signAndSend({ rpc, ...base() }).catch(
+      (e: unknown) => e,
+    )) as ApiClientError;
+    expect(error.code).toBe("BUILD_EXPIRED");
+  });
+
+  it("maps a 429 from the rpc route to RATE_LIMITED", async () => {
+    const { rpc } = fakeRpc({ throws: { simulate: httpError(429) } });
+    const error = (await signAndSend({ rpc, ...base() }).catch(
+      (e: unknown) => e,
+    )) as ApiClientError;
+    expect(error).toBeInstanceOf(ApiClientError);
+    expect(error.code).toBe("RATE_LIMITED");
+  });
+
+  it("turns other Kit errors into a plain message", async () => {
+    const { rpc } = fakeRpc({ throws: { simulate: httpError(502) } });
+    const error = (await signAndSend({ rpc, ...base() }).catch(
+      (e: unknown) => e,
+    )) as ApiClientError;
+    expect(error).toBeInstanceOf(ApiClientError);
+    expect(error.code).toBe("INTERNAL");
+    expect(error.message).not.toMatch(/Solana error|HTTP error/);
   });
 });
 
