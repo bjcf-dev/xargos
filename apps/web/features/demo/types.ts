@@ -8,6 +8,8 @@ export type DemoError = {
   retryAfterSeconds?: number;
   /** El backend no contestó: manda sobre el código, que entonces es INTERNAL. */
   unreachable?: true;
+  /** El backend contestó con un error: x402 no liquidó el pago (D17). */
+  rejected?: true;
 };
 
 /** Lo que se arrastra desde que hay build: el agente, su posición, la tx y el recibo x402. */

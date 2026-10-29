@@ -105,6 +105,7 @@ describe("demoReducer: setup → paying → built", () => {
       message: "Slow down",
       retryAfterSeconds: 20,
       unreachable: true,
+      rejected: true,
     } as const;
     const next = demoReducer(paying, { type: "FAILED", error });
     expect(next.status === "error" && next.error).toEqual(error);

@@ -252,6 +252,43 @@ describe("createApiClient", () => {
     expect(error.unreachable).toBe(false);
   });
 
+  it("takes a 429 without a contract body (platform limit) as RATE_LIMITED with its wait", async () => {
+    const { fetch } = fakeFetch(
+      () => new Response("Too Many Requests", { status: 429, headers: { "retry-after": "15" } }),
+    );
+    const api = createApiClient({ fetch, baseUrl: BASE });
+
+    const error = await catchError(api.listRecipes());
+    expect(error.code).toBe("RATE_LIMITED");
+    expect(error.status).toBe(429);
+    expect(error.retryAfterSeconds).toBe(15);
+  });
+
+  it("marks a contract error as rejected: the backend answered, so x402 did not settle", async () => {
+    const { fetch } = fakeFetch(() =>
+      json({ error: { code: "BUILD_FAILED", message: "Simulation failed" } }, 500),
+    );
+    const api = createApiClient({ fetch, baseUrl: BASE });
+
+    const error = await catchError(api.build(fixtureRecipe.id, { agent: AGENT, position: AGENT }));
+    expect(error.rejected).toBe(true);
+  });
+
+  it("does not mark as rejected what the backend may not have answered", async () => {
+    const cases: Array<() => Response> = [
+      () => {
+        throw new TypeError("fetch failed");
+      },
+      () => new Response("<html>Gateway timeout</html>", { status: 504 }),
+      () => json([{ id: "" }]),
+    ];
+    for (const respond of cases) {
+      const api = createApiClient({ fetch: fakeFetch(respond).fetch, baseUrl: BASE });
+      const error = await catchError(api.listRecipes());
+      expect(error.rejected).toBe(false);
+    }
+  });
+
   it("uses /api/xargos as the default base URL", async () => {
     const { fetch, calls } = fakeFetch(() => json([fixtureRecipe]));
     const api = createApiClient({ fetch });

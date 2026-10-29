@@ -134,7 +134,10 @@ describe("runner", () => {
 
     expect(events).toEqual([
       { type: "PAY" },
-      { type: "FAILED", error: { code: "RATE_LIMITED", message: "Too many builds" } },
+      {
+        type: "FAILED",
+        error: { code: "RATE_LIMITED", message: "Too many builds", rejected: true },
+      },
     ]);
   });
 
@@ -164,7 +167,7 @@ describe("runner", () => {
 
     expect(events.at(-1)).toEqual({
       type: "FAILED",
-      error: { code: "RATE_LIMITED", message: "Slow down", retryAfterSeconds: 20 },
+      error: { code: "RATE_LIMITED", message: "Slow down", retryAfterSeconds: 20, rejected: true },
     });
   });
 

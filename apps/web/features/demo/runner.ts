@@ -22,6 +22,7 @@ function toDemoError(error: unknown): DemoError {
         ? { retryAfterSeconds: error.retryAfterSeconds }
         : {}),
       ...(error.unreachable ? { unreachable: true as const } : {}),
+      ...(error.rejected ? { rejected: true as const } : {}),
     };
   }
   return { code: "INTERNAL", message: error instanceof Error ? error.message : "Unexpected error" };

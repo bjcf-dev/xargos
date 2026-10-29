@@ -148,13 +148,16 @@ export function humanError(error: DemoError): HumanError {
 export const FAILED_PAYMENTS_HREF = "/failed-payments";
 
 /**
- * Qué se cobró cuando la demo falla, según dónde falló. x402 solo liquida si el build
- * responde por debajo de 400 (D17): un fallo al pagar no cobra; después, la comisión ya se pagó.
+ * Qué se cobró cuando la demo falla. x402 solo liquida si el build responde por debajo de 400
+ * (D17): "nada" solo si el backend contestó con un error; sin respuesta (corte de Netlify a
+ * ~10 s, red) o con un 2xx ilegible no se sabe. Después del build, la comisión ya se pagó.
  */
-export function chargeNote(failedAt: DemoStatus): string | null {
+export function chargeNote(failedAt: DemoStatus, error: DemoError): string | null {
   if (failedAt === "idle" || failedAt === "setup") return null;
   if (failedAt === "paying") {
-    return "Nothing was charged: x402 only settles the payment when the build succeeds.";
+    return error.rejected
+      ? "Nothing was charged: x402 only settles the payment when the build succeeds."
+      : "We could not confirm whether the payment settled: x402 only charges when the build succeeds.";
   }
   return "The recipe fee was already paid when this transaction was built.";
 }

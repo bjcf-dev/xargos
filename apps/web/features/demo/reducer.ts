@@ -45,6 +45,7 @@ function toError(state: DemoState, error: DemoError): DemoState {
         ? { retryAfterSeconds: error.retryAfterSeconds }
         : {}),
       ...(error.unreachable ? { unreachable: true as const } : {}),
+      ...(error.rejected ? { rejected: true as const } : {}),
     },
     failedAt: state.status,
     ...contextOf(state),

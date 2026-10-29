@@ -272,17 +272,28 @@ describe("humanError: wait and backend down (F12)", () => {
 // Criterio del jurado (pagos fallidos): x402 solo liquida si el build sale bien (D17).
 describe("chargeNote", () => {
   it("says nothing before there is anything to pay", () => {
-    expect(chargeNote("setup")).toBeNull();
+    expect(chargeNote("setup", { code: "SETUP_FAILED", message: "" })).toBeNull();
   });
 
-  it("says nothing was charged when the paid build itself failed", () => {
-    expect(chargeNote("paying")).toMatch(/nothing was charged/i);
+  it("says nothing was charged when the backend rejected the build", () => {
+    expect(chargeNote("paying", { code: "BUILD_FAILED", message: "", rejected: true })).toMatch(
+      /nothing was charged/i,
+    );
+  });
+
+  it.each([
+    ["the backend did not answer", { code: "INTERNAL", message: "", unreachable: true }],
+    ["the answer could not be read", { code: "INTERNAL", message: "Does not match" }],
+  ] as const)("does not claim nothing was charged when %s", (_, error) => {
+    const note = chargeNote("paying", error);
+    expect(note).not.toMatch(/nothing was charged/i);
+    expect(note).toMatch(/could not confirm/i);
   });
 
   it.each(["shocking", "signing", "expired", "rebuilding"] as const)(
     "after the build (%s) says the fee was already paid, never that nothing was charged",
     (failedAt) => {
-      const note = chargeNote(failedAt);
+      const note = chargeNote(failedAt, { code: "INTERNAL", message: "" });
       expect(note).toMatch(/already paid/i);
       expect(note).not.toMatch(/nothing was charged/i);
     },

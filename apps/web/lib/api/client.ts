@@ -94,6 +94,7 @@ export function createApiClient({
         throw new ApiClientError(code, message, {
           status: response.status,
           details,
+          rejected: true,
           ...(paymentRequired ? { paymentRequired } : {}),
           ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
         });
@@ -101,7 +102,16 @@ export function createApiClient({
       if (response.status === 402) {
         throw new ApiClientError("PAYMENT_REQUIRED", "Payment required", {
           status: 402,
+          rejected: true,
           ...(paymentRequired ? { paymentRequired } : {}),
+        });
+      }
+      // El límite de la plataforma (Netlify) no habla el contrato, pero un 429 sigue siendo un 429.
+      if (response.status === 429) {
+        throw new ApiClientError("RATE_LIMITED", "Too many requests", {
+          status: 429,
+          rejected: true,
+          ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
         });
       }
       throw new ApiClientError("INTERNAL", `Unexpected HTTP ${response.status}`, {
