@@ -10,6 +10,8 @@ export type SetupSteps = {
   openPosition(agent: string): Promise<{ position: string }>;
   initSnapshot(agent: string): Promise<void>;
   balances(agent: string): Promise<NonNullable<DemoSetupStatus["balances"]>>;
+  /** Whether the agent still holds this position with liquidity (the demo closes it). */
+  positionIsOpen(agent: string, position: string): Promise<boolean>;
 };
 
 export type Logger = { error(data: object, message: string): void };
