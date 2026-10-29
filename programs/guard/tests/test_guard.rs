@@ -6,7 +6,7 @@ use anchor_lang::{
 };
 use guard::error::GuardError;
 use litesvm::{types::FailedTransactionMetadata, LiteSVM};
-use litesvm_token::{CreateAccount, CreateMint, MintTo};
+use litesvm_token::{CreateAccount, CreateAssociatedTokenAccount, CreateMint, MintTo};
 use solana_keypair::Keypair;
 use solana_message::Message;
 use solana_signer::Signer;
@@ -36,6 +36,19 @@ fn new_mint(svm: &mut LiteSVM, payer: &Keypair) -> Pubkey {
 }
 
 fn new_token_account(svm: &mut LiteSVM, payer: &Keypair, mint: &Pubkey, owner: &Pubkey) -> Pubkey {
+    CreateAssociatedTokenAccount::new(svm, payer, mint)
+        .owner(owner)
+        .send()
+        .unwrap()
+}
+
+/// A second token account of the same owner and mint: valid for the token program, not an ATA.
+fn new_non_associated_token_account(
+    svm: &mut LiteSVM,
+    payer: &Keypair,
+    mint: &Pubkey,
+    owner: &Pubkey,
+) -> Pubkey {
     CreateAccount::new(svm, payer, mint)
         .owner(owner)
         .send()
@@ -247,5 +260,33 @@ fn fails_when_min_delta_is_zero() {
     assert_fails_with(
         send(&mut env.svm, &env.payer, ix),
         GuardError::InvalidMinDelta,
+    );
+}
+
+#[test]
+fn fails_when_assert_uses_another_token_account_of_the_agent() {
+    let mut env = setup();
+    let other = new_non_associated_token_account(&mut env.svm, &env.payer, &env.mint, &env.agent);
+    MintTo::new(&mut env.svm, &env.payer, &env.mint, &other, 50_000_000)
+        .send()
+        .unwrap();
+    take_snapshot(&mut env); // on the associated account, balance 0
+
+    let ix = assert_ix(&other, &env.snapshot, 10_000_000);
+    assert_fails_with(
+        send(&mut env.svm, &env.payer, ix),
+        GuardError::NotAssociatedTokenAccount,
+    );
+}
+
+#[test]
+fn fails_when_snapshot_uses_another_token_account_of_the_agent() {
+    let mut env = setup();
+    let other = new_non_associated_token_account(&mut env.svm, &env.payer, &env.mint, &env.agent);
+
+    let ix = snapshot_ix(&other, &env.snapshot);
+    assert_fails_with(
+        send(&mut env.svm, &env.payer, ix),
+        GuardError::NotAssociatedTokenAccount,
     );
 }

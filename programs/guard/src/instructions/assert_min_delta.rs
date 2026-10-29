@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_spl::associated_token::get_associated_token_address;
 use anchor_spl::token::TokenAccount;
 
 use crate::error::GuardError;
@@ -9,6 +10,10 @@ pub struct AssertMinDelta<'info> {
     #[account(
         constraint = agent_token_account.owner == snapshot.agent @ GuardError::InvalidOwner,
         constraint = agent_token_account.mint == snapshot.mint @ GuardError::InvalidMint,
+        // Snapshot and assert must read the same account: a second token account of the agent would do.
+        constraint = agent_token_account.key()
+            == get_associated_token_address(&snapshot.agent, &snapshot.mint)
+            @ GuardError::NotAssociatedTokenAccount,
     )]
     pub agent_token_account: Account<'info, TokenAccount>,
     #[account(

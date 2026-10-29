@@ -12,4 +12,6 @@ pub enum GuardError {
     InvalidMinDelta,
     #[msg("Received amount is below min_delta")]
     MinDeltaNotMet,
+    #[msg("Token account is not the associated token account of the snapshot agent and mint")]
+    NotAssociatedTokenAccount,
 }
