@@ -223,13 +223,16 @@ describe("useDemo: expiry, free rebuild and run again (F11, D19)", () => {
     expect(builds()).toBe(0);
   });
 
-  it("runAgain() pays for a new build once the window has closed", async () => {
+  it("runAgain() pays for a new build once the window has closed and the step changed", async () => {
     const { result } = renderDemo();
     await untilBuilt(result);
     const run = builtRun(result);
     vi.setSystemTime(Date.parse(run.build.expiresAt) + 1_000);
     act(() => result.current.expire());
     vi.setSystemTime(Date.parse(run.build.rebuildUntil));
+    // La pantalla llama a rebuild() al cerrarse la ventana: pasa al error con "Run again".
+    act(() => result.current.rebuild());
+    expect(result.current.canRunAgain).toBe(true);
 
     act(() => result.current.runAgain());
     await waitFor(() => expect(result.current.state.status).toBe("built"));

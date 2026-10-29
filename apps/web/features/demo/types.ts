@@ -62,7 +62,8 @@ export type DemoState =
   | { status: "signing"; run: Run }
   | { status: "confirmed"; run: Run; signature: string }
   | { status: "reverted"; run: Run; signature: string; failure: RevertFailure }
-  | { status: "expired"; run: Run }
+  /** `error`: falló un rebuild por algo pasajero; la ventana gratis sigue abierta. */
+  | { status: "expired"; run: Run; error?: DemoError }
   | { status: "rebuilding"; run: Run }
   /** Guarda agente y posición si los había: así se puede volver a pagar sin otro setup. */
   | { status: "error"; error: DemoError; failedAt: DemoStatus; agent?: string; position?: string };

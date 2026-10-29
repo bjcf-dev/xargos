@@ -23,6 +23,7 @@ import {
   DEMO_PATHS,
   type DemoPath,
   formatFee,
+  humanError,
   runAgainNote,
   secondsLeft,
   stepAnnouncement,
@@ -124,11 +125,21 @@ export function DemoScreen({
   // expiresAt ya pasó: la tx caduca (D19). No basta con la cuenta a 0, que llega hasta 999 ms
   // antes (redondea hacia abajo) y el reducer la ignoraría. Firmando no: la tx puede estar en
   // vuelo y solo el signer sabe si entró (BUILD_EXPIRED la caduca desde el reducer).
-  const pastExpiry = live && now >= Date.parse(state.run.build.expiresAt);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: solo cuando cambia la caducidad o el paso.
+  // Con el shock en vuelo tampoco: run.shock llega con SHOCK_SETTLED y, si caducara antes, otro
+  // shock sería posible tras el rebuild (D10). Al volver a built, este efecto caduca la tx.
+  const pastExpiry = state.status === "built" && now >= Date.parse(state.run.build.expiresAt);
+  // Al cerrarse la ventana gratis, la tarjeta pasa a otro paso (el error con "Run again"): un
+  // botón gratis con el foco nunca se convierte en uno de pago en el mismo sitio.
+  const windowClosed =
+    state.status === "expired" && now >= Date.parse(state.run.build.rebuildUntil);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: solo cuando cambia la caducidad.
   useEffect(() => {
-    if (pastExpiry && (state.status === "built" || state.status === "shocking")) demo.expire();
-  }, [pastExpiry, state.status]);
+    if (pastExpiry) demo.expire();
+  }, [pastExpiry]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: solo cuando se cierra la ventana.
+  useEffect(() => {
+    if (windowClosed) demo.rebuild();
+  }, [windowClosed]);
   // El shock está bloqueado por falta de tiempo: su aviso lo describe para el lector de pantalla.
   const shockBlocked = live && !expired && !canShock(left);
 
@@ -384,22 +395,17 @@ export function DemoScreen({
                   The transaction expired before it was sent
                 </AlertTitle>
                 <AlertDescription>
-                  {rebuildLeft ? (
-                    <p>
-                      Its blockhash is no longer valid, so nothing ran. Free rebuild for{" "}
-                      {rebuildLeft}s: same build, no new payment.
-                    </p>
-                  ) : (
-                    <p>The free rebuild window has closed. {runAgainNote(fee, mode)}</p>
-                  )}
+                  {state.error ? (
+                    <p>The free rebuild did not go through: {humanError(state.error).hint}</p>
+                  ) : null}
+                  <p>
+                    Its blockhash is no longer valid, so nothing ran. Free rebuild for{" "}
+                    {rebuildLeft ?? 0}s: same build, no new payment.
+                  </p>
                 </AlertDescription>
               </Alert>
               <div className="flex gap-2">
-                {rebuildLeft ? (
-                  <Button onClick={demo.rebuild}>Rebuild for free</Button>
-                ) : (
-                  <Button onClick={demo.runAgain}>Run again</Button>
-                )}
+                <Button onClick={demo.rebuild}>Rebuild for free</Button>
                 {startOver}
               </div>
             </>

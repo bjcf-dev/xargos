@@ -1,5 +1,10 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { fixtureBuildResponse, fixtureRecipe, fixtureSetupReady } from "@xargos/shared";
+import {
+  fixtureBuildResponse,
+  fixtureRecipe,
+  fixtureSetupReady,
+  fixtureShockConfirmed,
+} from "@xargos/shared";
 import { delay, HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -281,6 +286,75 @@ describe("DemoScreen (mock mode)", () => {
           { timeout: 2_500 },
         ),
       ).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("moves to a new step when the free window closes, so a focused free button never turns paid", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      render(
+        <DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />,
+      );
+      await click(/happy path/i);
+      await click(/pay & build/i);
+      expect(await screen.findByText("Valid for 60s")).toBeDefined();
+
+      vi.setSystemTime(Date.now() + 61_000);
+      const free = await screen.findByRole(
+        "button",
+        { name: /rebuild for free/i },
+        { timeout: 2_000 },
+      );
+      free.focus();
+
+      vi.setSystemTime(Date.now() + 60_000);
+      const title = await screen.findByText(
+        "The free rebuild window has closed",
+        { selector: "[data-step-title]" },
+        { timeout: 2_500 },
+      );
+      expect(screen.queryByRole("button", { name: /rebuild for free/i })).toBeNull();
+      expect(document.activeElement).toBe(title);
+      expect(screen.getByRole("button", { name: /run again/i })).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not expire while the price shock runs: the shock stays in the run (D10)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      server.use(
+        http.get("*/api/xargos/demo/price-shock/:shockId", async ({ params }) => {
+          await delay(1_500);
+          return HttpResponse.json({ ...fixtureShockConfirmed, shockId: params.shockId });
+        }),
+      );
+      render(
+        <DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />,
+      );
+      await click(/price moves against/i);
+      await click(/pay & build/i);
+      await click(/apply price shock first/i);
+      expect(await screen.findByText("Moving the pool price…")).toBeDefined();
+
+      vi.setSystemTime(Date.now() + 61_000);
+      await new Promise((resolve) => setTimeout(resolve, 1_100));
+      expect(screen.queryByText("The transaction expired before it was sent")).toBeNull();
+
+      // El shock entra y, ya en built, caduca con el shock guardado: no se ofrece otro.
+      expect(
+        await screen.findByText(
+          "The transaction expired before it was sent",
+          { selector: "[data-step-title]" },
+          { timeout: 3_000 },
+        ),
+      ).toBeDefined();
+      await click(/rebuild for free/i);
+      expect(await screen.findByText(/Valid for/)).toBeDefined();
+      expect(screen.queryByRole("button", { name: /apply price shock first/i })).toBeNull();
     } finally {
       vi.useRealTimers();
     }

@@ -437,3 +437,11 @@ describe("runAgainNote", () => {
     );
   });
 });
+
+describe("humanError for a closed rebuild window", () => {
+  it("points to Run again, the button next to it, not only to start over", () => {
+    expect(humanError({ code: "REBUILD_WINDOW_CLOSED", message: "" }).hint).toBe(
+      "Run again to build and pay for a new transaction, or start over.",
+    );
+  });
+});

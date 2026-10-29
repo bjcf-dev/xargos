@@ -82,7 +82,10 @@ export function useDemo({
     dispatch({ type: "EXPIRED", now: Date.now() });
   }
 
-  /** Rebuild gratis con el mismo buildId (D19). */
+  /**
+   * Rebuild gratis con el mismo buildId (D19). Con la ventana ya cerrada solo pasa al error
+   * REBUILD_WINDOW_CLOSED, sin llamar a la API.
+   */
   function rebuild() {
     if (state.status === "expired") void runRebuild(deps, state.run, dispatch, begin());
   }
@@ -97,20 +100,9 @@ export function useDemo({
     state.error.code === "REBUILD_WINDOW_CLOSED" &&
     Boolean(state.agent && state.position);
 
-  /**
-   * Paga un build nuevo tras cerrarse la ventana gratis. Dentro de ella no hace nada: cobrar
-   * por lo que sale gratis sería un pago de más.
-   */
+  /** Paga un build nuevo tras cerrarse la ventana gratis (D19): la persona lo pide sabiendo que cobra. */
   function runAgain() {
-    if (state.status === "expired") {
-      const now = Date.now();
-      if (now < Date.parse(state.run.build.rebuildUntil)) return;
-      // REBUILD con la ventana cerrada pasa a error con agente y posición; PAY sale de ahí.
-      dispatch({ type: "REBUILD", now });
-      void runPay(deps, state.run.agent, state.run.position, dispatch, begin());
-    } else if (canRunAgain) {
-      pay();
-    }
+    if (canRunAgain) pay();
   }
 
   /** Vuelve a pagar si se conoce la posición; si no, repite el setup. */

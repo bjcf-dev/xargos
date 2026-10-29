@@ -95,7 +95,7 @@ const HUMAN_ERRORS: Record<ErrorCode, HumanError | null> = {
   BUILD_EXPIRED: { title: "The transaction expired", hint: "Start over to build a new one." },
   REBUILD_WINDOW_CLOSED: {
     title: "The free rebuild window has closed",
-    hint: "Start over to build and pay for a new transaction.",
+    hint: "Run again to build and pay for a new transaction, or start over.",
   },
   RATE_LIMITED: { title: "Too many demos right now", hint: "Wait a moment, then try again." },
   ACCESS_DENIED: {
