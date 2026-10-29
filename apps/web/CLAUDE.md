@@ -26,7 +26,7 @@ components/ui/              # shadcn
 - **El navegador solo llama a `/api/xargos/*`.** Ninguna clave ni URL privada en código de cliente ni en variables `NEXT_PUBLIC_*`.
 - **Ningún `fetch` directo en componentes**: todo pasa por `lib/api`.
 - **Máquina de estados de la demo** como unión discriminada con `useReducer`: `idle → setup → paying → built → signing → confirmed | reverted | expired → rebuilding`, con tests en Vitest.
-- **Keypair del agente generado en el navegador** (`generateKeyPairSigner` de Kit), guardado en `sessionStorage`; al backend solo va la pública (D13).
+- **Agente generado en el navegador:** `CryptoKey` Ed25519 no extraíble en IndexedDB (`AgentKeyStore`, `lib/solana`), 24 h y botón _New agent_. Si no se puede guardar, solo en memoria, nunca la semilla. Al backend solo va la pública (D13, D30).
 - **Ninguna cifra escrita a mano:** todo sale de `quote` y `guard`.
 - **Solo decir "guard" si falló el guard:** leer `meta.err` y el log `GUARD_FAIL` (D15).
 - `/demo/setup` y `/demo/price-shock` son asíncronos: progreso por fases con polling, y mensajes claros para `RATE_LIMITED` y `ACCESS_DENIED`.
