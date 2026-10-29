@@ -13,6 +13,7 @@ const steps = (overrides: Partial<SetupSteps> = {}): SetupSteps => ({
   openPosition: async () => ({ position: "PositionMint1111111111111111111111111111111" }),
   initSnapshot: async () => {},
   balances: async () => ({ sol: "1", usdc: "2" }),
+  positionIsOpen: async () => true,
   ...overrides,
 });
 
@@ -135,6 +136,46 @@ describe("retrying a failed setup", () => {
 });
 
 describe("GET /demo/setup/:agent", () => {
+  /** Un setup que ya llegó a ready, con la comprobación de la posición que se pida. */
+  async function readyJob(positionIsOpen: SetupSteps["positionIsOpen"]) {
+    const ctx = setup({ steps: steps({ positionIsOpen }) });
+    await ctx.post({ agent: AGENT });
+    await vi.waitFor(() => expect(ctx.jobs.get(AGENT)?.phase).toBe("ready"));
+    return ctx;
+  }
+
+  it("reports a ready job whose position was already used as failed", async () => {
+    const { app } = await readyJob(async () => false);
+    const body = DemoSetupStatus.parse(await (await app.request(`/demo/setup/${AGENT}`)).json());
+    expect(body.phase).toBe("failed");
+    expect(body.error?.code).toBe("SETUP_FAILED");
+  });
+
+  it("lets the client start again after a used position, with the same agent", async () => {
+    const { app, post } = await readyJob(async () => false);
+    await app.request(`/demo/setup/${AGENT}`);
+    expect((await post({ agent: AGENT })).status).toBe(202);
+    await vi.waitFor(async () => {
+      const body = await (await app.request(`/demo/setup/${AGENT}`)).json();
+      expect(DemoSetupStatus.parse(body).phase).not.toBe("ready");
+    });
+  });
+
+  it("keeps a ready job whose position is still open", async () => {
+    const { app } = await readyJob(async () => true);
+    const body = DemoSetupStatus.parse(await (await app.request(`/demo/setup/${AGENT}`)).json());
+    expect(body.phase).toBe("ready");
+  });
+
+  it("keeps the job as it is when the position check fails", async () => {
+    const { app } = await readyJob(async () => {
+      throw new Error("rpc down");
+    });
+    const res = await app.request(`/demo/setup/${AGENT}`);
+    expect(res.status).toBe(200);
+    expect(DemoSetupStatus.parse(await res.json()).phase).toBe("ready");
+  });
+
   it("returns a status that matches the shared contract, ending ready", async () => {
     const { app, post } = setup();
     await post({ agent: AGENT });

@@ -7,6 +7,13 @@ import {
   type SolanaRpcApi,
 } from "@solana/kit";
 import { describe, expect, it, vi } from "vitest";
+
+const positions = vi.hoisted(() => ({ held: [] as unknown[] }));
+vi.mock("@orca-so/whirlpools", async (importActual) => ({
+  ...(await importActual<typeof import("@orca-so/whirlpools")>()),
+  fetchPositionsForOwner: async () => positions.held,
+}));
+
 import { createSetupSteps, type SetupStepsDeps } from "./steps";
 
 const PAYER = createNoopSigner(
@@ -87,5 +94,33 @@ describe("setup steps are safe to run again", () => {
     const fresh = steps({ snapshot: false });
     await fresh.built.initSnapshot(AGENT);
     expect(fresh.send).toHaveBeenCalledOnce();
+  });
+});
+
+describe("positionIsOpen", () => {
+  const POSITION = "PositionMint1111111111111111111111111111111";
+  const held = (positionMint: string, liquidity: bigint) => ({
+    isPositionBundle: false,
+    data: { positionMint, liquidity, whirlpool: "pool" },
+  });
+
+  it("is true while the agent holds the position with liquidity", async () => {
+    positions.held = [held(POSITION, 10n)];
+    expect(await steps({}).built.positionIsOpen(AGENT, POSITION)).toBe(true);
+  });
+
+  it("is false once the demo closed the position", async () => {
+    positions.held = [];
+    expect(await steps({}).built.positionIsOpen(AGENT, POSITION)).toBe(false);
+  });
+
+  it("is false when the position is left without liquidity", async () => {
+    positions.held = [held(POSITION, 0n)];
+    expect(await steps({}).built.positionIsOpen(AGENT, POSITION)).toBe(false);
+  });
+
+  it("only looks at that position, not at another one of the agent", async () => {
+    positions.held = [held("OtherMint111111111111111111111111111111111", 10n)];
+    expect(await steps({}).built.positionIsOpen(AGENT, POSITION)).toBe(false);
   });
 });

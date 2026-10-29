@@ -19,6 +19,7 @@ function fakeSteps(overrides: Partial<SetupSteps> = {}): SetupSteps {
     openPosition: async () => ({ position: "PositionMint" }),
     initSnapshot: async () => {},
     balances: async () => ({ sol: "20000000", usdc: "50000" }),
+    positionIsOpen: async () => true,
     ...overrides,
   };
 }

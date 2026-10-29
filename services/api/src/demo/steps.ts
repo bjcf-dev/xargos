@@ -105,6 +105,13 @@ export function createSetupSteps(d: SetupStepsDeps): SetupSteps {
       await d.send(instructions);
     },
 
+    async positionIsOpen(agent, position) {
+      const held = await fetchPositionsForOwner(d.rpc, address(agent), WhirlpoolDeployment.devnet);
+      return held.some(
+        (p) => !p.isPositionBundle && p.data.positionMint === position && p.data.liquidity > 0n,
+      );
+    },
+
     async openPosition(agent) {
       // The SDK would otherwise wrap SOL with throwaway keypairs; the payer's wSOL ATA is simpler.
       setNativeMintWrappingStrategy("ata");
