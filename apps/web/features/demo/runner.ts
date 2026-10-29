@@ -14,7 +14,16 @@ export type RunnerDeps = {
 };
 
 function toDemoError(error: unknown): DemoError {
-  if (error instanceof ApiClientError) return { code: error.code, message: error.message };
+  if (error instanceof ApiClientError) {
+    return {
+      code: error.code,
+      message: error.message,
+      ...(error.retryAfterSeconds !== undefined
+        ? { retryAfterSeconds: error.retryAfterSeconds }
+        : {}),
+      ...(error.unreachable ? { unreachable: true as const } : {}),
+    };
+  }
   return { code: "INTERNAL", message: error instanceof Error ? error.message : "Unexpected error" };
 }
 

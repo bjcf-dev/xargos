@@ -38,7 +38,14 @@ function contextOf(state: DemoState): { agent?: string; position?: string } {
 function toError(state: DemoState, error: DemoError): DemoState {
   return {
     status: "error",
-    error: { code: error.code, message: error.message },
+    error: {
+      code: error.code,
+      message: error.message,
+      ...(error.retryAfterSeconds !== undefined
+        ? { retryAfterSeconds: error.retryAfterSeconds }
+        : {}),
+      ...(error.unreachable ? { unreachable: true as const } : {}),
+    },
     failedAt: state.status,
     ...contextOf(state),
   };

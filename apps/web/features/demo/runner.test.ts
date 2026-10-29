@@ -149,6 +149,35 @@ describe("runner", () => {
 
     expect(events.map((e) => e.type)).toEqual(["SETUP_STARTED", "SETUP_PROGRESS"]);
   });
+
+  it("passes the Retry-After wait of a rate-limited build to the error", async () => {
+    server.use(
+      http.post("*/api/xargos/recipes/:id/build", () =>
+        HttpResponse.json(
+          { error: { code: "RATE_LIMITED", message: "Slow down" } },
+          { status: 429, headers: { "retry-after": "20" } },
+        ),
+      ),
+    );
+    const { events, dispatch } = recorder();
+    await runPay(deps, AGENT, POSITION, dispatch, live());
+
+    expect(events.at(-1)).toEqual({
+      type: "FAILED",
+      error: { code: "RATE_LIMITED", message: "Slow down", retryAfterSeconds: 20 },
+    });
+  });
+
+  it("flags an unreachable backend in the error", async () => {
+    server.use(http.post("*/api/xargos/recipes/:id/build", () => HttpResponse.error()));
+    const { events, dispatch } = recorder();
+    await runPay(deps, AGENT, POSITION, dispatch, live());
+
+    expect(events.at(-1)).toEqual({
+      type: "FAILED",
+      error: { code: "INTERNAL", message: "Network error", unreachable: true },
+    });
+  });
 });
 
 // El firmante real (F6) no está obligado a rechazar al abortar: lo que resuelva tarde no se despacha.

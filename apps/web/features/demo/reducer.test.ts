@@ -99,6 +99,17 @@ describe("demoReducer: setup → paying → built", () => {
     expect(next.status === "built" && "paymentResponse" in next.run).toBe(false);
   });
 
+  it("keeps the Retry-After wait and the unreachable flag of a failure", () => {
+    const error = {
+      code: "RATE_LIMITED",
+      message: "Slow down",
+      retryAfterSeconds: 20,
+      unreachable: true,
+    } as const;
+    const next = demoReducer(paying, { type: "FAILED", error });
+    expect(next.status === "error" && next.error).toEqual(error);
+  });
+
   it("turns a rejected payment into an error that keeps agent and position", () => {
     const error = { code: "PAYMENT_INVALID", message: "Insufficient amount" } as const;
     expect(demoReducer(paying, { type: "FAILED", error })).toEqual({

@@ -1,7 +1,14 @@
 import type { BuildResponse, DemoSetupStatus, ErrorCode, PriceShockStatus } from "@xargos/shared";
 
 /** Error de la demo: siempre un ErrorCode del contrato, para tener un mensaje por código. */
-export type DemoError = { code: ErrorCode; message: string };
+export type DemoError = {
+  code: ErrorCode;
+  message: string;
+  /** Segundos de Retry-After (RATE_LIMITED), si el backend los dio. */
+  retryAfterSeconds?: number;
+  /** El backend no contestó: manda sobre el código, que entonces es INTERNAL. */
+  unreachable?: true;
+};
 
 /** Lo que se arrastra desde que hay build: el agente, su posición, la tx y el recibo x402. */
 export type Run = {
