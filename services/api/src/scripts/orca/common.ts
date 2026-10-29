@@ -29,6 +29,19 @@ export const rpc = createSolanaRpc(RPC_URL);
 export const explorerTx = (signature: string) =>
   `https://explorer.solana.com/tx/${signature}?cluster=devnet`;
 
+/** Genesis hash of Solana devnet. The RPC must answer with it before any key is loaded (rule 1). */
+export const DEVNET_GENESIS_HASH = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG";
+
+type GenesisClient = { getGenesisHash(): { send(): Promise<string> } };
+
+/** Stops the script when RPC_URL does not point to devnet, so a wrong URL can never reach mainnet. */
+export async function assertDevnet(client: GenesisClient = rpc): Promise<void> {
+  const genesis = await client.getGenesisHash().send();
+  if (genesis !== DEVNET_GENESIS_HASH) {
+    throw new Error("RPC_URL does not point to devnet (genesis hash differs): stopping");
+  }
+}
+
 /** Reads ~/.config/xargos/<name>-keypair.json. The bytes never leave this process or get printed. */
 export function loadKeyBytes(name: string): Uint8Array<ArrayBuffer> {
   const file = join(homedir(), ".config", "xargos", `${name}-keypair.json`);
@@ -37,6 +50,7 @@ export function loadKeyBytes(name: string): Uint8Array<ArrayBuffer> {
 
 /** Points the Orca SDK actions at devnet with the facilitator as payer (decision of 28 Oct). */
 export async function useFacilitator() {
+  await assertDevnet();
   await setRpc(RPC_URL);
   setPriorityFeeSetting({ type: "none" });
   const payer = await setPayerFromBytes(loadKeyBytes("facilitator"));
