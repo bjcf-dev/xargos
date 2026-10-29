@@ -103,6 +103,8 @@ jobs:
           avm install "$ANCHOR_VERSION"
           avm use "$ANCHOR_VERSION"
       - run: anchor build
+      - name: The committed IDL must match the program
+        run: diff target/idl/guard.json packages/guard-client/idl/guard.json
       - run: cargo test -p guard # tests LiteSVM sobre target/deploy/guard.so
 
   ci-ok:
