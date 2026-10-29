@@ -12,6 +12,10 @@ import { createSetupSteps } from "./demo/steps";
 import { createSender } from "./solana/send";
 
 const config = parseConfig(process.env);
+if (!config.DEMO_ACCESS_CODE) {
+  // Without the code anyone can start setups that cost the payer SOL: fine locally, not in Railway.
+  console.warn("DEMO_ACCESS_CODE is not set: /demo/setup is open to anyone");
+}
 const payer = await createKeyPairSignerFromBytes(
   Uint8Array.from(JSON.parse(readFileSync(config.PAYER_KEYPAIR_PATH, "utf8"))),
 );
