@@ -66,12 +66,30 @@ export function createDemoRoutes({ jobs, steps, limiter, accessCode, log }: Demo
     return c.json({ agent }, 202);
   });
 
-  app.get("/demo/setup/:agent", (c) => {
+  app.get("/demo/setup/:agent", async (c) => {
     const agent = Address.safeParse(c.req.param("agent"));
     if (!agent.success) return errorResponse(c, "VALIDATION_ERROR", "Invalid agent address");
     const job = jobs.get(agent.data);
     if (!job) return errorResponse(c, "VALIDATION_ERROR", "Unknown agent: start a setup first");
-    return c.json(job);
+    // A ready job outlives the demo that closes its position (the agent survives reloads, D30).
+    // Reported as failed, the client posts again and the steps open a new position.
+    if (job.phase === "ready" && job.position) {
+      try {
+        if (!(await steps.positionIsOpen(agent.data, job.position))) {
+          jobs.update(agent.data, {
+            phase: "failed",
+            error: {
+              code: "SETUP_FAILED",
+              message: "The demo position was already used. Start again to get a new one.",
+            },
+          });
+        }
+      } catch (error) {
+        // Without the check the job stays as it was: better a stale ready than a false failure.
+        log?.error({ agent: agent.data, error: String(error) }, "position check failed");
+      }
+    }
+    return c.json(jobs.get(agent.data) ?? job);
   });
 
   return app;
