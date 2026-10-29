@@ -289,6 +289,49 @@ describe("DemoScreen (mock mode)", () => {
     expect(screen.getByRole("button", { name: /start over/i })).toBeDefined();
   });
 
+  it("tells a rate-limited build with its wait and that nothing was charged", async () => {
+    server.use(
+      http.post("*/api/xargos/recipes/:id/build", () =>
+        HttpResponse.json(
+          { error: { code: "RATE_LIMITED", message: "Slow down" } },
+          { status: 429, headers: { "retry-after": "20" } },
+        ),
+      ),
+    );
+    render(<DemoScreen api={api} signer={null} pollIntervalMs={1} />);
+
+    await click(/happy path/i);
+    await click(/pay & build/i);
+
+    expect(
+      await screen.findByText("Too many demos right now", { selector: "[data-step-title]" }),
+    ).toBeDefined();
+    expect(
+      screen.getByText("Wait 20 seconds, then try again.", {
+        selector: '[data-slot="alert-description"] p',
+      }),
+    ).toBeDefined();
+    expect(screen.getByText(/nothing was charged/i)).toBeDefined();
+    const link = screen.getByRole("link", { name: "How failed payments work" });
+    expect(link.getAttribute("href")).toBe("/failed-payments");
+    // Un 429 se puede repetir tras esperar (ERROR_HTTP: retryable).
+    expect(screen.getByRole("button", { name: /try again/i })).toBeDefined();
+  });
+
+  it("says the backend is not responding when the network fails", async () => {
+    server.use(http.post("*/api/xargos/recipes/:id/build", () => HttpResponse.error()));
+    render(<DemoScreen api={api} signer={null} pollIntervalMs={1} />);
+
+    await click(/happy path/i);
+    await click(/pay & build/i);
+
+    expect(
+      await screen.findByText("The demo backend is not responding", {
+        selector: "[data-step-title]",
+      }),
+    ).toBeDefined();
+  });
+
   it("blocks the price shock when the transaction is about to expire", async () => {
     server.use(
       http.post("*/api/xargos/recipes/:recipeId/build", () =>
@@ -327,6 +370,28 @@ describe("AgentCard address", () => {
   });
 });
 
+describe("ResultCard for an error after the build", () => {
+  const error = {
+    status: "error",
+    error: { code: "INTERNAL", message: "Could not reach Solana devnet" },
+    failedAt: "signing",
+  } as const;
+
+  it("says the fee was already paid, never that nothing was charged", () => {
+    render(<ResultCard state={error} mode="local" price={fixtureRecipe.price} />);
+
+    expect(screen.getByText(/already paid/i)).toBeDefined();
+    expect(screen.queryByText(/nothing was charged/i)).toBeNull();
+  });
+
+  it("in mock mode says what mock mode charges instead", () => {
+    render(<ResultCard state={error} mode="mock" price={fixtureRecipe.price} />);
+
+    expect(screen.getByText(mockPaymentNote("0.01 USDC"))).toBeDefined();
+    expect(screen.queryByText(/already paid/i)).toBeNull();
+  });
+});
+
 // D15: un revert que no es del guard sigue en rojo, nombra el paso y no habla de "guard".
 describe("ResultCard for a revert outside the guard", () => {
   it("stays red, names the step and never mentions the guard", () => {
@@ -347,6 +412,7 @@ describe("ResultCard for a revert outside the guard", () => {
     expect(title.closest('[data-slot="alert"]')?.className).toContain("text-destructive");
     expect(document.body.textContent).not.toMatch(/guard/i);
     expect(screen.queryByText(/shortfall/i)).toBeNull();
+    expect(screen.getByRole("link", { name: "How failed payments work" })).toBeDefined();
   });
 });
 

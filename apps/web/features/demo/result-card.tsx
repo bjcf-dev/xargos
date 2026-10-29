@@ -1,10 +1,20 @@
 import type { Recipe } from "@xargos/shared";
 import { AlertTriangleIcon, CheckCircle2Icon, ShieldCheckIcon, XCircleIcon } from "lucide-react";
+import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { ApiMode } from "@/lib/api/mode";
 import { formatUnits, USDC_DECIMALS } from "@/lib/format";
 import { ellipsify, getExplorerUrl } from "@/lib/solana/explorer";
-import { describeRevert, describeSpent, humanError, mockPaymentNote, POOL_TOKEN } from "./copy";
+import {
+  chargeNote,
+  describeRevert,
+  describeSpent,
+  FAILED_PAYMENTS_HREF,
+  formatFee,
+  humanError,
+  mockPaymentNote,
+  POOL_TOKEN,
+} from "./copy";
 import type { DemoState } from "./types";
 
 type ResultState = Extract<DemoState, { status: "confirmed" | "reverted" | "error" }>;
@@ -26,6 +36,14 @@ function Signature({ signature, mode }: { signature: string; mode: ApiMode }) {
     >
       {ellipsify(signature, 8)}
     </a>
+  );
+}
+
+function FailedPaymentsLink() {
+  return (
+    <Link className="underline underline-offset-4" href={FAILED_PAYMENTS_HREF}>
+      How failed payments work
+    </Link>
   );
 }
 
@@ -93,6 +111,9 @@ export function ResultCard({ state, mode, price }: ResultCardProps) {
           <p>
             <Signature signature={state.signature} mode={mode} />
           </p>
+          <p>
+            <FailedPaymentsLink />
+          </p>
         </AlertDescription>
       </Alert>
     );
@@ -100,6 +121,12 @@ export function ResultCard({ state, mode, price }: ResultCardProps) {
 
   // Errores para personas: la frase arriba y el código del contrato en pequeño, para soporte.
   const human = humanError(state.error);
+  // En mock no se cobra nada: tras el build, lo dice la nota de mock en vez de "ya pagada".
+  const afterBuild = state.failedAt !== "paying";
+  const charge =
+    mode === "mock" && afterBuild && chargeNote(state.failedAt)
+      ? mockPaymentNote(formatFee(price))
+      : chargeNote(state.failedAt);
   return (
     <Alert variant="destructive" role="presentation">
       <AlertTriangleIcon />
@@ -108,6 +135,11 @@ export function ResultCard({ state, mode, price }: ResultCardProps) {
       </AlertTitle>
       <AlertDescription>
         <p>{human.hint}</p>
+        {charge ? (
+          <p>
+            {charge} <FailedPaymentsLink />
+          </p>
+        ) : null}
         <p className="font-mono text-xs text-muted-foreground">{state.error.code}</p>
       </AlertDescription>
     </Alert>
