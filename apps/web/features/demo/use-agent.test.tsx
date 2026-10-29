@@ -67,4 +67,27 @@ describe("useAgent", () => {
     const { result } = renderHook(() => useAgent(options({ openStore: async () => store })));
     await waitFor(() => expect(result.current.status).toBe("failed"));
   });
+
+  it("New agent fails visibly too, without an unhandled rejection", async () => {
+    let calls = 0;
+    const store = createAgentKeyStore(createMemoryBackend(), {
+      persistent: true,
+      // La primera clave sale; la del "New agent", no.
+      generate: () => {
+        calls += 1;
+        return calls === 1
+          ? (crypto.subtle.generateKey("Ed25519", false, [
+              "sign",
+              "verify",
+            ]) as Promise<CryptoKeyPair>)
+          : Promise.reject(new Error("NotSupportedError"));
+      },
+    });
+    const { result } = renderHook(() => useAgent(options({ openStore: async () => store })));
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    if (result.current.status !== "ready") throw new Error("expected ready");
+
+    await expect(result.current.newAgent()).resolves.toBeUndefined();
+    await waitFor(() => expect(result.current.status).toBe("failed"));
+  });
 });

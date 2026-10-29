@@ -31,6 +31,12 @@ export type UseAgentOptions = {
   rpc?: () => SendRpc;
 };
 
+/** Un fallo al crear o leer la clave: sin esto la demo se quedaría cargando para siempre. */
+const failed = (error: unknown): AgentState => ({
+  status: "failed",
+  message: error instanceof Error ? error.message : String(error),
+});
+
 const MOCK_AGENT: AgentState = {
   status: "ready",
   address: fixtureSetupReady.agent,
@@ -66,7 +72,7 @@ export function useAgent({
       address: await getAddressFromPublicKey(keyPair.publicKey),
       signer: createRealSigner({ rpc: deps.current.rpc(), keyPair }),
       persistent: current.persistent,
-      newAgent: () => load(true),
+      newAgent: () => load(true).catch((error: unknown) => setAgent(failed(error))),
     });
   }, []);
 
@@ -83,13 +89,7 @@ export function useAgent({
       store.current = opened;
       await load(false);
     })().catch((error: unknown) => {
-      // Sin esto la demo se quedaría cargando para siempre.
-      if (!cancelled) {
-        setAgent({
-          status: "failed",
-          message: error instanceof Error ? error.message : String(error),
-        });
-      }
+      if (!cancelled) setAgent(failed(error));
     });
     return () => {
       cancelled = true;
