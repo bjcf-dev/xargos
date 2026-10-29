@@ -13,11 +13,12 @@ Dos instrucciones, nada más. Sin custodia: solo lee saldos.
 
 - `token_account.owner == agent` y `token_account.mint == mint`.
 - `min_delta > 0`.
-- Aritmética con `checked_sub` (si el saldo baja, `received` = 0 y falla el assert, sin panic).
+- Aritmética con `saturating_sub` (si el saldo baja, `received` = 0 y falla el assert, sin panic).
+- La cuenta de tokens de `snapshot` y de `assert_min_delta` debe ser la **ATA** de `(snapshot.agent, snapshot.mint)`. Sin eso, el agente podría hacer el snapshot sobre una cuenta vacía y el assert sobre otra con saldo.
 
 ## Tests (LiteSVM)
 
-Delta suficiente pasa · delta insuficiente falla con `MinDeltaNotMet` y el log `GUARD_FAIL` · snapshot de otro slot falla · cuenta de otro owner falla · mint distinto falla · `min_delta = 0` falla.
+Delta suficiente pasa · delta insuficiente falla con `MinDeltaNotMet` y el log `GUARD_FAIL` · snapshot de otro slot falla · cuenta de otro owner falla · mint distinto falla · `min_delta = 0` falla · una segunda cuenta de tokens del agente (no ATA) falla en `snapshot` y en `assert_min_delta`.
 
 ## Build y despliegue
 
