@@ -35,3 +35,5 @@ components/ui/              # shadcn
 ## Netlify
 
 Producción = solo `main` (cada deploy gasta créditos). `netlify.toml` salta el build si no cambia el front. Las funciones se cortan a ~10 s: no hacer esperas largas en el proxy.
+
+`SOLANA_RPC_URL` (solo servidor, nunca `NEXT_PUBLIC_*`): RPC de devnet al que reenvía `/api/xargos/rpc`. Sin ella, el devnet público. La ruta comprueba el genesis de devnet y solo deja pasar `getLatestBlockhash`, `simulateTransaction`, `sendTransaction`, `getSignatureStatuses` y `getTransaction` (D30).
