@@ -1,7 +1,7 @@
 import type { ErrorCode, Guard, Recipe, Step } from "@xargos/shared";
 import type { ApiMode } from "@/lib/api/mode";
 import { formatUnits, SOL_DECIMALS, USDC_DECIMALS } from "@/lib/format";
-import type { DemoError, DemoState, RevertFailure, Run } from "./types";
+import type { DemoError, DemoState, DemoStatus, RevertFailure, Run } from "./types";
 
 /** ADR 0003: el pool usa un USDC propio. Solo la comisión x402 es USDC de Circle. */
 export const POOL_TOKEN = "demo USDC";
@@ -118,13 +118,45 @@ const HUMAN_ERRORS: Record<ErrorCode, HumanError | null> = {
   INTERNAL: null,
 };
 
+const UNREACHABLE: HumanError = {
+  title: "The demo backend is not responding",
+  hint: "It may be starting up or down. Try again in a minute.",
+};
+
+/** La espera de Retry-After en palabras: segundos hasta un minuto, minutos redondeados después. */
+function waitHint(seconds: number): string {
+  if (seconds < 60)
+    return `Wait ${seconds} ${seconds === 1 ? "second" : "seconds"}, then try again.`;
+  const minutes = Math.round(seconds / 60);
+  return `Wait about ${minutes} ${minutes === 1 ? "minute" : "minutes"}, then try again.`;
+}
+
 export function humanError(error: DemoError): HumanError {
+  if (error.unreachable) return UNREACHABLE;
+  if (error.code === "RATE_LIMITED" && error.retryAfterSeconds) {
+    return { title: "Too many demos right now", hint: waitHint(error.retryAfterSeconds) };
+  }
   return (
     HUMAN_ERRORS[error.code] ?? {
       title: "Something went wrong",
       hint: error.message || "Try again in a moment, or start over.",
     }
   );
+}
+
+/** Página que explica cada pago fallido (criterio del jurado). */
+export const FAILED_PAYMENTS_HREF = "/failed-payments";
+
+/**
+ * Qué se cobró cuando la demo falla, según dónde falló. x402 solo liquida si el build
+ * responde por debajo de 400 (D17): un fallo al pagar no cobra; después, la comisión ya se pagó.
+ */
+export function chargeNote(failedAt: DemoStatus): string | null {
+  if (failedAt === "idle" || failedAt === "setup") return null;
+  if (failedAt === "paying") {
+    return "Nothing was charged: x402 only settles the payment when the build succeeds.";
+  }
+  return "The recipe fee was already paid when this transaction was built.";
 }
 
 /**

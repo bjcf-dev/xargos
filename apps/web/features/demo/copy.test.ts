@@ -2,6 +2,7 @@ import { fixtureBuildResponse, fixtureRecipe, fixtureSetupReady } from "@xargos/
 import { describe, expect, it } from "vitest";
 import {
   canShock,
+  chargeNote,
   DEMO_PATHS,
   describeRevert,
   describeShock,
@@ -234,6 +235,58 @@ describe("humanError", () => {
     expect(humanError({ code: "PAYMENT_INVALID", message: "" }).hint).not.toMatch(/try again/i);
     expect(humanError({ code: "PAYMENT_REQUIRED", message: "" }).hint).not.toMatch(/try again/i);
   });
+});
+
+describe("humanError: wait and backend down (F12)", () => {
+  it("says the backend is not responding, whatever the code", () => {
+    expect(humanError({ code: "INTERNAL", message: "Network error", unreachable: true })).toEqual({
+      title: "The demo backend is not responding",
+      hint: "It may be starting up or down. Try again in a minute.",
+    });
+  });
+
+  it("tells the Retry-After wait in seconds, or in minutes when it is long", () => {
+    expect(humanError({ code: "RATE_LIMITED", message: "", retryAfterSeconds: 20 }).hint).toBe(
+      "Wait 20 seconds, then try again.",
+    );
+    expect(humanError({ code: "RATE_LIMITED", message: "", retryAfterSeconds: 1 }).hint).toBe(
+      "Wait 1 second, then try again.",
+    );
+    expect(humanError({ code: "RATE_LIMITED", message: "", retryAfterSeconds: 90 }).hint).toBe(
+      "Wait about 2 minutes, then try again.",
+    );
+  });
+
+  it("keeps the generic wait when there is no Retry-After or it is zero", () => {
+    for (const retryAfterSeconds of [undefined, 0]) {
+      const error = {
+        code: "RATE_LIMITED" as const,
+        message: "",
+        ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
+      };
+      expect(humanError(error).hint).toBe("Wait a moment, then try again.");
+    }
+  });
+});
+
+// Criterio del jurado (pagos fallidos): x402 solo liquida si el build sale bien (D17).
+describe("chargeNote", () => {
+  it("says nothing before there is anything to pay", () => {
+    expect(chargeNote("setup")).toBeNull();
+  });
+
+  it("says nothing was charged when the paid build itself failed", () => {
+    expect(chargeNote("paying")).toMatch(/nothing was charged/i);
+  });
+
+  it.each(["shocking", "signing", "expired", "rebuilding"] as const)(
+    "after the build (%s) says the fee was already paid, never that nothing was charged",
+    (failedAt) => {
+      const note = chargeNote(failedAt);
+      expect(note).toMatch(/already paid/i);
+      expect(note).not.toMatch(/nothing was charged/i);
+    },
+  );
 });
 
 // Un solo canal por paso: el foco ya dice el título; la región solo dice lo que el título no dice.
