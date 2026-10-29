@@ -1,4 +1,5 @@
 import {
+  fetchPositionsForOwner,
   openPositionInstructions,
   setNativeMintWrappingStrategy,
   WhirlpoolDeployment,
@@ -60,12 +61,24 @@ export function createSetupSteps(d: SetupStepsDeps): SetupSteps {
       tokenProgram,
     });
 
+  const circleBalance = async (owner: Address): Promise<bigint> => {
+    const balance = await d.rpc
+      .getTokenAccountBalance(await ata(owner, d.circleUsdc))
+      .send()
+      .catch(() => null);
+    return balance ? BigInt(balance.value.amount) : 0n;
+  };
+
   return {
     async fundSol(agent) {
+      const owner = address(agent);
+      // A retry must not send the SOL twice.
+      const { value: balance } = await d.rpc.getBalance(owner).send();
+      if (balance >= d.fundSolLamports) return;
       await d.send([
         getTransferSolInstruction({
           source: d.payer,
-          destination: address(agent),
+          destination: owner,
           amount: d.fundSolLamports,
         }),
       ]);
@@ -77,7 +90,7 @@ export function createSetupSteps(d: SetupStepsDeps): SetupSteps {
         await createAta(owner, d.circleUsdc),
         await createAta(owner, d.demoUsdc),
       ];
-      if (d.fundUsdcBase > 0n) {
+      if (d.fundUsdcBase > 0n && (await circleBalance(owner)) < d.fundUsdcBase) {
         instructions.push(
           getTransferCheckedInstruction({
             source: await ata(d.payer.address, d.circleUsdc),
@@ -96,6 +109,11 @@ export function createSetupSteps(d: SetupStepsDeps): SetupSteps {
       // The SDK would otherwise wrap SOL with throwaway keypairs; the payer's wSOL ATA is simpler.
       setNativeMintWrappingStrategy("ata");
       const owner = address(agent);
+      // A retry must not open a second position: reuse the one the agent already holds.
+      const held = (await fetchPositionsForOwner(d.rpc, owner, WhirlpoolDeployment.devnet)).find(
+        (p) => !p.isPositionBundle && p.data.whirlpool === d.whirlpool && p.data.liquidity > 0n,
+      );
+      if (held && !held.isPositionBundle) return { position: held.data.positionMint };
       const { instructions, positionMint } = await openPositionInstructions(
         d.rpc,
         d.whirlpool,
@@ -131,6 +149,9 @@ export function createSetupSteps(d: SetupStepsDeps): SetupSteps {
       const owner = address(agent);
       const config = { programAddress: d.guardProgram };
       const [snapshot] = await findSnapshotStatePda({ agent: owner, mint: d.demoUsdc }, config);
+      // init_snapshot fails when the PDA exists, so a retry skips it.
+      const existing = await d.rpc.getAccountInfo(snapshot, { encoding: "base64" }).send();
+      if (existing.value) return;
       await d.send([
         getInitSnapshotInstruction(
           { payer: d.payer, agent: owner, mint: d.demoUsdc, snapshot },
