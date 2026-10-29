@@ -1,3 +1,5 @@
+import { createRateLimiter } from "./rate-limit";
+
 /** Lo único que el navegador puede pedirle a Solana (F6, D30). */
 export const RPC_METHODS = [
   "getLatestBlockhash",
@@ -13,7 +15,16 @@ export const DEVNET_PUBLIC_RPC = "https://api.devnet.solana.com";
 const MAX_BODY_BYTES = 64 * 1024;
 const ALLOWED: ReadonlySet<string> = new Set(RPC_METHODS);
 
-type Deps = { upstreamUrl: string; fetch?: typeof fetch; timeoutMs?: number };
+type Window = { max: number; windowMs: number };
+type Deps = {
+  upstreamUrl: string;
+  fetch?: typeof fetch;
+  timeoutMs?: number;
+  /** Por cliente: una demo hace ~70 llamadas (polling de 1 s durante como mucho 60 s). */
+  perClient?: Window;
+  /** Total de la instancia: el techo si la IP del cliente no llega o se falsifica. */
+  total?: Window;
+};
 type RequestId = string | number | null;
 
 function rpcError(status: number, id: RequestId, code: number, message: string): Response {
@@ -27,8 +38,16 @@ function rpcError(status: number, id: RequestId, code: number, message: string):
  * Reenvía JSON-RPC a un RPC de devnet que solo conoce el servidor. Nunca devuelve su URL
  * (puede llevar una api-key) ni sus errores de red: solo mensajes propios.
  */
-export function createRpcProxy({ upstreamUrl, fetch = globalThis.fetch, timeoutMs = 8_000 }: Deps) {
+export function createRpcProxy({
+  upstreamUrl,
+  fetch = globalThis.fetch,
+  timeoutMs = 8_000,
+  perClient = { max: 120, windowMs: 60_000 },
+  total = { max: 600, windowMs: 60_000 },
+}: Deps) {
   let devnet: Promise<boolean> | null = null;
+  const limitClient = createRateLimiter(perClient);
+  const limitTotal = createRateLimiter(total);
 
   const post = (body: string) =>
     fetch(upstreamUrl, {
@@ -50,6 +69,17 @@ export function createRpcProxy({ upstreamUrl, fetch = globalThis.fetch, timeoutM
   }
 
   return async function proxy(request: Request): Promise<Response> {
+    // Netlify pone la IP del cliente en x-nf-client-connection-ip (comprobarlo al desplegar, F7).
+    const client = request.headers.get("x-nf-client-connection-ip") ?? "unknown";
+    // Primero el del cliente: uno bloqueado no debe gastar el cupo total de los demás.
+    const byClient = limitClient(client);
+    const decision = byClient.allowed ? limitTotal("all") : byClient;
+    if (!decision.allowed) {
+      const response = rpcError(429, null, -32005, "Too many requests, try again later");
+      response.headers.set("retry-after", String(decision.retryAfterSeconds));
+      return response;
+    }
+
     const body = await request.text();
     if (new TextEncoder().encode(body).byteLength > MAX_BODY_BYTES) {
       return rpcError(413, null, -32600, "Request too large");

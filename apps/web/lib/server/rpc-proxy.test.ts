@@ -24,10 +24,13 @@ function fakeFetch({
   return { fetch, calls };
 }
 
-const rpcRequest = (body: unknown) =>
+const rpcRequest = (body: unknown, ip?: string) =>
   new Request("http://localhost/api/xargos/rpc", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      ...(ip ? { "x-nf-client-connection-ip": ip } : {}),
+    },
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
 
@@ -96,5 +99,44 @@ describe("createRpcProxy", () => {
     await proxy(rpcRequest(call("getTransaction")));
     await proxy(rpcRequest(call("getTransaction")));
     expect(calls.filter((c) => c.body.includes("getGenesisHash"))).toHaveLength(1);
+  });
+
+  it("limits each client", async () => {
+    const { fetch, calls } = fakeFetch();
+    const proxy = createRpcProxy({
+      upstreamUrl: UPSTREAM,
+      fetch,
+      perClient: { max: 1, windowMs: 60_000 },
+    });
+    expect((await proxy(rpcRequest(call("getTransaction"), "1.1.1.1"))).status).toBe(200);
+    const limited = await proxy(rpcRequest(call("getTransaction"), "1.1.1.1"));
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).toBe("60");
+    expect(await limited.json()).toMatchObject({ error: { code: -32005 } });
+    expect((await proxy(rpcRequest(call("getTransaction"), "2.2.2.2"))).status).toBe(200);
+    expect(calls.filter((c) => c.body.includes("getTransaction"))).toHaveLength(2);
+  });
+
+  it("limits the total across clients", async () => {
+    const { fetch } = fakeFetch();
+    const proxy = createRpcProxy({
+      upstreamUrl: UPSTREAM,
+      fetch,
+      total: { max: 1, windowMs: 60_000 },
+    });
+    expect((await proxy(rpcRequest(call("getTransaction"), "1.1.1.1"))).status).toBe(200);
+    expect((await proxy(rpcRequest(call("getTransaction"), "2.2.2.2"))).status).toBe(429);
+  });
+
+  it("does not let a blocked client use up the total", async () => {
+    const { fetch } = fakeFetch();
+    const proxy = createRpcProxy({
+      upstreamUrl: UPSTREAM,
+      fetch,
+      perClient: { max: 1, windowMs: 60_000 },
+      total: { max: 3, windowMs: 60_000 },
+    });
+    for (let i = 0; i < 5; i++) await proxy(rpcRequest(call("getTransaction"), "6.6.6.6"));
+    expect((await proxy(rpcRequest(call("getTransaction"), "1.1.1.1"))).status).toBe(200);
   });
 });
