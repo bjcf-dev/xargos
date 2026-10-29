@@ -5,7 +5,13 @@ vi.mock("@solana/kit", () => ({
 }));
 
 import { generateKeyPair } from "@solana/kit";
-import { AGENT_TTL_MS, createAgentKeyStore, createMemoryBackend } from "./agent-key-store";
+import {
+  AGENT_TTL_MS,
+  createAgentKeyStore,
+  createMemoryBackend,
+  type KeyPairBackend,
+  openAgentKeyStore,
+} from "./agent-key-store";
 
 const MINUTE = 60 * 1000;
 const fakePair = () => ({ publicKey: {}, privateKey: {} }) as CryptoKeyPair;
@@ -61,5 +67,50 @@ describe("createAgentKeyStore", () => {
     await store.create();
     expect(generateKeyPair).toHaveBeenCalledWith(false);
     expect(store.persistent).toBe(false);
+  });
+});
+
+describe("openAgentKeyStore", () => {
+  const nonExtractable = () =>
+    ({ publicKey: {}, privateKey: { extractable: false } }) as unknown as CryptoKeyPair;
+
+  it("falls back to memory when IndexedDB cannot open", async () => {
+    const store = await openAgentKeyStore({
+      openBackend: () => Promise.reject(new Error("no indexedDB")),
+      generate: async () => nonExtractable(),
+    });
+    expect(store.persistent).toBe(false);
+    expect(await store.create()).toBeTruthy();
+  });
+
+  it("falls back to memory when the key cannot be stored", async () => {
+    const broken: KeyPairBackend = {
+      ...createMemoryBackend(),
+      write: () => Promise.reject(new DOMException("cannot clone", "DataCloneError")),
+    };
+    const store = await openAgentKeyStore({
+      openBackend: async () => broken,
+      generate: async () => nonExtractable(),
+    });
+    expect(store.persistent).toBe(false);
+  });
+
+  it("uses IndexedDB when the round trip works", async () => {
+    const backend = createMemoryBackend();
+    const store = await openAgentKeyStore({
+      openBackend: async () => backend,
+      generate: async () => nonExtractable(),
+    });
+    expect(store.persistent).toBe(true);
+    expect(await backend.read()).toBeNull();
+  });
+
+  it("keeps an agent that is already stored", async () => {
+    const backend = createMemoryBackend();
+    const existing = { keyPair: nonExtractable(), createdAt: Date.now() };
+    await backend.write(existing);
+    const store = await openAgentKeyStore({ openBackend: async () => backend });
+    expect(store.persistent).toBe(true);
+    expect((await store.get())?.keyPair).toBe(existing.keyPair);
   });
 });
