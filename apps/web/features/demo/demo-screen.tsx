@@ -121,12 +121,14 @@ export function DemoScreen({
   const rebuildLeft =
     state.status === "expired" ? secondsLeft(state.run.build.rebuildUntil, now) : null;
 
-  // La cuenta atrás llegó a 0: la tx caduca (D19). Firmando no: la tx puede estar en vuelo y
-  // solo el signer sabe si entró (BUILD_EXPIRED la caduca desde el reducer).
+  // expiresAt ya pasó: la tx caduca (D19). No basta con la cuenta a 0, que llega hasta 999 ms
+  // antes (redondea hacia abajo) y el reducer la ignoraría. Firmando no: la tx puede estar en
+  // vuelo y solo el signer sabe si entró (BUILD_EXPIRED la caduca desde el reducer).
+  const pastExpiry = live && now >= Date.parse(state.run.build.expiresAt);
   // biome-ignore lint/correctness/useExhaustiveDependencies: solo cuando cambia la caducidad o el paso.
   useEffect(() => {
-    if (expired && (state.status === "built" || state.status === "shocking")) demo.expire();
-  }, [expired, state.status]);
+    if (pastExpiry && (state.status === "built" || state.status === "shocking")) demo.expire();
+  }, [pastExpiry, state.status]);
   // El shock está bloqueado por falta de tiempo: su aviso lo describe para el lector de pantalla.
   const shockBlocked = live && !expired && !canShock(left);
 

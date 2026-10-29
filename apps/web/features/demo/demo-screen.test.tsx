@@ -250,6 +250,42 @@ describe("DemoScreen (mock mode)", () => {
     }
   });
 
+  it("expires once expiresAt really passes, even when the countdown hit 0 a moment before", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const t0 = Date.now();
+      server.use(
+        http.post("*/api/xargos/recipes/:recipeId/build", () =>
+          HttpResponse.json({
+            ...fixtureBuildResponse,
+            expiresAt: new Date(t0 + 30_000).toISOString(),
+            rebuildUntil: new Date(t0 + 120_000).toISOString(),
+          }),
+        ),
+      );
+      render(
+        <DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />,
+      );
+      await click(/happy path/i);
+      await click(/pay & build/i);
+      expect(await screen.findByText(/Valid for/)).toBeDefined();
+
+      // A 500 ms del final la cuenta ya marca 0, pero la tx aún no ha caducado.
+      vi.setSystemTime(t0 + 29_500);
+      expect(await screen.findByText("Expired", {}, { timeout: 2_000 })).toBeDefined();
+      vi.setSystemTime(t0 + 30_500);
+      expect(
+        await screen.findByText(
+          "The transaction expired before it was sent",
+          { selector: "[data-step-title]" },
+          { timeout: 2_500 },
+        ),
+      ).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("offers run again, with its cost, once the free rebuild window has closed", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     try {
