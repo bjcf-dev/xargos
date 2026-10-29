@@ -33,6 +33,8 @@ export type RevertFailure = {
   instructionIndex: number | null;
   /** parseGuardFail(logs); null si el que falló no fue el guard. */
   guard: { received: bigint; min: bigint } | null;
+  /** meta.fee de la tx (lamports, D16). Sin él (mock, o la cadena no lo dio), no se cifra. */
+  networkFeeLamports?: bigint;
 };
 
 export type DemoStatus =

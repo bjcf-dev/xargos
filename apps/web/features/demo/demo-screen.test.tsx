@@ -525,6 +525,36 @@ describe("ResultCard for an error after the build", () => {
   });
 });
 
+// D16: el revert dice la comisión de red, leída de la cadena.
+describe("ResultCard network fee", () => {
+  const reverted = (networkFeeLamports?: bigint) =>
+    ({
+      status: "reverted",
+      run: { agent: "agent", position: "position", build: fixtureBuildResponse },
+      signature: "sig",
+      failure: {
+        instructionIndex: fixtureBuildResponse.guard.assertIndex,
+        guard: { received: 1n, min: 2n },
+        ...(networkFeeLamports !== undefined ? { networkFeeLamports } : {}),
+      },
+    }) as const;
+
+  it("states the network fee read from the transaction", () => {
+    render(<ResultCard state={reverted(5000n)} mode="local" price={fixtureRecipe.price} />);
+    expect(
+      screen.getByText("Spent: 0.01 USDC recipe fee (x402) · 0.000005 SOL network fee."),
+    ).toBeDefined();
+  });
+
+  it("says the network fee is not available instead of pending once the read is over", () => {
+    render(<ResultCard state={reverted()} mode="local" price={fixtureRecipe.price} />);
+    expect(
+      screen.getByText("Spent: 0.01 USDC recipe fee (x402) · network fee not available."),
+    ).toBeDefined();
+    expect(screen.queryByText(/pending/i)).toBeNull();
+  });
+});
+
 // D15: un revert que no es del guard sigue en rojo, nombra el paso y no habla de "guard".
 describe("ResultCard for a revert outside the guard", () => {
   it("stays red, names the step and never mentions the guard", () => {
