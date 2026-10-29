@@ -1,5 +1,6 @@
 import type { DemoSetupPhase, DemoSetupStatus } from "@xargos/shared";
 import { CheckCircle2Icon, CircleIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
@@ -39,9 +40,20 @@ type AgentCardProps = {
   /** Último estado de setup conocido: la máquina lo suelta al pagar, la tarjeta lo conserva. */
   setup: DemoSetupStatus | null;
   mode: ApiMode;
+  /** false: el navegador no guarda la clave y el agente se pierde al recargar (D30). */
+  persistent?: boolean;
+  /** Fuera de mock: borra la clave y crea otro agente. */
+  onNewAgent?: () => void;
 };
 
-export function AgentCard({ state, agent, setup, mode }: AgentCardProps) {
+export function AgentCard({
+  state,
+  agent,
+  setup,
+  mode,
+  persistent = true,
+  onNewAgent,
+}: AgentCardProps) {
   const done = phasesDone(state, setup);
   const running = state.status === "setup" && done < PHASES.length;
   // En el móvil, con el setup terminado, las fases sobran: una línea y las acciones suben.
@@ -54,7 +66,11 @@ export function AgentCard({ state, agent, setup, mode }: AgentCardProps) {
         <CardTitle>{mode === "mock" ? "Simulated agent" : "Agent"}</CardTitle>
         <CardDescription className="font-mono">
           {/* En mock la dirección es de las fixtures: que no parezca una cuenta real. */}
-          {mode === "mock" ? `Demo address · ${ellipsify(agent, 6)}` : ellipsify(agent, 6)}
+          {mode === "mock"
+            ? `Demo address · ${ellipsify(agent, 6)}`
+            : agent
+              ? ellipsify(agent, 6)
+              : "Creating the agent…"}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -103,6 +119,16 @@ export function AgentCard({ state, agent, setup, mode }: AgentCardProps) {
             {formatUnits(setup.balances.sol, SOL_DECIMALS)} SOL ·{" "}
             {formatUnits(setup.balances.usdc, USDC_DECIMALS)} USDC
           </p>
+        ) : null}
+        {persistent ? null : (
+          <p className="text-sm text-muted-foreground">
+            This agent lasts until you reload the page: this browser does not keep its key.
+          </p>
+        )}
+        {onNewAgent ? (
+          <Button variant="outline" size="sm" className="self-start" onClick={onNewAgent}>
+            New agent
+          </Button>
         ) : null}
       </CardContent>
     </Card>

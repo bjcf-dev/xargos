@@ -1,5 +1,5 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
-import { fixtureRecipe } from "@xargos/shared";
+import { fixtureRecipe, fixtureSetupReady } from "@xargos/shared";
 import { delay, HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -20,7 +20,15 @@ afterEach(cleanup);
 afterAll(() => server.close());
 
 function renderDemo(signer: DemoSigner | null = createMockSigner({ latencyMs: 0 })) {
-  return renderHook(() => useDemo({ recipeId: fixtureRecipe.id, api, signer, pollIntervalMs: 1 }));
+  return renderHook(() =>
+    useDemo({
+      recipeId: fixtureRecipe.id,
+      agent: fixtureSetupReady.agent,
+      api,
+      signer,
+      pollIntervalMs: 1,
+    }),
+  );
 }
 
 type Demo = ReturnType<typeof renderDemo>["result"];
@@ -99,7 +107,7 @@ describe("useDemo", () => {
     await waitFor(() =>
       expect(result.current.state).toMatchObject({
         status: "error",
-        error: { code: "INTERNAL", message: "Signing arrives with F6" },
+        error: { code: "INTERNAL", message: "No signer for this agent" },
       }),
     );
   });

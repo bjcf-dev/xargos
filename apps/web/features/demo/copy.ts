@@ -114,7 +114,7 @@ const HUMAN_ERRORS: Record<ErrorCode, HumanError | null> = {
     title: "The price shock failed",
     hint: "The price shock could not be applied.",
   },
-  // Nuestros propios errores (p. ej. "Signing arrives with F6"): el mensaje ya es para personas.
+  // Nuestros propios errores (p. ej. "No signer for this agent"): el mensaje ya es para personas.
   INTERNAL: null,
 };
 

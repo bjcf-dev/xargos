@@ -1,9 +1,11 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { fixtureBuildResponse, fixtureRecipe } from "@xargos/shared";
+import { fixtureBuildResponse, fixtureRecipe, fixtureSetupReady } from "@xargos/shared";
 import { delay, HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApiClient } from "@/lib/api/client";
+import { createAgentKeyStore, createMemoryBackend } from "@/lib/solana/agent-key-store";
+import type { SendRpc } from "@/lib/solana/send";
 import { createHandlers } from "@/mocks/handlers";
 import { AgentCard } from "./agent-card";
 import { mockPaymentNote } from "./copy";
@@ -11,7 +13,9 @@ import { DemoScreen } from "./demo-screen";
 import { createMockSigner } from "./mock-signer";
 import { ResultCard } from "./result-card";
 import { initialDemoState } from "./types";
-import { DEMO_AGENT } from "./use-demo";
+import type { UseAgentOptions } from "./use-agent";
+
+const DEMO_AGENT = fixtureSetupReady.agent;
 
 const server = setupServer();
 const api = createApiClient({ baseUrl: "http://localhost/api/xargos" });
@@ -272,7 +276,7 @@ describe("DemoScreen (mock mode)", () => {
     await click(/sign & send/i);
 
     expect(
-      await screen.findByText("Signing arrives with F6", {
+      await screen.findByText("No signer for this agent", {
         selector: '[data-slot="alert-description"] p',
       }),
     ).toBeDefined();
@@ -382,5 +386,44 @@ describe("DemoScreen recipe loading", () => {
     expect(await screen.findByText("The recipe could not be loaded")).toBeDefined();
     await click(/try again/i);
     expect(await screen.findByRole("button", { name: /happy path/i })).toBeDefined();
+  });
+});
+
+describe("DemoScreen (devnet modes)", () => {
+  const agentOptions = ({ persistent = true, ed25519 = true } = {}): UseAgentOptions => {
+    const store = createAgentKeyStore(createMemoryBackend(), { persistent });
+    return {
+      openStore: async () => store,
+      ed25519: async () => ed25519,
+      rpc: () => ({}) as SendRpc,
+    };
+  };
+
+  it("shows New agent outside mock mode", async () => {
+    render(<DemoScreen api={api} mode="local" agentOptions={agentOptions()} />);
+    expect(await screen.findByRole("button", { name: /new agent/i })).toBeDefined();
+    expect(screen.queryByText(/lasts until you reload/i)).toBeNull();
+  });
+
+  it("explains that the agent lasts until reload when not persistent", async () => {
+    render(
+      <DemoScreen api={api} mode="local" agentOptions={agentOptions({ persistent: false })} />,
+    );
+    expect(await screen.findByText(/lasts until you reload/i)).toBeDefined();
+  });
+
+  it("tells the browser is not supported", async () => {
+    render(<DemoScreen api={api} mode="local" agentOptions={agentOptions({ ed25519: false })} />);
+    const message = await screen.findByText(/browser cannot create the agent/i);
+    expect(message.closest('[data-slot="alert"]')?.textContent).toMatch(
+      /Chrome 137.*Firefox 129.*Safari 17/,
+    );
+    expect(screen.queryByRole("button", { name: /happy path/i })).toBeNull();
+  });
+
+  it("mock mode has no New agent button", async () => {
+    render(<DemoScreen api={api} />);
+    await screen.findByRole("button", { name: /happy path/i });
+    expect(screen.queryByRole("button", { name: /new agent/i })).toBeNull();
   });
 });

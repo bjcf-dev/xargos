@@ -48,7 +48,19 @@ export function runSetup(
   const dispatch = unlessAborted(rawDispatch, signal);
   dispatch({ type: "SETUP_STARTED", agent });
   return step(dispatch, signal, async () => {
-    await api.startSetup({ agent }, { signal });
+    // Primero se pregunta: un agente que sobrevivió a la recarga no gasta otro setup ni el
+    // límite por IP. Desconocido (servidor reiniciado, job caducado) o fallido: POST con el
+    // mismo agente; el backend se salta lo que ya está hecho (#52).
+    const known = await api.getSetupStatus(agent, { signal }).catch((error: unknown) => {
+      if (
+        error instanceof ApiClientError &&
+        error.code === "VALIDATION_ERROR" &&
+        error.status === 400
+      )
+        return null;
+      throw error;
+    });
+    if (!known || known.phase === "failed") await api.startSetup({ agent }, { signal });
     await pollUntil(
       async () => {
         const setup = await api.getSetupStatus(agent, { signal });

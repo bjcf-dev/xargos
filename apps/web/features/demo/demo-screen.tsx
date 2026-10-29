@@ -29,7 +29,8 @@ import {
 import { ResultCard } from "./result-card";
 import type { DemoSigner } from "./signer";
 import { TxAnatomy } from "./tx-anatomy";
-import { DEMO_AGENT, useDemo } from "./use-demo";
+import { type UseAgentOptions, useAgent } from "./use-agent";
+import { useDemo } from "./use-demo";
 import { DEMO_RECIPE_ID, useRecipe } from "./use-recipe";
 import { X402Timeline } from "./x402-timeline";
 
@@ -38,6 +39,8 @@ type DemoScreenProps = {
   signer?: DemoSigner | null;
   pollIntervalMs?: number;
   mode?: ApiMode;
+  /** Para los tests: de dónde sale el agente fuera de mock (useAgent). */
+  agentOptions?: UseAgentOptions;
 };
 
 /** Hora actual que se refresca cada segundo mientras `active`, para la cuenta atrás. */
@@ -68,8 +71,14 @@ export function DemoScreen({
   signer,
   pollIntervalMs,
   mode = apiMode,
+  agentOptions,
 }: DemoScreenProps) {
   const load = useRecipe(api);
+  const agent = useAgent({ mode, ...agentOptions });
+  const address = agent.status === "ready" ? agent.address : "";
+  // Un signer pasado por props (tests) gana; si no, el del agente (undefined en mock: el de mock).
+  const chosenSigner =
+    signer !== undefined ? signer : agent.status === "ready" ? agent.signer : undefined;
   const recipe = load.status === "ready" ? load.recipe : null;
   const [lastSetup, setLastSetup] = useState<DemoSetupStatus | null>(null);
   const [path, setPath] = useState<DemoPath | null>(null);
@@ -78,8 +87,9 @@ export function DemoScreen({
   const firstStatus = useRef(true);
   const demo = useDemo({
     recipeId: recipe?.id ?? "",
+    agent: address,
     api,
-    ...(signer !== undefined ? { signer } : {}),
+    ...(chosenSigner !== undefined ? { signer: chosenSigner } : {}),
     ...(pollIntervalMs ? { pollIntervalMs } : {}),
   });
   const { state } = demo;
@@ -135,6 +145,18 @@ export function DemoScreen({
     return <Skeleton className="h-64 w-full" />;
   }
 
+  if (agent.status === "unsupported") {
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>This browser cannot create the agent's key</AlertTitle>
+        <AlertDescription>
+          The demo agent signs in your browser with Ed25519, which needs Chrome 137, Firefox 129,
+          Safari 17 or later. Open the demo in one of them.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
   const fee = formatFee(recipe.price);
   const startOver = (
     <Button
@@ -157,7 +179,22 @@ export function DemoScreen({
       </div>
 
       <div className="grid gap-6 md:grid-cols-[18rem_1fr]">
-        <AgentCard state={state} agent={DEMO_AGENT} setup={lastSetup} mode={mode} />
+        <AgentCard
+          state={state}
+          agent={address}
+          setup={lastSetup}
+          mode={mode}
+          persistent={agent.status !== "ready" || agent.persistent}
+          {...(mode !== "mock" && agent.status === "ready"
+            ? {
+                onNewAgent: () => {
+                  setPath(null);
+                  demo.reset();
+                  void agent.newAgent();
+                },
+              }
+            : {})}
+        />
 
         <div ref={panelRef} className="flex min-w-0 flex-col gap-4">
           <p data-testid="step-announcement" className="sr-only" aria-live="polite">
@@ -180,6 +217,7 @@ export function DemoScreen({
                     <div key={p} className="flex flex-col items-start gap-1">
                       <Button
                         variant={p === "A" ? "default" : "outline"}
+                        disabled={agent.status !== "ready"}
                         aria-label={DEMO_PATHS[p].ariaLabel}
                         aria-describedby={`${a11yId}-path-${p}`}
                         onClick={() => {

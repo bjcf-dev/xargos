@@ -2,6 +2,7 @@
 import {
   fixtureBuildResponse,
   fixtureRecipe,
+  fixtureSetupFailed,
   fixtureSetupReady,
   fixtureShockConfirmed,
 } from "@xargos/shared";
@@ -26,7 +27,10 @@ const deps: RunnerDeps = {
 };
 
 beforeAll(() => server.listen({ onUnhandledFrame: "error" }));
-beforeEach(() => server.resetHandlers(...createHandlers()));
+beforeEach(() => {
+  server.events.removeAllListeners();
+  server.resetHandlers(...createHandlers());
+});
 afterAll(() => server.close());
 
 /** Guarda los eventos despachados para comprobar su secuencia. */
@@ -36,6 +40,15 @@ function recorder() {
 }
 const live = () => new AbortController().signal;
 
+/** Cuenta los POST /demo/setup que llegan al mock a partir de ahora. */
+function countSetupPosts() {
+  let count = 0;
+  server.events.on("request:start", ({ request }) => {
+    if (request.method === "POST" && request.url.endsWith("/demo/setup")) count += 1;
+  });
+  return () => count;
+}
+
 describe("runner", () => {
   it("starts the setup and reports every phase until ready", async () => {
     const { events, dispatch } = recorder();
@@ -44,6 +57,39 @@ describe("runner", () => {
     expect(events[0]).toEqual({ type: "SETUP_STARTED", agent: AGENT });
     const phases = events.slice(1).map((e) => e.type === "SETUP_PROGRESS" && e.setup.phase);
     expect(phases).toEqual(["queued", "funding_sol", "funding_usdc", "opening_position", "ready"]);
+  });
+
+  it("resumes a known agent without POST", async () => {
+    const posts = countSetupPosts();
+    server.use(
+      http.get("http://localhost/api/xargos/demo/setup/:agent", () =>
+        HttpResponse.json(fixtureSetupReady),
+      ),
+    );
+    const { events, dispatch } = recorder();
+    await runSetup(deps, AGENT, dispatch, live());
+    expect(posts()).toBe(0);
+    expect(events.at(-1)).toEqual({ type: "SETUP_PROGRESS", setup: fixtureSetupReady });
+  });
+
+  it("posts again when the agent is unknown", async () => {
+    const posts = countSetupPosts();
+    await runSetup(deps, AGENT, recorder().dispatch, live());
+    expect(posts()).toBe(1);
+  });
+
+  it("posts again when the job failed", async () => {
+    const posts = countSetupPosts();
+    let first = true;
+    server.use(
+      http.get("http://localhost/api/xargos/demo/setup/:agent", () => {
+        if (!first) return HttpResponse.json(fixtureSetupReady);
+        first = false;
+        return HttpResponse.json(fixtureSetupFailed);
+      }),
+    );
+    await runSetup(deps, AGENT, recorder().dispatch, live());
+    expect(posts()).toBe(1);
   });
 
   it("pays and builds", async () => {
