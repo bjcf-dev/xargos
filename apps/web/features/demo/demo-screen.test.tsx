@@ -650,6 +650,17 @@ describe("DemoScreen (devnet modes)", () => {
     expect(screen.queryByRole("button", { name: /happy path/i })).toBeNull();
   });
 
+  it("explains when the agent's key cannot be created, instead of loading forever", async () => {
+    const options: UseAgentOptions = {
+      ...agentOptions(),
+      openStore: () => Promise.reject(new Error("QuotaExceededError")),
+    };
+    render(<DemoScreen api={api} mode="local" agentOptions={options} />);
+    const message = await screen.findByText(/agent's key could not be created/i);
+    expect(message.closest('[data-slot="alert"]')?.textContent).toMatch(/QuotaExceededError/);
+    expect(screen.getByRole("button", { name: /reload/i })).toBeDefined();
+  });
+
   it("mock mode has no New agent button", async () => {
     render(<DemoScreen api={api} />);
     await screen.findByRole("button", { name: /happy path/i });

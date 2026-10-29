@@ -12,6 +12,8 @@ import type { DemoSigner } from "./signer";
 export type AgentState =
   | { status: "loading" }
   | { status: "unsupported" }
+  /** No se pudo crear o leer la clave (p. ej. el navegador rechazó generarla). */
+  | { status: "failed"; message: string }
   | {
       status: "ready";
       address: string;
@@ -80,7 +82,15 @@ export function useAgent({
       if (cancelled) return;
       store.current = opened;
       await load(false);
-    })();
+    })().catch((error: unknown) => {
+      // Sin esto la demo se quedaría cargando para siempre.
+      if (!cancelled) {
+        setAgent({
+          status: "failed",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    });
     return () => {
       cancelled = true;
     };

@@ -58,4 +58,13 @@ describe("useAgent", () => {
       expect(result.current.status === "ready" && result.current.address).not.toBe(before),
     );
   });
+
+  it("fails visibly instead of loading forever when the key cannot be created", async () => {
+    const store = createAgentKeyStore(createMemoryBackend(), {
+      persistent: true,
+      generate: () => Promise.reject(new Error("NotSupportedError")),
+    });
+    const { result } = renderHook(() => useAgent(options({ openStore: async () => store })));
+    await waitFor(() => expect(result.current.status).toBe("failed"));
+  });
 });
