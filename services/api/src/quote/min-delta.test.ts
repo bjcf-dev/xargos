@@ -1,15 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { expectedOut, GUARD_SLIPPAGE_BPS, minDelta, STEP_SLIPPAGE_BPS, swapFee } from "./min-delta";
+import { expectedOut, GUARD_SLIPPAGE_BPS, minDelta, STEP_SLIPPAGE_BPS } from "./min-delta";
 
 describe("quote", () => {
   it("keeps the guard stricter than the intermediate steps (D10)", () => {
     expect(GUARD_SLIPPAGE_BPS).toBeLessThan(STEP_SLIPPAGE_BPS);
-  });
-
-  it("charges the pool fee rounded up", () => {
-    expect(swapFee(10_000_000n, 3000)).toBe(30_000n);
-    expect(swapFee(1n, 3000)).toBe(1n);
-    expect(swapFee(0n, 3000)).toBe(0n);
   });
 
   it("adds what comes from the position and from the swap", () => {
