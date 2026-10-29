@@ -14,3 +14,18 @@
 
 # Los secretos (URL del backend, DEMO_ACCESS_CODE) se ponen en el panel de Netlify,
 # separados para producción y para develop/previews. Nunca aquí.
+
+# Límite de la plataforma para la ruta RPC del navegador (D30). Una ruta de Next no puede
+# exportar el `config.rateLimit` de Netlify, así que va como redirect a sí misma: Netlify solo
+# documenta `rate_limit` en funciones propias y en redirects. Mismo cupo que el límite en
+# memoria por cliente (120/min). Comprobar al desplegar que devuelve 429 (F7, #21).
+[[redirects]]
+  from = "/api/xargos/rpc"
+  to = "/api/xargos/rpc"
+  status = 200
+  force = true
+
+  [redirects.rate_limit]
+    window_limit = 120
+    window_size = 60
+    aggregate_by = ["ip", "domain"]
