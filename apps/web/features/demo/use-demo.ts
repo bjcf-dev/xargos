@@ -5,7 +5,7 @@ import { ApiClientError } from "@/lib/api/errors";
 import { apiMode } from "@/lib/api/mode";
 import { paymentMayHaveSettled } from "./copy";
 import { createMockSigner } from "./mock-signer";
-import { type RunnerDeps, runPay, runSetup, runShock, runSign } from "./runner";
+import { type RunnerDeps, runPay, runRebuild, runSetup, runShock, runSign } from "./runner";
 import type { DemoSigner } from "./signer";
 import type { DemoStatus } from "./types";
 import { useDemoMachine } from "./use-demo-machine";
@@ -77,10 +77,41 @@ export function useDemo({
     if (state.status === "built") void runSign(deps, state.run, dispatch, begin());
   }
 
+  /** La tx caducó sin enviarse: el reducer solo la marca si expiresAt ya pasó. */
+  function expire() {
+    dispatch({ type: "EXPIRED", now: Date.now() });
+  }
+
+  /** Rebuild gratis con el mismo buildId (D19). */
+  function rebuild() {
+    if (state.status === "expired") void runRebuild(deps, state.run, dispatch, begin());
+  }
+
   const canRetry =
     state.status === "error" &&
     RETRYABLE.has(state.failedAt) &&
     !paymentMayHaveSettled(state.failedAt, state.error);
+  /** Se acabó la ventana gratis: solo queda pagar un build nuevo para el mismo agente y posición. */
+  const canRunAgain =
+    state.status === "error" &&
+    state.error.code === "REBUILD_WINDOW_CLOSED" &&
+    Boolean(state.agent && state.position);
+
+  /**
+   * Paga un build nuevo tras cerrarse la ventana gratis. Dentro de ella no hace nada: cobrar
+   * por lo que sale gratis sería un pago de más.
+   */
+  function runAgain() {
+    if (state.status === "expired") {
+      const now = Date.now();
+      if (now < Date.parse(state.run.build.rebuildUntil)) return;
+      // REBUILD con la ventana cerrada pasa a error con agente y posición; PAY sale de ahí.
+      dispatch({ type: "REBUILD", now });
+      void runPay(deps, state.run.agent, state.run.position, dispatch, begin());
+    } else if (canRunAgain) {
+      pay();
+    }
+  }
 
   /** Vuelve a pagar si se conoce la posición; si no, repite el setup. */
   function retry() {
@@ -95,5 +126,18 @@ export function useDemo({
     dispatch({ type: "RESET" });
   }
 
-  return { state, start, pay, shock, sign, retry, canRetry, reset };
+  return {
+    state,
+    start,
+    pay,
+    shock,
+    sign,
+    retry,
+    canRetry,
+    expire,
+    rebuild,
+    runAgain,
+    canRunAgain,
+    reset,
+  };
 }

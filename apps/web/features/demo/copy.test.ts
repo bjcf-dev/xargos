@@ -12,6 +12,7 @@ import {
   humanError,
   mockPaymentNote,
   paymentMayHaveSettled,
+  runAgainNote,
   secondsLeft,
   shockTrend,
   slippageLabel,
@@ -313,13 +314,14 @@ describe("stepAnnouncement", () => {
     ["signing", { status: "signing", run }],
     ["setup", { status: "setup", agent: run.agent, setup: fixtureSetupReady }],
     ["confirmed", { status: "confirmed", run, signature: "sig" }],
+    ["rebuilding", { status: "rebuilding", run }],
   ] as const)("stays silent while %s (Busy or the focused title says it)", (_, state) => {
     expect(stepAnnouncement(state)).toBe("");
   });
 
   it.each([
     ["built", { status: "built", run }, "Transaction ready to sign"],
-    ["expired", { status: "expired", run }, "Start over to build a new one."],
+    ["expired", { status: "expired", run }, "Rebuild it for free, or start over."],
     [
       "error",
       { status: "error", error: { code: "RATE_LIMITED", message: "x" }, failedAt: "paying" },
@@ -419,5 +421,19 @@ describe("chargeLine", () => {
   it("is the plain note outside mock mode, and null when there is nothing to say", () => {
     expect(chargeLine("paying", rejected, "staging", fee)).toBe(chargeNote("paying", rejected));
     expect(chargeLine("setup", rejected, "mock", fee)).toBeNull();
+  });
+});
+
+describe("runAgainNote", () => {
+  it("says the fee is charged again in devnet mode", () => {
+    expect(runAgainNote("0.01 USDC", "staging")).toBe(
+      "Run again pays 0.01 USDC again for a new transaction.",
+    );
+  });
+
+  it("in mock mode says nothing is charged now, and what devnet would charge", () => {
+    expect(runAgainNote("0.01 USDC", "mock")).toBe(
+      "Run again builds a new transaction. Mock mode charges nothing; in devnet mode it pays 0.01 USDC again.",
+    );
   });
 });

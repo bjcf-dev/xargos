@@ -23,6 +23,7 @@ import {
   DEMO_PATHS,
   type DemoPath,
   formatFee,
+  runAgainNote,
   secondsLeft,
   stepAnnouncement,
 } from "./copy";
@@ -114,9 +115,18 @@ export function DemoScreen({
 
   const live =
     state.status === "built" || state.status === "shocking" || state.status === "signing";
-  const now = useNow(live);
+  const now = useNow(live || state.status === "expired");
   const left = live ? secondsLeft(state.run.build.expiresAt, now) : null;
   const expired = left === 0;
+  const rebuildLeft =
+    state.status === "expired" ? secondsLeft(state.run.build.rebuildUntil, now) : null;
+
+  // La cuenta atrás llegó a 0: la tx caduca (D19). Firmando no: la tx puede estar en vuelo y
+  // solo el signer sabe si entró (BUILD_EXPIRED la caduca desde el reducer).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: solo cuando cambia la caducidad o el paso.
+  useEffect(() => {
+    if (expired && (state.status === "built" || state.status === "shocking")) demo.expire();
+  }, [expired, state.status]);
   // El shock está bloqueado por falta de tiempo: su aviso lo describe para el lector de pantalla.
   const shockBlocked = live && !expired && !canShock(left);
 
@@ -354,23 +364,49 @@ export function DemoScreen({
           {state.status === "error" ? (
             <>
               <ResultCard state={state} mode={mode} price={recipe.price} />
+              {demo.canRunAgain ? (
+                <p className="text-sm text-muted-foreground">{runAgainNote(fee, mode)}</p>
+              ) : null}
               <div className="flex gap-2">
                 {demo.canRetry ? <Button onClick={demo.retry}>Try again</Button> : null}
+                {demo.canRunAgain ? <Button onClick={demo.runAgain}>Run again</Button> : null}
                 {startOver}
               </div>
             </>
           ) : null}
 
-          {/* TODO(F11): nadie despacha EXPIRED ni REBUILD todavía; aquí irá "Rebuild for free". */}
-          {state.status === "expired" || state.status === "rebuilding" ? (
+          {state.status === "expired" ? (
             <>
               <Alert variant="destructive" role="presentation">
                 <AlertTitle data-step-title tabIndex={-1}>
                   The transaction expired before it was sent
                 </AlertTitle>
-                <AlertDescription>Start over to build a new one.</AlertDescription>
+                <AlertDescription>
+                  {rebuildLeft ? (
+                    <p>
+                      Its blockhash is no longer valid, so nothing ran. Free rebuild for{" "}
+                      {rebuildLeft}s: same build, no new payment.
+                    </p>
+                  ) : (
+                    <p>The free rebuild window has closed. {runAgainNote(fee, mode)}</p>
+                  )}
+                </AlertDescription>
               </Alert>
-              <div className="flex gap-2">{startOver}</div>
+              <div className="flex gap-2">
+                {rebuildLeft ? (
+                  <Button onClick={demo.rebuild}>Rebuild for free</Button>
+                ) : (
+                  <Button onClick={demo.runAgain}>Run again</Button>
+                )}
+                {startOver}
+              </div>
+            </>
+          ) : null}
+
+          {state.status === "rebuilding" ? (
+            <>
+              <X402Timeline state={state} mode={mode} price={recipe.price} />
+              <Busy>Rebuilding the transaction for free…</Busy>
             </>
           ) : null}
         </div>

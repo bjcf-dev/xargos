@@ -197,8 +197,7 @@ export function stepAnnouncement(state: DemoState): string {
     case "error":
       return humanError(state.error).hint;
     case "expired":
-    case "rebuilding":
-      return "Start over to build a new one.";
+      return "Rebuild it for free, or start over.";
     default:
       return "";
   }
@@ -243,6 +242,14 @@ export function describeRevert(run: Run, failure: RevertFailure): RevertCopy {
 /** Comisión de la receta, cobrada con x402 en USDC de Circle. */
 export function formatFee(price: Recipe["price"]): string {
   return `${formatUnits(price.amount, USDC_DECIMALS)} USDC`;
+}
+
+/** "Run again" cobra otra vez (la ventana gratis ya pasó, D19); en mock no cobra nada. */
+export function runAgainNote(fee: string, mode: ApiMode): string {
+  if (mode === "mock") {
+    return `Run again builds a new transaction. Mock mode charges nothing; in devnet mode it pays ${fee} again.`;
+  }
+  return `Run again pays ${fee} again for a new transaction.`;
 }
 
 /** El coste del pago en mock, dicho una sola vez y igual en la línea de tiempo y en el resultado. */

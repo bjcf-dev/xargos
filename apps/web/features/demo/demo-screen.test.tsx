@@ -219,34 +219,57 @@ describe("DemoScreen (mock mode)", () => {
     await click(/sign & send/i);
     expect(await screen.findByText(/at least [\d.]+ demo USDC\./)).toBeDefined();
   });
-  it("marks the transaction expired once expiresAt passes and blocks signing", async () => {
+  it("marks the transaction expired once expiresAt passes and rebuilds it for free", async () => {
     // Solo se falsea Date: el reloj salta sin esperar la caducidad real; MSW y waitFor siguen con timers reales.
     vi.useFakeTimers({ toFake: ["Date"] });
     try {
-      server.use(
-        http.post("*/api/xargos/recipes/:recipeId/build", () =>
-          HttpResponse.json({
-            ...fixtureBuildResponse,
-            expiresAt: new Date(Date.now() + 30_000).toISOString(),
-            rebuildUntil: new Date(Date.now() + 120_000).toISOString(),
-          }),
-        ),
-      );
       render(
         <DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />,
       );
 
       await click(/happy path/i);
       await click(/pay & build/i);
-      expect(await screen.findByText("Valid for 30s")).toBeDefined();
+      expect(await screen.findByText("Valid for 60s")).toBeDefined();
 
-      vi.setSystemTime(Date.now() + 31_000);
-      expect(await screen.findByText("Expired", {}, { timeout: 2_000 })).toBeDefined();
-      expect(screen.getByRole("button", { name: /sign & send/i }).hasAttribute("disabled")).toBe(
-        true,
+      vi.setSystemTime(Date.now() + 61_000);
+      expect(
+        await screen.findByText(
+          "The transaction expired before it was sent",
+          { selector: "[data-step-title]" },
+          { timeout: 2_000 },
+        ),
+      ).toBeDefined();
+      expect(screen.queryByRole("button", { name: /sign & send/i })).toBeNull();
+      expect(screen.getByText(/free rebuild for 59s/i)).toBeDefined();
+
+      await click(/rebuild for free/i);
+      expect(await screen.findByText("Valid for 60s")).toBeDefined();
+      expect(screen.getByRole("button", { name: /sign & send/i })).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("offers run again, with its cost, once the free rebuild window has closed", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      render(
+        <DemoScreen api={api} signer={createMockSigner({ latencyMs: 0 })} pollIntervalMs={1} />,
       );
-      expect(screen.getByRole("button", { name: /start over/i })).toBeDefined();
-      expect(screen.queryByText(/not enough time left/i)).toBeNull();
+
+      await click(/happy path/i);
+      await click(/pay & build/i);
+      expect(await screen.findByText("Valid for 60s")).toBeDefined();
+
+      vi.setSystemTime(Date.now() + 121_000);
+      expect(
+        await screen.findByText(/free rebuild window has closed/i, {}, { timeout: 2_000 }),
+      ).toBeDefined();
+      expect(screen.queryByRole("button", { name: /rebuild for free/i })).toBeNull();
+      expect(screen.getByText(/pays 0\.01 USDC again/i)).toBeDefined();
+
+      await click(/run again/i);
+      expect(await screen.findByText("Valid for 60s")).toBeDefined();
     } finally {
       vi.useRealTimers();
     }
