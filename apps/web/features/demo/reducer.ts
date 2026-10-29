@@ -173,6 +173,12 @@ export function demoReducer(state: DemoState, event: DemoEvent): DemoState {
       return { status: "rebuilding", run: state.run };
 
     case "FAILED":
+      // La cadena ya no conoce el blockhash: nada entró, así que es una caducidad con rebuild
+      // gratis, no un error. Un BUILD_EXPIRED por plazo de confirmación, si la tx entrase tarde,
+      // haría fallar la simulación del rebuild (la posición ya no está): no se ejecuta dos veces.
+      if (state.status === "signing" && event.error.code === "BUILD_EXPIRED") {
+        return { status: "expired", run: state.run };
+      }
       return IN_FLIGHT.has(state.status) ? toError(state, event.error) : state;
 
     case "RESET":

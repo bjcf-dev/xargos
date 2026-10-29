@@ -347,6 +347,16 @@ describe("demoReducer: price shock (demo B, D10) and signing", () => {
 });
 
 describe("demoReducer: expiry and free rebuild (D19)", () => {
+  it("moves a signing run whose blockhash the chain no longer knows to expired", () => {
+    const error = { code: "BUILD_EXPIRED", message: "Expired before it landed" } as const;
+    expect(demoReducer(signing, { type: "FAILED", error })).toEqual({ status: "expired", run });
+  });
+
+  it("keeps any other signing failure an error", () => {
+    const error = { code: "INTERNAL", message: "Could not reach Solana devnet" } as const;
+    expect(demoReducer(signing, { type: "FAILED", error }).status).toBe("error");
+  });
+
   const expired: DemoState = { status: "expired", run };
   const rebuilding: DemoState = { status: "rebuilding", run };
 
