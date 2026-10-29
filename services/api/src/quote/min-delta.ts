@@ -1,18 +1,13 @@
 const BPS = 10_000n;
 
-/** Slippage of the intermediate steps (decrease liquidity, swap): wide, so a swap never fails first (D10). */
-export const STEP_SLIPPAGE_BPS = 500;
+/**
+ * Slippage of the intermediate steps (close position, swap): 100%, that is, no minimum. The guard is the
+ * only minimum (D10): with a price shock the position pays out less than quoted, and a step minimum
+ * would make Orca fail before the guard does.
+ */
+export const STEP_SLIPPAGE_BPS = 10_000;
 /** Slippage allowed by the guard: strict, so the guard is the one that reverts (D10). */
 export const GUARD_SLIPPAGE_BPS = 100;
-
-/** Orca fee rates are parts per million (3000 = 0.30%). */
-const FEE_RATE_DENOMINATOR = 1_000_000n;
-
-/** Fee Orca charges on an input amount, rounded up like the program does. */
-export function swapFee(amountIn: bigint, feeRate: number): bigint {
-  const numerator = amountIn * BigInt(feeRate);
-  return (numerator + FEE_RATE_DENOMINATOR - 1n) / FEE_RATE_DENOMINATOR;
-}
 
 /** What the agent should end up receiving: USDC straight from the position plus the swap output. */
 export function expectedOut(parts: { usdcFromPosition: bigint; usdcFromSwap: bigint }): bigint {
