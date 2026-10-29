@@ -6,7 +6,7 @@ import {
   fixtureShockConfirmed,
 } from "@xargos/shared";
 import { describe, expect, it } from "vitest";
-import { createApiClient } from "./client";
+import { createApiClient, parseRetryAfter } from "./client";
 import { ApiClientError } from "./errors";
 
 const BASE = "http://test.local/api/xargos";
@@ -201,11 +201,82 @@ describe("createApiClient", () => {
     await expect(promise).rejects.toMatchObject({ name: "AbortError" });
   });
 
+  it("reads the Retry-After wait of a 429", async () => {
+    const { fetch } = fakeFetch(() =>
+      json({ error: { code: "RATE_LIMITED", message: "Too many setups" } }, 429, {
+        "retry-after": "30",
+      }),
+    );
+    const api = createApiClient({ fetch, baseUrl: BASE });
+
+    const error = await catchError(api.startSetup({ agent: AGENT }));
+    expect(error.retryAfterSeconds).toBe(30);
+    expect(error.unreachable).toBe(false);
+  });
+
+  it("marks a network failure as an unreachable backend", async () => {
+    const { fetch } = fakeFetch(() => {
+      throw new TypeError("fetch failed");
+    });
+    const api = createApiClient({ fetch, baseUrl: BASE });
+
+    const error = await catchError(api.listRecipes());
+    expect(error.unreachable).toBe(true);
+  });
+
+  it.each([502, 503, 504])("marks a %i without a contract body as unreachable", async (status) => {
+    const { fetch } = fakeFetch(() => new Response("<html>Bad gateway</html>", { status }));
+    const api = createApiClient({ fetch, baseUrl: BASE });
+
+    const error = await catchError(api.listRecipes());
+    expect(error.code).toBe("INTERNAL");
+    expect(error.unreachable).toBe(true);
+  });
+
+  it("keeps the contract code of a 502 with a contract body", async () => {
+    const { fetch } = fakeFetch(() =>
+      json({ error: { code: "BUILD_FAILED", message: "Simulation failed" } }, 502),
+    );
+    const api = createApiClient({ fetch, baseUrl: BASE });
+
+    const error = await catchError(api.listRecipes());
+    expect(error.code).toBe("BUILD_FAILED");
+    expect(error.unreachable).toBe(false);
+  });
+
+  it("does not take a contract INTERNAL 500 for an unreachable backend", async () => {
+    const { fetch } = fakeFetch(() => json({ error: { code: "INTERNAL", message: "Oops" } }, 500));
+    const api = createApiClient({ fetch, baseUrl: BASE });
+
+    const error = await catchError(api.listRecipes());
+    expect(error.unreachable).toBe(false);
+  });
+
   it("uses /api/xargos as the default base URL", async () => {
     const { fetch, calls } = fakeFetch(() => json([fixtureRecipe]));
     const api = createApiClient({ fetch });
 
     await api.listRecipes();
     expect(calls[0]?.url).toBe("/api/xargos/recipes");
+  });
+});
+
+describe("parseRetryAfter", () => {
+  const NOW = Date.parse("2026-10-29T18:00:00Z");
+
+  it("reads whole seconds", () => {
+    expect(parseRetryAfter("12", NOW)).toBe(12);
+    expect(parseRetryAfter("0", NOW)).toBe(0);
+  });
+
+  it("reads an HTTP date as the seconds until then, never below zero", () => {
+    expect(parseRetryAfter(new Date(NOW + 90_000).toUTCString(), NOW)).toBe(90);
+    expect(parseRetryAfter(new Date(NOW - 5_000).toUTCString(), NOW)).toBe(0);
+  });
+
+  it("gives no wait for a missing, empty, negative or unreadable value", () => {
+    for (const value of [null, "", " ", "-3", "1.5", "soon"]) {
+      expect(parseRetryAfter(value, NOW)).toBeUndefined();
+    }
   });
 });

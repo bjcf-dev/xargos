@@ -36,6 +36,23 @@ export type BuildResult = {
   paymentResponse?: string;
 };
 
+/** Status de pasarela: el backend no contestó (Railway dormido, Netlify sin respuesta). */
+const GATEWAY_STATUS: ReadonlySet<number> = new Set([502, 503, 504]);
+
+/**
+ * Retry-After (RFC 9110): segundos enteros o una fecha HTTP. undefined si no se entiende,
+ * para no enseñar nunca una espera negativa ni NaN.
+ */
+export function parseRetryAfter(value: string | null, now = Date.now()): number | undefined {
+  const raw = value?.trim();
+  if (!raw) return undefined;
+  if (/^\d+$/.test(raw)) return Number(raw);
+  if (/^[+-]?\d/.test(raw)) return undefined;
+  const at = Date.parse(raw);
+  if (Number.isNaN(at)) return undefined;
+  return Math.max(0, Math.ceil((at - now) / 1000));
+}
+
 export function createApiClient({
   // Se resuelve en cada llamada: así se usa el fetch vigente (p. ej. el que parchea MSW).
   fetch = (input, init) => globalThis.fetch(input, init),
@@ -63,7 +80,7 @@ export function createApiClient({
     } catch (cause) {
       // Cancelar no es un error de red: se propaga tal cual, como en pollUntil.
       if (signal?.aborted) throw cause;
-      throw new ApiClientError("INTERNAL", "Network error", { cause });
+      throw new ApiClientError("INTERNAL", "Network error", { cause, unreachable: true });
     }
 
     const data: unknown = await response.json().catch(() => undefined);
@@ -71,12 +88,14 @@ export function createApiClient({
     if (!response.ok) {
       const parsed = ErrorResponse.safeParse(data);
       const paymentRequired = response.headers.get("PAYMENT-REQUIRED") ?? undefined;
+      const retryAfterSeconds = parseRetryAfter(response.headers.get("Retry-After"));
       if (parsed.success) {
         const { code, message, details } = parsed.data.error;
         throw new ApiClientError(code, message, {
           status: response.status,
           details,
           ...(paymentRequired ? { paymentRequired } : {}),
+          ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
         });
       }
       if (response.status === 402) {
@@ -87,6 +106,7 @@ export function createApiClient({
       }
       throw new ApiClientError("INTERNAL", `Unexpected HTTP ${response.status}`, {
         status: response.status,
+        unreachable: GATEWAY_STATUS.has(response.status),
       });
     }
 
