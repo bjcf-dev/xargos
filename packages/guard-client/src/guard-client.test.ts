@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import idl from "../idl/guard.json";
 import {
   findSnapshotStatePda,
+  GUARD_ERROR__NOT_ASSOCIATED_TOKEN_ACCOUNT,
   GUARD_PROGRAM_ADDRESS,
   getAssertMinDeltaInstruction,
   getInitSnapshotInstruction,
@@ -72,5 +73,11 @@ describe("guard client", () => {
 
     expect(Array.from(ix.data)).toEqual(discriminatorOf("init_snapshot"));
     expect(ix.accounts.map((a) => a.address)).toContain(SYSTEM_PROGRAM);
+  });
+
+  it("exposes the error codes of the program, in IDL order", () => {
+    const codes = idl.errors.map((e) => e.code);
+    expect(codes).toEqual([6000, 6001, 6002, 6003, 6004, 6005]);
+    expect(GUARD_ERROR__NOT_ASSOCIATED_TOKEN_ACCOUNT).toBe(6005);
   });
 });

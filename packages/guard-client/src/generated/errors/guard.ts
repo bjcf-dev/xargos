@@ -19,12 +19,14 @@ export const GUARD_ERROR__STALE_SNAPSHOT = 0x1772; // 6002
 export const GUARD_ERROR__INVALID_MIN_DELTA = 0x1773; // 6003
 /** MinDeltaNotMet: Received amount is below min_delta */
 export const GUARD_ERROR__MIN_DELTA_NOT_MET = 0x1774; // 6004
+/** NotAssociatedTokenAccount: Token account is not the associated token account of the snapshot agent and mint */
+export const GUARD_ERROR__NOT_ASSOCIATED_TOKEN_ACCOUNT = 0x1775; // 6005
 
-export type GuardError = typeof GUARD_ERROR__INVALID_MIN_DELTA | typeof GUARD_ERROR__INVALID_MINT | typeof GUARD_ERROR__INVALID_OWNER | typeof GUARD_ERROR__MIN_DELTA_NOT_MET | typeof GUARD_ERROR__STALE_SNAPSHOT;
+export type GuardError = typeof GUARD_ERROR__INVALID_MIN_DELTA | typeof GUARD_ERROR__INVALID_MINT | typeof GUARD_ERROR__INVALID_OWNER | typeof GUARD_ERROR__MIN_DELTA_NOT_MET | typeof GUARD_ERROR__NOT_ASSOCIATED_TOKEN_ACCOUNT | typeof GUARD_ERROR__STALE_SNAPSHOT;
 
 let guardErrorMessages: Record<GuardError, string> | undefined;
 if (process.env['NODE_ENV'] !== 'production') {
-  guardErrorMessages = { [GUARD_ERROR__INVALID_MIN_DELTA]: `min_delta must be greater than zero`, [GUARD_ERROR__INVALID_MINT]: `Token account mint is not the snapshot mint`, [GUARD_ERROR__INVALID_OWNER]: `Token account owner is not the snapshot agent`, [GUARD_ERROR__MIN_DELTA_NOT_MET]: `Received amount is below min_delta`, [GUARD_ERROR__STALE_SNAPSHOT]: `Snapshot was taken in a different slot` };
+  guardErrorMessages = { [GUARD_ERROR__INVALID_MIN_DELTA]: `min_delta must be greater than zero`, [GUARD_ERROR__INVALID_MINT]: `Token account mint is not the snapshot mint`, [GUARD_ERROR__INVALID_OWNER]: `Token account owner is not the snapshot agent`, [GUARD_ERROR__MIN_DELTA_NOT_MET]: `Received amount is below min_delta`, [GUARD_ERROR__NOT_ASSOCIATED_TOKEN_ACCOUNT]: `Token account is not the associated token account of the snapshot agent and mint`, [GUARD_ERROR__STALE_SNAPSHOT]: `Snapshot was taken in a different slot` };
 }
 
 export function getGuardErrorMessage(code: GuardError): string {

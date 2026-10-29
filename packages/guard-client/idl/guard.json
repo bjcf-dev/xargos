@@ -9,7 +9,16 @@
   "instructions": [
     {
       "name": "assert_min_delta",
-      "discriminator": [250, 209, 147, 108, 157, 58, 206, 34],
+      "discriminator": [
+        250,
+        209,
+        147,
+        108,
+        157,
+        58,
+        206,
+        34
+      ],
       "accounts": [
         {
           "name": "agent_token_account"
@@ -20,7 +29,12 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [115, 110, 97, 112]
+                "value": [
+                  115,
+                  110,
+                  97,
+                  112
+                ]
               },
               {
                 "kind": "account",
@@ -45,11 +59,22 @@
     },
     {
       "name": "init_snapshot",
-      "discriminator": [10, 43, 218, 193, 122, 69, 153, 162],
+      "discriminator": [
+        10,
+        43,
+        218,
+        193,
+        122,
+        69,
+        153,
+        162
+      ],
       "accounts": [
         {
           "name": "payer",
-          "docs": ["Pays the rent. The backend signs, the agent does not need to (D8)."],
+          "docs": [
+            "Pays the rent. The backend signs, the agent does not need to (D8)."
+          ],
           "writable": true,
           "signer": true
         },
@@ -66,7 +91,12 @@
             "seeds": [
               {
                 "kind": "const",
-                "value": [115, 110, 97, 112]
+                "value": [
+                  115,
+                  110,
+                  97,
+                  112
+                ]
               },
               {
                 "kind": "account",
@@ -88,20 +118,36 @@
     },
     {
       "name": "snapshot",
-      "discriminator": [144, 236, 6, 133, 233, 160, 21, 94],
+      "discriminator": [
+        144,
+        236,
+        6,
+        133,
+        233,
+        160,
+        21,
+        94
+      ],
       "accounts": [
         {
           "name": "agent_token_account"
         },
         {
           "name": "snapshot",
-          "docs": ["Seeds come from the stored agent and mint, not from whoever calls (lesson 1)."],
+          "docs": [
+            "Seeds come from the stored agent and mint, not from whoever calls (lesson 1)."
+          ],
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
-                "value": [115, 110, 97, 112]
+                "value": [
+                  115,
+                  110,
+                  97,
+                  112
+                ]
               },
               {
                 "kind": "account",
@@ -123,7 +169,16 @@
   "accounts": [
     {
       "name": "Snapshot",
-      "discriminator": [137, 213, 28, 133, 224, 161, 48, 108]
+      "discriminator": [
+        137,
+        213,
+        28,
+        133,
+        224,
+        161,
+        48,
+        108
+      ]
     }
   ],
   "errors": [
@@ -151,6 +206,11 @@
       "code": 6004,
       "name": "MinDeltaNotMet",
       "msg": "Received amount is below min_delta"
+    },
+    {
+      "code": 6005,
+      "name": "NotAssociatedTokenAccount",
+      "msg": "Token account is not the associated token account of the snapshot agent and mint"
     }
   ],
   "types": [
@@ -173,12 +233,16 @@
           },
           {
             "name": "amount",
-            "docs": ["Token account balance when `snapshot` last ran."],
+            "docs": [
+              "Token account balance when `snapshot` last ran."
+            ],
             "type": "u64"
           },
           {
             "name": "slot",
-            "docs": ["Slot of that run: `assert_min_delta` only accepts the same slot (D7)."],
+            "docs": [
+              "Slot of that run: `assert_min_delta` only accepts the same slot (D7)."
+            ],
             "type": "u64"
           },
           {
