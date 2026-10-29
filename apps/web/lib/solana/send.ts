@@ -25,7 +25,13 @@ export type SendRpc = Rpc<
 >;
 
 /** `err` puede traer bigint (Kit los usa): no pasa por JSON.stringify sin un replacer. */
-export type SendResult = { signature: string; err: unknown | null; logs: readonly string[] };
+export type SendResult = {
+  signature: string;
+  err: unknown | null;
+  logs: readonly string[];
+  /** Comisión de red cobrada (meta.fee, lamports; D16). null si la cadena no la da. */
+  fee: bigint | null;
+};
 
 type SignAndSendArgs = {
   rpc: SendRpc;
@@ -177,7 +183,14 @@ async function confirm({
           })
           .send({ abortSignal: signal });
         if (tx?.meta) {
-          return { signature, err: tx.meta.err ?? null, logs: tx.meta.logMessages ?? [] };
+          // Kit tipa meta.fee como Lamports (bigint); otra cosa no se inventa como cifra.
+          const fee: unknown = tx.meta.fee;
+          return {
+            signature,
+            err: tx.meta.err ?? null,
+            logs: tx.meta.logMessages ?? [],
+            fee: typeof fee === "bigint" ? fee : null,
+          };
         }
       }
     } catch (error) {
