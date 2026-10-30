@@ -7,15 +7,21 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "spike:live": "tsx src/spike/live.ts",
-    "orca:balances": "tsx src/scripts/orca/balances.ts",
-    "orca:create-demo-mint": "tsx src/scripts/orca/create-demo-mint.ts",
-    "orca:create-pool": "tsx src/scripts/orca/create-pool.ts",
-    "orca:open-position": "tsx src/scripts/orca/open-position.ts",
-    "orca:swap": "tsx src/scripts/orca/swap.ts"
+    "orca:balances": "tsx --env-file-if-exists=../../.env src/scripts/orca/balances.ts",
+    "orca:create-demo-mint": "tsx --env-file-if-exists=../../.env src/scripts/orca/create-demo-mint.ts",
+    "orca:create-pool": "tsx --env-file-if-exists=../../.env src/scripts/orca/create-pool.ts",
+    "orca:open-position": "tsx --env-file-if-exists=../../.env src/scripts/orca/open-position.ts",
+    "orca:swap": "tsx --env-file-if-exists=../../.env src/scripts/orca/swap.ts",
+    "orca:create-lookup-table": "tsx --env-file-if-exists=../../.env src/scripts/orca/create-lookup-table.ts",
+    "orca:init-snapshot": "tsx --env-file-if-exists=../../.env src/scripts/orca/init-snapshot.ts",
+    "demo:e2e": "tsx --env-file-if-exists=../../.env src/scripts/demo-e2e.ts",
+    "start": "tsx --env-file-if-exists=../../.env src/index.ts",
+    "orca:build-recipe": "tsx --env-file-if-exists=../../.env src/scripts/orca/build-recipe.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
     "@orca-so/whirlpools": "8.0.1",
+    "@solana-program/address-lookup-table": "0.12.0",
     "@solana-program/system": "^0.12.0",
     "@solana-program/token": "^0.18.0",
     "@solana/kit": "^6.10.0",
@@ -23,7 +29,10 @@
     "@x402/fetch": "^2.28.0",
     "@x402/hono": "^2.28.0",
     "@x402/svm": "^2.28.0",
-    "hono": "^4.13.13"
+    "@xargos/guard-client": "workspace:*",
+    "@xargos/shared": "workspace:*",
+    "hono": "^4.13.13",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

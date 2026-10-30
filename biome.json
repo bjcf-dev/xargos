@@ -15,6 +15,7 @@
       "!**/dist",
       "!**/coverage",
       "!**/generated",
+      "!**/idl",
       "!**/*.md",
       "!**/pnpm-lock.yaml"
     ]
