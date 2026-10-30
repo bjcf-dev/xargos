@@ -1,3 +1,4 @@
+import { DemoSetupPhase } from "@xargos/shared";
 import type { DemoError, DemoEvent, DemoState } from "./types";
 import { initialDemoState } from "./types";
 
@@ -9,6 +10,11 @@ const IN_FLIGHT = new Set<DemoState["status"]>([
   "signing",
   "rebuilding",
 ]);
+
+/** Orden de las fases del setup (sin `failed`, que puede llegar en cualquier momento). */
+const SETUP_ORDER: readonly DemoSetupPhase[] = DemoSetupPhase.options.filter(
+  (phase) => phase !== "failed",
+);
 
 /** Agente y posición del estado actual, si los hay: el error los guarda para reintentar. */
 function contextOf(state: DemoState): { agent?: string; position?: string } {
@@ -69,6 +75,10 @@ export function demoReducer(state: DemoState, event: DemoEvent): DemoState {
           message: "Demo setup finished without a position",
         });
       }
+      // Un poll desordenado no puede hacer retroceder la fase (ni desactivar Pagar).
+      if (SETUP_ORDER.indexOf(event.setup.phase) < SETUP_ORDER.indexOf(state.setup.phase)) {
+        return state;
+      }
       return { ...state, setup: event.setup };
     }
 
@@ -85,6 +95,8 @@ export function demoReducer(state: DemoState, event: DemoEvent): DemoState {
     case "BUILT":
       // Rebuild gratis (D19): tx nueva, mismo recibo y mismo shock del run.
       if (state.status === "rebuilding") {
+        // D19: el rebuild gratis conserva el buildId; otro build no es este run.
+        if (event.build.buildId !== state.run.build.buildId) return state;
         return { status: "built", run: { ...state.run, build: event.build } };
       }
       if (state.status !== "paying") return state;

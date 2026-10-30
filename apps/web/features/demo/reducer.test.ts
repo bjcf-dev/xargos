@@ -169,6 +169,16 @@ describe("demoReducer: events that do not apply leave the state untouched", () =
         setup: { agent: "OtherAgent111111111111111111111111111111111", phase: "ready" },
       },
     ],
+    [
+      "a setup poll that goes back to an earlier phase",
+      { status: "setup", agent: AGENT, setup: { agent: AGENT, phase: "funding_usdc" } },
+      { type: "SETUP_PROGRESS", setup: { agent: AGENT, phase: "funding_sol" } },
+    ],
+    [
+      "a rebuilt transaction with another buildId (D19 keeps it)",
+      { status: "rebuilding", run },
+      { type: "BUILT", build: { ...fixtureBuildResponse, buildId: "bld_other" } },
+    ],
     ["a second click on Pay", paying, { type: "PAY" }],
     ["Pay while the setup is still funding", setup("funding_sol"), { type: "PAY" }],
     [
