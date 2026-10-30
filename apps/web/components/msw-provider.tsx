@@ -13,7 +13,9 @@ export function MswProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<WorkerState>(apiMode === "mock" ? "starting" : "ready");
 
   useEffect(() => {
-    if (apiMode !== "mock") return;
+    // Una sola expresión con la variable escrita literal: Next la sustituye al construir y,
+    // fuera de mock, elimina el import() y con él todo MSW del build (#42).
+    if (process.env.NEXT_PUBLIC_API_MODE && process.env.NEXT_PUBLIC_API_MODE !== "mock") return;
     let active = true;
     import("@/mocks/browser")
       .then(({ startMockWorker }) => startMockWorker())
