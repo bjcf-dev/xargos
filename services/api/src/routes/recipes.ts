@@ -23,6 +23,11 @@ export type RecipeRoutesDeps = {
   payTo: string;
   /** Price in dollars for the x402 middleware, e.g. "$0.01". */
   price: string;
+  /**
+   * Public base URL of the API as the agent sees it (the Netlify proxy). Without it x402 uses the
+   * URL of the request that reaches this server, which behind a proxy is not the one the agent paid for.
+   */
+  publicUrl?: string | undefined;
   log?: Logger;
 };
 
@@ -38,6 +43,7 @@ export function createRecipeRoutes({
   facilitator,
   payTo,
   price,
+  publicUrl,
   log,
 }: RecipeRoutesDeps) {
   const app = new Hono();
@@ -142,6 +148,9 @@ export function createRecipeRoutes({
           {
             accepts: { scheme: "exact", price, network: SOLANA_DEVNET_CAIP2, payTo },
             description: recipe.info.name,
+            ...(publicUrl && {
+              resource: `${publicUrl.replace(/\/+$/, "")}/recipes/${recipe.info.id}/build`,
+            }),
           },
         ]),
       ),

@@ -16,6 +16,8 @@ export const ConfigSchema = z.object({
   PAY_TO_ADDRESS: Address,
   /** Recipe price in base units of Circle's USDC (10000 = 0.01 USDC). */
   RECIPE_PRICE_BASE_UNITS: BaseUnitsNumber.default(10_000n),
+  /** Public base URL the agent calls (the Netlify proxy), e.g. https://app.netlify.app/api/xargos (D20). */
+  PUBLIC_RESOURCE_URL: z.url().optional(),
   DEMO_ACCESS_CODE: z.string().min(1).optional(),
   PORT: z.coerce.number().int().min(1).max(65_535).default(8787),
   SETUP_RATE_LIMIT_PER_HOUR: z.coerce.number().int().min(1).default(10),

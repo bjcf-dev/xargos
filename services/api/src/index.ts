@@ -77,6 +77,7 @@ const app = createApp({
     facilitator: asFacilitatorClient(facilitator),
     payTo: config.PAY_TO_ADDRESS,
     price: `$${dollars}`,
+    publicUrl: config.PUBLIC_RESOURCE_URL,
     log: { error: (data, message) => console.error(message, data) },
   }),
   steps: createSetupSteps({
