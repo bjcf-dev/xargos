@@ -16,6 +16,7 @@
     "orca:init-snapshot": "tsx --env-file-if-exists=../../.env src/scripts/orca/init-snapshot.ts",
     "demo:e2e": "tsx --env-file-if-exists=../../.env src/scripts/demo-e2e.ts",
     "start": "tsx --env-file-if-exists=../../.env src/index.ts",
+    "demo:shock": "tsx --env-file-if-exists=../../.env src/scripts/shock-live.ts",
     "orca:build-recipe": "tsx --env-file-if-exists=../../.env src/scripts/orca/build-recipe.ts"
   },
   "dependencies": {
