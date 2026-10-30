@@ -5,6 +5,8 @@ import { createDemoRoutes } from "./routes/demo";
 import { SetupJobs } from "./store/setup-jobs";
 
 export type AppDeps = {
+  /** The paid recipe routes (x402), built in index.ts with the real facilitator. */
+  recipeRoutes: Hono;
   steps: SetupSteps;
   accessCode?: string | undefined;
   setupRateLimitPerHour: number;
@@ -15,6 +17,7 @@ export type AppDeps = {
 export function createApp(deps: AppDeps) {
   const app = new Hono();
   app.get("/health", (c) => c.json({ ok: true }));
+  app.route("/", deps.recipeRoutes);
   app.route(
     "/",
     createDemoRoutes({

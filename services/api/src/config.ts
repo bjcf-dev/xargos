@@ -12,6 +12,10 @@ export const ConfigSchema = z.object({
   DEMO_USDC_MINT: Address,
   GUARD_PROGRAM_ID: Address,
   WHIRLPOOL_ADDRESS: Address,
+  /** Address that receives the x402 payments. */
+  PAY_TO_ADDRESS: Address,
+  /** Recipe price in base units of Circle's USDC (10000 = 0.01 USDC). */
+  RECIPE_PRICE_BASE_UNITS: BaseUnitsNumber.default(10_000n),
   DEMO_ACCESS_CODE: z.string().min(1).optional(),
   PORT: z.coerce.number().int().min(1).max(65_535).default(8787),
   SETUP_RATE_LIMIT_PER_HOUR: z.coerce.number().int().min(1).default(10),

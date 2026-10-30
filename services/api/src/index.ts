@@ -6,10 +6,17 @@ import {
   createSolanaRpc,
   createSolanaRpcSubscriptions,
 } from "@solana/kit";
+import { x402Facilitator } from "@x402/core/facilitator";
+import { SOLANA_DEVNET_CAIP2, toFacilitatorSvmSigner } from "@x402/svm";
+import { registerExactSvmScheme as registerFacilitator } from "@x402/svm/exact/facilitator";
 import { createApp } from "./app";
 import { parseConfig } from "./config";
 import { createSetupSteps } from "./demo/steps";
+import { asFacilitatorClient } from "./payment/local-facilitator";
+import { createExitOrcaLpRecipe } from "./recipes/exit-orca-lp";
+import { createRecipeRoutes } from "./routes/recipes";
 import { createSender } from "./solana/send";
+import { BuildStore } from "./store/build-store";
 
 const config = parseConfig(process.env);
 if (!config.DEMO_ACCESS_CODE) {
@@ -22,7 +29,32 @@ const payer = await createKeyPairSignerFromBytes(
 const rpc = createSolanaRpc(config.RPC_URL);
 const rpcSubscriptions = createSolanaRpcSubscriptions(config.RPC_URL.replace(/^http/, "ws"));
 
+// x402: the backend settles its own payments with the payer key (ADR 0001, D18).
+const facilitator = new x402Facilitator();
+registerFacilitator(facilitator, {
+  signer: toFacilitatorSvmSigner(payer),
+  networks: SOLANA_DEVNET_CAIP2,
+});
+const recipe = createExitOrcaLpRecipe({
+  rpc,
+  whirlpool: address(config.WHIRLPOOL_ADDRESS),
+  usdcMint: address(config.DEMO_USDC_MINT),
+  guardProgram: address(config.GUARD_PROGRAM_ID),
+  priceAmount: config.RECIPE_PRICE_BASE_UNITS.toString(),
+  priceMint: address(config.USDC_MINT),
+});
+const dollars = (Number(config.RECIPE_PRICE_BASE_UNITS) / 1_000_000).toFixed(6);
+
 const app = createApp({
+  recipeRoutes: createRecipeRoutes({
+    recipes: [recipe],
+    rpc,
+    store: new BuildStore(),
+    facilitator: asFacilitatorClient(facilitator),
+    payTo: config.PAY_TO_ADDRESS,
+    price: `$${dollars}`,
+    log: { error: (data, message) => console.error(message, data) },
+  }),
   steps: createSetupSteps({
     rpc,
     send: createSender(rpc, rpcSubscriptions, payer),
