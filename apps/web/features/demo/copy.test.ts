@@ -2,6 +2,8 @@ import { fixtureBuildResponse, fixtureRecipe, fixtureSetupReady } from "@xargos/
 import { describe, expect, it } from "vitest";
 import {
   canShock,
+  chargeLine,
+  chargeNote,
   DEMO_PATHS,
   describeRevert,
   describeShock,
@@ -9,6 +11,8 @@ import {
   formatFee,
   humanError,
   mockPaymentNote,
+  paymentMayHaveSettled,
+  runAgainNote,
   secondsLeft,
   shockTrend,
   slippageLabel,
@@ -236,6 +240,71 @@ describe("humanError", () => {
   });
 });
 
+describe("humanError: wait and backend down (F12)", () => {
+  it("says the backend is not responding, whatever the code", () => {
+    expect(humanError({ code: "INTERNAL", message: "Network error", unreachable: true })).toEqual({
+      title: "The demo backend is not responding",
+      hint: "It may be starting up or down. Try again in a minute.",
+    });
+  });
+
+  it("tells the Retry-After wait in seconds, or in minutes when it is long", () => {
+    expect(humanError({ code: "RATE_LIMITED", message: "", retryAfterSeconds: 20 }).hint).toBe(
+      "Wait 20 seconds, then try again.",
+    );
+    expect(humanError({ code: "RATE_LIMITED", message: "", retryAfterSeconds: 1 }).hint).toBe(
+      "Wait 1 second, then try again.",
+    );
+    expect(humanError({ code: "RATE_LIMITED", message: "", retryAfterSeconds: 90 }).hint).toBe(
+      "Wait about 2 minutes, then try again.",
+    );
+  });
+
+  it("keeps the generic wait when there is no Retry-After or it is zero", () => {
+    for (const retryAfterSeconds of [undefined, 0]) {
+      const error = {
+        code: "RATE_LIMITED" as const,
+        message: "",
+        ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
+      };
+      expect(humanError(error).hint).toBe("Wait a moment, then try again.");
+    }
+  });
+});
+
+// Criterio del jurado (pagos fallidos): x402 solo liquida si el build sale bien (D17).
+describe("chargeNote", () => {
+  it("says nothing before there is anything to pay", () => {
+    expect(chargeNote("setup", { code: "SETUP_FAILED", message: "" })).toBeNull();
+  });
+
+  it("says nothing was charged when the backend rejected the build", () => {
+    expect(chargeNote("paying", { code: "BUILD_FAILED", message: "", rejected: true })).toMatch(
+      /nothing was charged/i,
+    );
+  });
+
+  it.each([
+    ["the backend did not answer", { code: "INTERNAL", message: "", unreachable: true }],
+    ["the answer could not be read", { code: "INTERNAL", message: "Does not match" }],
+  ] as const)("does not claim nothing was charged when %s", (_, error) => {
+    const note = chargeNote("paying", error);
+    expect(note).not.toMatch(/nothing was charged/i);
+    expect(note).toMatch(/could not confirm/i);
+    // Sin "Try again" en este caso (#44): la nota explica por qué se empieza de nuevo.
+    expect(note).toMatch(/start over/i);
+  });
+
+  it.each(["shocking", "signing", "expired", "rebuilding"] as const)(
+    "after the build (%s) says the fee was already paid, never that nothing was charged",
+    (failedAt) => {
+      const note = chargeNote(failedAt, { code: "INTERNAL", message: "" });
+      expect(note).toMatch(/already paid/i);
+      expect(note).not.toMatch(/nothing was charged/i);
+    },
+  );
+});
+
 // Un solo canal por paso: el foco ya dice el título; la región solo dice lo que el título no dice.
 describe("stepAnnouncement", () => {
   it.each([
@@ -245,13 +314,14 @@ describe("stepAnnouncement", () => {
     ["signing", { status: "signing", run }],
     ["setup", { status: "setup", agent: run.agent, setup: fixtureSetupReady }],
     ["confirmed", { status: "confirmed", run, signature: "sig" }],
+    ["rebuilding", { status: "rebuilding", run }],
   ] as const)("stays silent while %s (Busy or the focused title says it)", (_, state) => {
     expect(stepAnnouncement(state)).toBe("");
   });
 
   it.each([
     ["built", { status: "built", run }, "Transaction ready to sign"],
-    ["expired", { status: "expired", run }, "Start over to build a new one."],
+    ["expired", { status: "expired", run }, "Rebuild it for free, or start over."],
     [
       "error",
       { status: "error", error: { code: "RATE_LIMITED", message: "x" }, failedAt: "paying" },
@@ -310,6 +380,68 @@ describe("x402Timeline", () => {
   it("shows nothing done before paying", () => {
     expect(new Set(Object.values(byKey(states(run).idle, "staging")))).toEqual(
       new Set(["pending"]),
+    );
+  });
+});
+
+describe("paymentMayHaveSettled (D17)", () => {
+  it("is true when paying failed without a clear rejection from the backend", () => {
+    expect(
+      paymentMayHaveSettled("paying", { code: "INTERNAL", message: "", unreachable: true }),
+    ).toBe(true);
+    expect(paymentMayHaveSettled("paying", { code: "INTERNAL", message: "Does not match" })).toBe(
+      true,
+    );
+  });
+
+  it("is false when the backend rejected the build, or the failure was not in paying", () => {
+    expect(
+      paymentMayHaveSettled("paying", { code: "BUILD_FAILED", message: "", rejected: true }),
+    ).toBe(false);
+    expect(
+      paymentMayHaveSettled("setup", { code: "INTERNAL", message: "", unreachable: true }),
+    ).toBe(false);
+  });
+});
+
+describe("chargeLine", () => {
+  const fee = "0.01 USDC";
+  const rejected = { code: "BUILD_FAILED", message: "", rejected: true } as const;
+
+  it("says the charge is simulated in mock mode when paying failed", () => {
+    const line = chargeLine("paying", rejected, "mock", fee);
+    expect(line).toMatch(/^Simulated in mock mode\./);
+    expect(line).toContain(chargeNote("paying", rejected));
+  });
+
+  it("uses the mock payment note after the build in mock mode", () => {
+    expect(chargeLine("signing", rejected, "mock", fee)).toBe(mockPaymentNote(fee));
+  });
+
+  it("is the plain note outside mock mode, and null when there is nothing to say", () => {
+    expect(chargeLine("paying", rejected, "staging", fee)).toBe(chargeNote("paying", rejected));
+    expect(chargeLine("setup", rejected, "mock", fee)).toBeNull();
+  });
+});
+
+describe("runAgainNote", () => {
+  it("says the fee is charged again in devnet mode", () => {
+    expect(runAgainNote("0.01 USDC", "staging")).toBe(
+      "Run again pays 0.01 USDC again for a new transaction.",
+    );
+  });
+
+  it("in mock mode says nothing is charged now, and what devnet would charge", () => {
+    expect(runAgainNote("0.01 USDC", "mock")).toBe(
+      "Run again builds a new transaction. Mock mode charges nothing; in devnet mode it pays 0.01 USDC again.",
+    );
+  });
+});
+
+describe("humanError for a closed rebuild window", () => {
+  it("points to Run again, the button next to it, not only to start over", () => {
+    expect(humanError({ code: "REBUILD_WINDOW_CLOSED", message: "" }).hint).toBe(
+      "Run again to build and pay for a new transaction, or start over.",
     );
   });
 });

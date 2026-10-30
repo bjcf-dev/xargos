@@ -6,15 +6,30 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { type AgentKeyStore, openAgentKeyStore } from "@/lib/solana/agent-key-store";
 import { isEd25519Supported } from "@/lib/solana/ed25519";
+import { getExplorerUrl } from "@/lib/solana/explorer";
+import { browserRpc } from "@/lib/solana/rpc";
+import { sendTestTransaction } from "./sign-check";
 
 type Check =
   | { status: "loading" }
   | { status: "unsupported" }
-  | { status: "ready"; store: AgentKeyStore; address: string; createdAt: number };
+  | {
+      status: "ready";
+      store: AgentKeyStore;
+      keyPair: CryptoKeyPair;
+      address: string;
+      createdAt: number;
+    };
+
+type SignResult =
+  | { status: "sending" }
+  | { status: "landed"; signature: string; failed: boolean }
+  | { status: "error"; message: string };
 
 async function loadAgent(store: AgentKeyStore) {
   const agent = (await store.get()) ?? (await store.create());
   return {
+    keyPair: agent.keyPair,
     address: await getAddressFromPublicKey(agent.keyPair.publicKey),
     createdAt: agent.createdAt,
   };
@@ -22,6 +37,7 @@ async function loadAgent(store: AgentKeyStore) {
 
 export function AgentCheck() {
   const [check, setCheck] = useState<Check>({ status: "loading" });
+  const [sign, setSign] = useState<SignResult | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -34,7 +50,23 @@ export function AgentCheck() {
   const newAgent = useCallback(async () => {
     if (check.status !== "ready") return;
     await check.store.clear();
+    setSign(null);
     setCheck({ ...check, ...(await loadAgent(check.store)) });
+  }, [check]);
+
+  const signCheck = useCallback(async () => {
+    if (check.status !== "ready") return;
+    setSign({ status: "sending" });
+    try {
+      const { signature, err } = await sendTestTransaction(
+        browserRpc(),
+        check.keyPair,
+        new AbortController().signal,
+      );
+      setSign({ status: "landed", signature, failed: err !== null });
+    } catch (error) {
+      setSign({ status: "error", message: error instanceof Error ? error.message : String(error) });
+    }
   }, [check]);
 
   return (
@@ -54,6 +86,21 @@ export function AgentCheck() {
             <Button className="self-start" onClick={newAgent}>
               New agent
             </Button>
+            <Button variant="outline" className="self-start" onClick={signCheck}>
+              Send a test transaction
+            </Button>
+            {sign?.status === "sending" && <p>Sending…</p>}
+            {sign?.status === "error" && <p>Error: {sign.message}</p>}
+            {sign?.status === "landed" && (
+              <>
+                <p className="font-mono break-all">
+                  {sign.failed ? "Failed" : "Confirmed"}: {sign.signature}
+                </p>
+                <a className="underline" href={getExplorerUrl(`tx/${sign.signature}`)}>
+                  Open in the explorer (devnet)
+                </a>
+              </>
+            )}
           </>
         )}
       </CardContent>

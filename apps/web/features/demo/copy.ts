@@ -1,7 +1,7 @@
 import type { ErrorCode, Guard, Recipe, Step } from "@xargos/shared";
 import type { ApiMode } from "@/lib/api/mode";
 import { formatUnits, SOL_DECIMALS, USDC_DECIMALS } from "@/lib/format";
-import type { DemoError, DemoState, RevertFailure, Run } from "./types";
+import type { DemoError, DemoState, DemoStatus, RevertFailure, Run } from "./types";
 
 /** ADR 0003: el pool usa un USDC propio. Solo la comisión x402 es USDC de Circle. */
 export const POOL_TOKEN = "demo USDC";
@@ -95,7 +95,7 @@ const HUMAN_ERRORS: Record<ErrorCode, HumanError | null> = {
   BUILD_EXPIRED: { title: "The transaction expired", hint: "Start over to build a new one." },
   REBUILD_WINDOW_CLOSED: {
     title: "The free rebuild window has closed",
-    hint: "Start over to build and pay for a new transaction.",
+    hint: "Run again to build and pay for a new transaction, or start over.",
   },
   RATE_LIMITED: { title: "Too many demos right now", hint: "Wait a moment, then try again." },
   ACCESS_DENIED: {
@@ -114,17 +114,73 @@ const HUMAN_ERRORS: Record<ErrorCode, HumanError | null> = {
     title: "The price shock failed",
     hint: "The price shock could not be applied.",
   },
-  // Nuestros propios errores (p. ej. "Signing arrives with F6"): el mensaje ya es para personas.
+  // Nuestros propios errores (p. ej. "No signer for this agent"): el mensaje ya es para personas.
   INTERNAL: null,
 };
 
+const UNREACHABLE: HumanError = {
+  title: "The demo backend is not responding",
+  hint: "It may be starting up or down. Try again in a minute.",
+};
+
+/** La espera de Retry-After en palabras: segundos hasta un minuto, minutos redondeados después. */
+function waitHint(seconds: number): string {
+  if (seconds < 60)
+    return `Wait ${seconds} ${seconds === 1 ? "second" : "seconds"}, then try again.`;
+  const minutes = Math.round(seconds / 60);
+  return `Wait about ${minutes} ${minutes === 1 ? "minute" : "minutes"}, then try again.`;
+}
+
 export function humanError(error: DemoError): HumanError {
+  if (error.unreachable) return UNREACHABLE;
+  if (error.code === "RATE_LIMITED" && error.retryAfterSeconds) {
+    return { title: "Too many demos right now", hint: waitHint(error.retryAfterSeconds) };
+  }
   return (
     HUMAN_ERRORS[error.code] ?? {
       title: "Something went wrong",
       hint: error.message || "Try again in a moment, or start over.",
     }
   );
+}
+
+/** Página que explica cada pago fallido (criterio del jurado). */
+export const FAILED_PAYMENTS_HREF = "/failed-payments";
+
+/**
+ * Qué se cobró cuando la demo falla. x402 solo liquida si el build responde por debajo de 400
+ * (D17): "nada" solo si el backend contestó con un error; sin respuesta (corte de Netlify a
+ * ~10 s, red) o con un 2xx ilegible no se sabe. Después del build, la comisión ya se pagó.
+ */
+export function chargeNote(failedAt: DemoStatus, error: DemoError): string | null {
+  if (failedAt === "idle" || failedAt === "setup") return null;
+  if (paymentMayHaveSettled(failedAt, error)) {
+    return "We could not confirm whether the payment settled: x402 only charges when the build succeeds. Start over instead of trying again, so the agent is not charged twice.";
+  }
+  if (failedAt === "paying") {
+    return "Nothing was charged: x402 only settles the payment when the build succeeds.";
+  }
+  return "The recipe fee was already paid when this transaction was built.";
+}
+
+/**
+ * Falló al pagar sin un rechazo claro del backend (D17): el pago pudo liquidarse. Entonces no
+ * se ofrece "Try again", que volvería a pagar (#44); solo "Start over".
+ */
+export function paymentMayHaveSettled(failedAt: DemoStatus, error: DemoError): boolean {
+  return failedAt === "paying" && !error.rejected;
+}
+
+/** La nota de cobro de la tarjeta de error; en mock dice que no se cobra de verdad. */
+export function chargeLine(
+  failedAt: DemoStatus,
+  error: DemoError,
+  mode: ApiMode,
+  fee: string,
+): string | null {
+  const note = chargeNote(failedAt, error);
+  if (mode !== "mock" || note === null) return note;
+  return failedAt === "paying" ? `Simulated in mock mode. ${note}` : mockPaymentNote(fee);
 }
 
 /**
@@ -141,8 +197,7 @@ export function stepAnnouncement(state: DemoState): string {
     case "error":
       return humanError(state.error).hint;
     case "expired":
-    case "rebuilding":
-      return "Start over to build a new one.";
+      return "Rebuild it for free, or start over.";
     default:
       return "";
   }
@@ -187,6 +242,14 @@ export function describeRevert(run: Run, failure: RevertFailure): RevertCopy {
 /** Comisión de la receta, cobrada con x402 en USDC de Circle. */
 export function formatFee(price: Recipe["price"]): string {
   return `${formatUnits(price.amount, USDC_DECIMALS)} USDC`;
+}
+
+/** "Run again" cobra otra vez (la ventana gratis ya pasó, D19); en mock no cobra nada. */
+export function runAgainNote(fee: string, mode: ApiMode): string {
+  if (mode === "mock") {
+    return `Run again builds a new transaction. Mock mode charges nothing; in devnet mode it pays ${fee} again.`;
+  }
+  return `Run again pays ${fee} again for a new transaction.`;
 }
 
 /** El coste del pago en mock, dicho una sola vez y igual en la línea de tiempo y en el resultado. */

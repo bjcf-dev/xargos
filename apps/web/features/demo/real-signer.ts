@@ -12,7 +12,7 @@ export function createRealSigner({
 }): DemoSigner {
   return async (run, signal) => {
     const { assertIndex } = run.build.guard;
-    const { signature, err, logs } = await signAndSend({
+    const { signature, err, logs, fee } = await signAndSend({
       rpc,
       keyPair,
       transactionBase64: run.build.transaction,
@@ -23,6 +23,10 @@ export function createRealSigner({
     const instructionIndex = failedInstructionIndex(err);
     // Solo "guard" si falló el assert y su log se lee (D15).
     const guard = instructionIndex === assertIndex ? parseGuardFail(logs) : null;
-    return { outcome: "reverted", signature, failure: { instructionIndex, guard } };
+    return {
+      outcome: "reverted",
+      signature,
+      failure: { instructionIndex, guard, ...(fee !== null ? { networkFeeLamports: fee } : {}) },
+    };
   };
 }
