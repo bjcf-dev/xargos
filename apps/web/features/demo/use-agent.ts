@@ -12,6 +12,8 @@ import type { DemoSigner } from "./signer";
 export type AgentState =
   | { status: "loading" }
   | { status: "unsupported" }
+  /** No se pudo crear o leer la clave (p. ej. el navegador rechazó generarla). */
+  | { status: "failed"; message: string }
   | {
       status: "ready";
       address: string;
@@ -28,6 +30,12 @@ export type UseAgentOptions = {
   ed25519?: () => Promise<boolean>;
   rpc?: () => SendRpc;
 };
+
+/** Un fallo al crear o leer la clave: sin esto la demo se quedaría cargando para siempre. */
+const failed = (error: unknown): AgentState => ({
+  status: "failed",
+  message: error instanceof Error ? error.message : String(error),
+});
 
 const MOCK_AGENT: AgentState = {
   status: "ready",
@@ -64,7 +72,7 @@ export function useAgent({
       address: await getAddressFromPublicKey(keyPair.publicKey),
       signer: createRealSigner({ rpc: deps.current.rpc(), keyPair }),
       persistent: current.persistent,
-      newAgent: () => load(true),
+      newAgent: () => load(true).catch((error: unknown) => setAgent(failed(error))),
     });
   }, []);
 
@@ -80,7 +88,9 @@ export function useAgent({
       if (cancelled) return;
       store.current = opened;
       await load(false);
-    })();
+    })().catch((error: unknown) => {
+      if (!cancelled) setAgent(failed(error));
+    });
     return () => {
       cancelled = true;
     };

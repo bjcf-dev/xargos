@@ -58,7 +58,7 @@ type FakeOptions = {
     statuses?: { error: unknown; times: number | "always" };
   };
   statuses?: Array<{ confirmationStatus: string; err: unknown } | null>;
-  meta?: { err: unknown; logMessages: string[] };
+  meta?: { err: unknown; logMessages: string[]; fee?: unknown };
 };
 
 function fakeRpc({
@@ -115,7 +115,12 @@ describe("signAndSend", () => {
       statuses: [null, { confirmationStatus: "confirmed", err: null }],
     });
     const result = await signAndSend({ rpc, ...base() });
-    expect(result).toEqual({ signature: expect.any(String), err: null, logs: ["Program log: ok"] });
+    expect(result).toEqual({
+      signature: expect.any(String),
+      err: null,
+      logs: ["Program log: ok"],
+      fee: null,
+    });
     expect(result.signature).not.toBe("sig-from-rpc");
     expect(sent).toHaveLength(1);
     expect(sent[0]?.wire).not.toBe(transactionBase64);
@@ -145,6 +150,25 @@ describe("signAndSend", () => {
     expect((error as ApiClientError).code).toBe("INTERNAL");
     expect((error as ApiClientError).message).toContain("step 7");
     expect(sent).toHaveLength(0);
+  });
+
+  it("returns the network fee read from meta.fee (D16)", async () => {
+    const guardErr = { InstructionError: [7, { Custom: 6004 }] };
+    const { rpc } = fakeRpc({
+      simulationErr: guardErr,
+      simulationLogs: ["Program log: GUARD_FAIL received=1 min=2"],
+      statuses: [{ confirmationStatus: "confirmed", err: guardErr }],
+      meta: { err: guardErr, logMessages: [], fee: 5000n },
+    });
+    const result = await signAndSend({ rpc, ...base() });
+    expect(result.fee).toBe(5000n);
+  });
+
+  it("gives no fee when meta.fee is missing or not a bigint", async () => {
+    for (const fee of [undefined, null, 5000, "5000"]) {
+      const { rpc } = fakeRpc({ meta: { err: null, logMessages: [], fee } });
+      expect((await signAndSend({ rpc, ...base() })).fee).toBeNull();
+    }
   });
 
   it("does not send when simulation fails at a non-guard step", async () => {

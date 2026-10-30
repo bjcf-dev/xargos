@@ -59,4 +59,28 @@ describe("createRealSigner", () => {
     if (outcome.outcome !== "reverted") throw new Error("expected a revert");
     expect(outcome.failure).toEqual({ instructionIndex: assertIndex - 2, guard: null });
   });
+
+  it("carries the network fee of a revert to the card (D16)", async () => {
+    signAndSend.mockResolvedValue({
+      signature: "sig",
+      err: { InstructionError: [assertIndex, { Custom: 6004 }] },
+      logs: fixtureGuardFailLogs,
+      fee: 5000n,
+    });
+    const outcome = await signer(run, signal);
+    if (outcome.outcome !== "reverted") throw new Error("expected a revert");
+    expect(outcome.failure.networkFeeLamports).toBe(5000n);
+  });
+
+  it("leaves the fee out when the chain did not give it", async () => {
+    signAndSend.mockResolvedValue({
+      signature: "sig",
+      err: { InstructionError: [assertIndex - 2, { Custom: 1 }] },
+      logs: [],
+      fee: null,
+    });
+    const outcome = await signer(run, signal);
+    if (outcome.outcome !== "reverted") throw new Error("expected a revert");
+    expect("networkFeeLamports" in outcome.failure).toBe(false);
+  });
 });
