@@ -180,6 +180,21 @@ export function DemoScreen({
     );
   }
 
+  if (agent.status === "failed") {
+    return (
+      <div className="flex flex-col items-start gap-3">
+        <Alert variant="destructive">
+          <AlertTitle>The agent's key could not be created</AlertTitle>
+          <AlertDescription>
+            This browser refused to create or read the demo agent's key ({agent.message}). Reload
+            the page, or try another browser.
+          </AlertDescription>
+        </Alert>
+        <Button onClick={() => window.location.reload()}>Reload</Button>
+      </div>
+    );
+  }
+
   const fee = formatFee(recipe.price);
   const startOver = (
     <Button

@@ -525,6 +525,36 @@ describe("ResultCard for an error after the build", () => {
   });
 });
 
+// D16: el revert dice la comisión de red, leída de la cadena.
+describe("ResultCard network fee", () => {
+  const reverted = (networkFeeLamports?: bigint) =>
+    ({
+      status: "reverted",
+      run: { agent: "agent", position: "position", build: fixtureBuildResponse },
+      signature: "sig",
+      failure: {
+        instructionIndex: fixtureBuildResponse.guard.assertIndex,
+        guard: { received: 1n, min: 2n },
+        ...(networkFeeLamports !== undefined ? { networkFeeLamports } : {}),
+      },
+    }) as const;
+
+  it("states the network fee read from the transaction", () => {
+    render(<ResultCard state={reverted(5000n)} mode="local" price={fixtureRecipe.price} />);
+    expect(
+      screen.getByText("Spent: 0.01 USDC recipe fee (x402) · 0.000005 SOL network fee."),
+    ).toBeDefined();
+  });
+
+  it("says the network fee is not available instead of pending once the read is over", () => {
+    render(<ResultCard state={reverted()} mode="local" price={fixtureRecipe.price} />);
+    expect(
+      screen.getByText("Spent: 0.01 USDC recipe fee (x402) · network fee not available."),
+    ).toBeDefined();
+    expect(screen.queryByText(/pending/i)).toBeNull();
+  });
+});
+
 // D15: un revert que no es del guard sigue en rojo, nombra el paso y no habla de "guard".
 describe("ResultCard for a revert outside the guard", () => {
   it("stays red, names the step and never mentions the guard", () => {
@@ -618,6 +648,17 @@ describe("DemoScreen (devnet modes)", () => {
       /Chrome 137.*Firefox 129.*Safari 17/,
     );
     expect(screen.queryByRole("button", { name: /happy path/i })).toBeNull();
+  });
+
+  it("explains when the agent's key cannot be created, instead of loading forever", async () => {
+    const options: UseAgentOptions = {
+      ...agentOptions(),
+      openStore: () => Promise.reject(new Error("QuotaExceededError")),
+    };
+    render(<DemoScreen api={api} mode="local" agentOptions={options} />);
+    const message = await screen.findByText(/agent's key could not be created/i);
+    expect(message.closest('[data-slot="alert"]')?.textContent).toMatch(/QuotaExceededError/);
+    expect(screen.getByRole("button", { name: /reload/i })).toBeDefined();
   });
 
   it("mock mode has no New agent button", async () => {
