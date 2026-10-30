@@ -55,7 +55,7 @@ const log = { error: (data: object, message: string) => console.error(message, d
 const app = createApp({
   shockRoutes: createShockRoutes({
     jobs: new ShockJobs(),
-    gate: new ShockGate(config.SHOCK_COOLDOWN_MS),
+    gate: new ShockGate(),
     steps: createShockSteps({
       rpc,
       send: createSender(rpc, rpcSubscriptions, payer),

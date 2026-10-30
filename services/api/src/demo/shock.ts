@@ -28,32 +28,44 @@ export class ShockJobs {
 }
 
 /**
- * One shock at a time, and not again until the pool has been restored. A second shock on a pool
- * that is still low would not be a shock, and two demos would fight over the same price.
+ * One shock at a time, and not again until the pool has been RESTORED. A second shock on a pool
+ * that is still low would not be a shock, and a shock that overlaps the restore cancels itself.
  */
 export class ShockGate {
-  private busyUntil = 0;
-
-  constructor(
-    private readonly cooldownMs: number,
-    private readonly now: () => number = Date.now,
-  ) {}
+  private locked = false;
 
   tryStart(): boolean {
-    if (this.now() < this.busyUntil) return false;
-    this.busyUntil = Number.POSITIVE_INFINITY; // running: released by `finish` or `release`
+    if (this.locked) return false;
+    this.locked = true;
     return true;
   }
 
-  /** The shock landed: the pool stays low (and locked) until the cooldown is over. */
-  finish(): void {
-    this.busyUntil = this.now() + this.cooldownMs;
-  }
-
-  /** The shock failed: nothing moved, so the next one may start right away. */
+  /** Opens the gate: the shock failed (nothing moved) or the pool is back at its baseline. */
   release(): void {
-    this.busyUntil = 0;
+    this.locked = false;
   }
+}
+
+/** A restore that never answers (a lost confirmation) must not keep the demo locked forever. */
+const RESTORE_TIMEOUT_MS = 45_000;
+const RESTORE_ATTEMPTS = 3;
+const RESTORE_RETRY_MS = 5_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`timed out after ${ms} ms`)), ms);
+    timer.unref?.();
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
 }
 
 /** Never throws: a failure ends the job as `failed`; a landed shock schedules the restore. */
@@ -64,6 +76,8 @@ export async function runShock(
   shockId: string,
   options: {
     cooldownMs: number;
+    /** How long a restore may take before it counts as failed (and is retried). */
+    restoreTimeoutMs?: number;
     /** Injected so tests do not wait; defaults to setTimeout. */
     schedule?: (task: () => void, ms: number) => void;
     log?: Logger;
@@ -73,12 +87,19 @@ export async function runShock(
   try {
     const result = await steps.shock();
     jobs.update(shockId, { status: "confirmed", ...result });
-    gate.finish();
-    schedule(() => {
-      steps.restore().catch((error: unknown) => {
-        options.log?.error({ shockId, error: String(error) }, "pool restore failed");
-      });
-    }, options.cooldownMs);
+    // The gate stays locked: the pool is low until it is restored, and restoring takes place
+    // after the free rebuild window so it cannot undo the shock before the agent signs.
+    const restore = (attempt: number): void => {
+      withTimeout(steps.restore(), options.restoreTimeoutMs ?? RESTORE_TIMEOUT_MS).then(
+        () => gate.release(),
+        (error: unknown) => {
+          options.log?.error({ shockId, attempt, error: String(error) }, "pool restore failed");
+          if (attempt < RESTORE_ATTEMPTS) schedule(() => restore(attempt + 1), RESTORE_RETRY_MS);
+          else gate.release(); // do not lock the demo forever; the log says the pool needs a look
+        },
+      );
+    };
+    schedule(() => restore(1), options.cooldownMs);
   } catch (error) {
     options.log?.error({ shockId, error: String(error) }, "price shock failed");
     gate.release();

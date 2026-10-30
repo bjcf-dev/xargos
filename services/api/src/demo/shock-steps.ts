@@ -26,7 +26,9 @@ const SOL_DECIMALS = 9;
 const USDC_DECIMALS = 6;
 
 /** The on-chain side of /demo/price-shock. Selling SOL pushes the price down; buying it back restores. */
-export function createShockSteps(d: ShockStepsDeps): ShockSteps {
+export function createShockSteps(
+  d: ShockStepsDeps,
+): ShockSteps & { restoreTo(humanPrice: number): Promise<void> } {
   // The sqrtPrice from before the last shock: restore() aims back at it.
   let baselineSqrtPrice: bigint | null = null;
 
@@ -68,6 +70,14 @@ export function createShockSteps(d: ShockStepsDeps): ShockSteps {
         priceBefore: humanPrice(before.sqrtPrice, SOL_DECIMALS, USDC_DECIMALS).toFixed(4),
         priceAfter: humanPrice(after.sqrtPrice, SOL_DECIMALS, USDC_DECIMALS).toFixed(4),
       };
+    },
+
+    /** Puts the pool at a chosen price (SOL in USDC). For operators: it resets a drifted demo pool. */
+    async restoreTo(price) {
+      baselineSqrtPrice = BigInt(
+        Math.round(Math.sqrt(price / 10 ** (SOL_DECIMALS - USDC_DECIMALS)) * 2 ** 64),
+      );
+      await this.restore();
     },
 
     async restore() {

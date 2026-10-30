@@ -22,18 +22,25 @@ const steps = (overrides: Partial<ShockSteps> = {}): ShockSteps => ({
 });
 
 function setup(
-  options: { steps?: ShockSteps; accessCode?: string; withBuild?: boolean; limit?: number } = {},
+  options: {
+    steps?: ShockSteps;
+    accessCode?: string;
+    withBuild?: boolean;
+    limit?: number;
+    restoreTimeoutMs?: number;
+  } = {},
 ) {
   const store = new BuildStore();
   if (options.withBuild !== false) store.put(fixtureBuild);
   const scheduled: Array<{ task: () => void; ms: number }> = [];
   const app = createShockRoutes({
     jobs: new ShockJobs(),
-    gate: new ShockGate(120_000),
+    gate: new ShockGate(),
     steps: options.steps ?? steps(),
     store,
     limiter: new RateLimiter(options.limit ?? 10, 60_000),
     cooldownMs: 120_000,
+    ...(options.restoreTimeoutMs ? { restoreTimeoutMs: options.restoreTimeoutMs } : {}),
     accessCode: options.accessCode,
     schedule: (task, ms) => void scheduled.push({ task, ms }),
   });
@@ -72,6 +79,40 @@ describe("POST /demo/price-shock", () => {
     expect(restore).not.toHaveBeenCalled();
     scheduled[0]?.task();
     expect(restore).toHaveBeenCalledOnce();
+  });
+
+  it("stays locked until the restore finishes, then accepts a new shock", async () => {
+    let finishRestore: () => void = () => {};
+    const restore = () =>
+      new Promise<void>((resolve) => {
+        finishRestore = resolve;
+      });
+    const { post, status, scheduled } = setup({ steps: steps({ restore }) });
+    const { shockId } = (await (await post()).json()) as { shockId: string };
+    await vi.waitFor(async () => expect((await status(shockId)).status).toBe("confirmed"));
+
+    scheduled[0]?.task(); // the cooldown is over and the restore is running
+    expect((await post()).status).toBe(429); // a shock now would overlap the restore
+    finishRestore();
+    await vi.waitFor(async () => expect((await post()).status).toBe(202));
+  });
+
+  it("retries a failed restore and keeps the gate locked meanwhile", async () => {
+    let calls = 0;
+    const restore = async () => {
+      calls += 1;
+      if (calls === 1) throw new Error("rpc down");
+    };
+    const { post, status, scheduled } = setup({ steps: steps({ restore }) });
+    const { shockId } = (await (await post()).json()) as { shockId: string };
+    await vi.waitFor(async () => expect((await status(shockId)).status).toBe("confirmed"));
+
+    scheduled[0]?.task();
+    await vi.waitFor(() => expect(scheduled).toHaveLength(2)); // the retry was scheduled
+    expect((await post()).status).toBe(429);
+    scheduled[1]?.task();
+    await vi.waitFor(async () => expect((await post()).status).toBe(202));
+    expect(calls).toBe(2);
   });
 
   it("allows one shock at a time and while the pool is recovering", async () => {
@@ -125,5 +166,22 @@ describe("POST /demo/price-shock", () => {
     const { app, post } = setup();
     expect((await post({}, "nope")).status).toBe(400);
     expect((await app.request("/demo/price-shock/shk_unknown")).status).toBe(400);
+  });
+
+  it("does not stay locked when a restore never answers: it times out and retries", async () => {
+    let calls = 0;
+    const restore = () => {
+      calls += 1;
+      return calls === 1 ? new Promise<void>(() => {}) : Promise.resolve();
+    };
+    const { post, status, scheduled } = setup({ steps: steps({ restore }), restoreTimeoutMs: 20 });
+    const { shockId } = (await (await post()).json()) as { shockId: string };
+    await vi.waitFor(async () => expect((await status(shockId)).status).toBe("confirmed"));
+
+    scheduled[0]?.task(); // the restore starts and hangs
+    await vi.waitFor(() => expect(scheduled).toHaveLength(2)); // after the timeout, a retry
+    scheduled[1]?.task();
+    await vi.waitFor(async () => expect((await post()).status).toBe(202));
+    expect(calls).toBe(2);
   });
 });

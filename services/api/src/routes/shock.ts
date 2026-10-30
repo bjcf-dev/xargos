@@ -15,6 +15,7 @@ export type ShockRoutesDeps = {
   store: BuildStore;
   limiter: RateLimiter;
   cooldownMs: number;
+  restoreTimeoutMs?: number;
   accessCode?: string | undefined;
   /** Test hook: lets the restore run at once instead of after the cooldown. */
   schedule?: (task: () => void, ms: number) => void;
@@ -56,6 +57,7 @@ export function createShockRoutes(deps: ShockRoutesDeps) {
     deps.jobs.create(shockId);
     void runShock(deps.jobs, deps.gate, deps.steps, shockId, {
       cooldownMs: deps.cooldownMs,
+      ...(deps.restoreTimeoutMs ? { restoreTimeoutMs: deps.restoreTimeoutMs } : {}),
       ...(deps.schedule ? { schedule: deps.schedule } : {}),
       ...(deps.log ? { log: deps.log } : {}),
     });

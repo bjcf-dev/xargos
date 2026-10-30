@@ -17,6 +17,12 @@ const steps = createShockSteps({
   dropBps: Number(process.env.SHOCK_DROP_BPS ?? 600),
 });
 
+if (process.env.RESTORE_TO) {
+  await steps.restoreTo(Number(process.env.RESTORE_TO));
+  console.log("pool restored to", process.env.RESTORE_TO);
+  process.exit(0);
+}
+
 const shock = await steps.shock();
 console.log("shock:", shock.priceBefore, "->", shock.priceAfter, explorerTx(shock.signature));
 await steps.restore();

@@ -21,6 +21,7 @@ import {
 } from "../../quote/min-delta";
 import { POOL_TICK_SPACING, WSOL_MINT } from "../../solana/constants";
 import type { BuildContext, BuiltRecipe, Recipe, RecipeStep } from "../types";
+import { withCollectFees } from "./collect-fees";
 import { tagStep } from "./steps";
 
 /** Same id as the contract fixture (packages/shared), which the front looks up. */
@@ -117,7 +118,7 @@ export function createExitOrcaLpRecipe(deps: ExitOrcaLpDeps): Recipe {
           protocol: "xARGOS guard",
           kind: "guard",
         },
-        ...close.instructions.map((instruction) =>
+        ...withCollectFees(close.instructions, authority).map((instruction) =>
           tagStep(instruction, { label: "Close the LP position", protocol: "Orca Whirlpools" }),
         ),
         ...swap.instructions.map((instruction) =>

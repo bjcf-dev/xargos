@@ -17,11 +17,13 @@
     "demo:e2e": "tsx --env-file-if-exists=../../.env src/scripts/demo-e2e.ts",
     "start": "tsx --env-file-if-exists=../../.env src/index.ts",
     "demo:shock": "tsx --env-file-if-exists=../../.env src/scripts/shock-live.ts",
+    "demo:full": "tsx --env-file-if-exists=../../.env src/scripts/demo-full.ts",
     "orca:build-recipe": "tsx --env-file-if-exists=../../.env src/scripts/orca/build-recipe.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
     "@orca-so/whirlpools": "8.0.1",
+    "@orca-so/whirlpools-client": "7.0.0",
     "@solana-program/address-lookup-table": "0.12.0",
     "@solana-program/system": "^0.12.0",
     "@solana-program/token": "^0.18.0",
