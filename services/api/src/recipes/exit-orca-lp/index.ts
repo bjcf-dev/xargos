@@ -48,7 +48,7 @@ export function createExitOrcaLpRecipe(deps: ExitOrcaLpDeps): Recipe {
       price: { amount: deps.priceAmount, mint: deps.priceMint },
     },
 
-    async build({ agent, position }: BuildContext): Promise<BuiltRecipe> {
+    async build({ agent, position, fixed }: BuildContext): Promise<BuiltRecipe> {
       // The steps have no minimum of their own: the guard is the only one (D10). A price shock between
       // build and signing moves what the position pays out, and that must be caught by the guard.
       // Note: the swap spends `solOut` SOL from the agent's wallet after the wSOL account is closed. If
@@ -91,8 +91,10 @@ export function createExitOrcaLpRecipe(deps: ExitOrcaLpDeps): Recipe {
         },
       );
 
-      const expected = expectedOut({ usdcFromPosition, usdcFromSwap: swap.quote.tokenEstOut });
-      const min = minDelta(expected, GUARD_SLIPPAGE_BPS);
+      const expected =
+        fixed?.expectedOut ??
+        expectedOut({ usdcFromPosition, usdcFromSwap: swap.quote.tokenEstOut });
+      const min = fixed?.minDelta ?? minDelta(expected, GUARD_SLIPPAGE_BPS);
 
       const [watchedAccount] = await findAssociatedTokenPda({
         owner: agent,
