@@ -38,6 +38,10 @@ async function until<T>(
   throw new Error(`timeout waiting for ${label}`);
 }
 
+// Back to back runs: let the pool recover from the last shock first (a person needs longer than
+// this between demos). A build made while the pool is low is quoted at the low price.
+await sleep(Number(process.env.WAIT_BEFORE_MS ?? 0));
+
 const agent = await generateKeyPairSigner();
 console.log(`demo ${DEMO}, agent ${agent.address}`);
 
