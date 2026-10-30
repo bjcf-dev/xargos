@@ -8,7 +8,8 @@ export type PollOptions = {
   signal?: AbortSignal;
 };
 
-function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+/** Espera cancelable: rechaza con signal.reason en cuanto se aborta. */
+export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     // Si ya se canceló (p. ej. durante la consulta anterior), el evento no volverá a llegar.
     if (signal?.aborted) return reject(signal.reason);

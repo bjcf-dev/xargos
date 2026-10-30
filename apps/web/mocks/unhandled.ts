@@ -15,6 +15,8 @@ export function isApiRequest(url: string): boolean {
  *
  * `defaults.error()` solo imprime el aviso (MSW 3.0.3); lo que corta la
  * petición es lanzar: si se lanza un Response, MSW responde con él.
+ * El 501 ("Not Implemented") es a propósito y no sale de ERROR_HTTP: es una
+ * señal de los mocks (falta un handler), no un error que dé el backend.
  */
 export const onUnhandledFrame: Exclude<UnhandledFrameHandle, string> = ({ frame, defaults }) => {
   if (!(frame instanceof HttpNetworkFrame)) return;

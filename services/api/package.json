@@ -6,10 +6,17 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "spike:live": "tsx src/spike/live.ts"
+    "spike:live": "tsx src/spike/live.ts",
+    "orca:balances": "tsx src/scripts/orca/balances.ts",
+    "orca:create-demo-mint": "tsx src/scripts/orca/create-demo-mint.ts",
+    "orca:create-pool": "tsx src/scripts/orca/create-pool.ts",
+    "orca:open-position": "tsx src/scripts/orca/open-position.ts",
+    "orca:swap": "tsx src/scripts/orca/swap.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
+    "@orca-so/whirlpools": "8.0.1",
+    "@solana-program/system": "^0.12.0",
     "@solana-program/token": "^0.18.0",
     "@solana/kit": "^6.10.0",
     "@x402/core": "^2.28.0",
