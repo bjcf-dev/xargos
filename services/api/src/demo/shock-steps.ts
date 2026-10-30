@@ -6,7 +6,7 @@ import {
   WhirlpoolDeployment,
 } from "@orca-so/whirlpools";
 import type { Address, KeyPairSigner, Rpc, SolanaRpcApi } from "@solana/kit";
-import { amountToRestore, amountToSell, humanPrice } from "../quote/shock";
+import { amountToRestore, amountToSellTo, humanPrice, targetSqrtPrice } from "../quote/shock";
 import { POOL_TICK_SPACING, WSOL_MINT } from "../solana/constants";
 import type { SendInstructions } from "../solana/send";
 import type { ShockSteps } from "./shock";
@@ -59,14 +59,19 @@ export function createShockSteps(
   };
 
   return {
-    async shock() {
+    async shock(quoteSqrtPrice) {
       const before = await pool();
       baselineSqrtPrice = before.sqrtPrice;
-      const sell = amountToSell(before.liquidity, before.sqrtPrice, d.dropBps, before.feeRate);
-      const signature = await swapAsPayer(sell, WSOL_MINT);
-      const after = await pool();
+      // Aim below the price the agent was quoted, not below the current one: if the pool is still
+      // low from another shock, the quote is low too and a fixed drop on the current price would
+      // land exactly where the quote was, and the guard would have nothing to catch.
+      const target = targetSqrtPrice(quoteSqrtPrice ?? before.sqrtPrice, d.dropBps);
+      const sell = amountToSellTo(before.liquidity, before.sqrtPrice, target, before.feeRate);
+      // Nothing to sell when the pool is already below the target: the agent is already short.
+      const signature = sell > 0n ? await swapAsPayer(sell, WSOL_MINT) : undefined;
+      const after = sell > 0n ? await pool() : before;
       return {
-        signature,
+        ...(signature ? { signature } : {}),
         priceBefore: humanPrice(before.sqrtPrice, SOL_DECIMALS, USDC_DECIMALS).toFixed(4),
         priceAfter: humanPrice(after.sqrtPrice, SOL_DECIMALS, USDC_DECIMALS).toFixed(4),
       };

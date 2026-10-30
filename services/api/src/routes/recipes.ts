@@ -49,6 +49,7 @@ export function createRecipeRoutes({
   /** Builds and simulates. `rebuildOf` is the first build when this is a free rebuild (D19). */
   async function build(c: Context, recipe: Recipe, request: BuildRequest, rebuildOf?: StoredBuild) {
     const buildId = rebuildOf?.response.buildId ?? `bld_${randomUUID()}`;
+    let quoteSqrtPrice = rebuildOf?.quoteSqrtPrice;
     try {
       const response = await buildResponse({
         recipe,
@@ -68,6 +69,10 @@ export function createRecipeRoutes({
         },
         buildId,
         rpc,
+        // A rebuild keeps the price of the first quote; a new build records its own.
+        onBuilt: (built) => {
+          quoteSqrtPrice ??= built.quoteSqrtPrice;
+        },
         // ...and the window of the first build, it does not restart.
         ...(rebuildOf ? { rebuildUntil: new Date(rebuildOf.response.rebuildUntil) } : {}),
       });
@@ -92,6 +97,7 @@ export function createRecipeRoutes({
         response,
         agent: request.agent,
         position: request.position,
+        quoteSqrtPrice,
         // The PAYMENT-RESPONSE receipt only exists after the middleware settles, which happens
         // once this handler returns, so it cannot be kept here yet.
         paymentResponse: rebuildOf?.paymentResponse,

@@ -4,7 +4,12 @@ import type { Logger } from "./setup-runner";
 /** What the shock does on-chain. Injected so the flow can be tested without a network. */
 export type ShockSteps = {
   /** Sells SOL in the demo pool so the price falls; returns the tx and the prices around it. */
-  shock(): Promise<{ signature: string; priceBefore: string; priceAfter: string }>;
+  shock(quoteSqrtPrice?: bigint): Promise<{
+    /** Absent when the pool was already low enough and nothing had to be sold. */
+    signature?: string;
+    priceBefore: string;
+    priceAfter: string;
+  }>;
   /** Buys the price back to its baseline, so the next demo starts from the same pool. */
   restore(): Promise<void>;
 };
@@ -76,6 +81,8 @@ export async function runShock(
   shockId: string,
   options: {
     cooldownMs: number;
+    /** sqrtPrice of the agent's quote: the shock aims below it. */
+    quoteSqrtPrice?: bigint;
     /** How long a restore may take before it counts as failed (and is retried). */
     restoreTimeoutMs?: number;
     /** Injected so tests do not wait; defaults to setTimeout. */
@@ -85,7 +92,7 @@ export async function runShock(
 ): Promise<void> {
   const schedule = options.schedule ?? ((task, ms) => void setTimeout(task, ms).unref());
   try {
-    const result = await steps.shock();
+    const result = await steps.shock(options.quoteSqrtPrice);
     jobs.update(shockId, { status: "confirmed", ...result });
     // The gate stays locked: the pool is low until it is restored, and restoring takes place
     // after the free rebuild window so it cannot undo the shock before the agent signs.

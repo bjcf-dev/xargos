@@ -42,7 +42,8 @@ export function createShockRoutes(deps: ShockRoutesDeps) {
     if (!deps.limiter.allow(clientKey(c, codeIsValid))) {
       return errorResponse(c, "RATE_LIMITED", "Too many price shocks, try later");
     }
-    if (!deps.store.hasLiveBuildFor(request.data.agent)) {
+    const build = deps.store.latestLiveBuildFor(request.data.agent);
+    if (!build) {
       return errorResponse(
         c,
         "VALIDATION_ERROR",
@@ -57,6 +58,7 @@ export function createShockRoutes(deps: ShockRoutesDeps) {
     deps.jobs.create(shockId);
     void runShock(deps.jobs, deps.gate, deps.steps, shockId, {
       cooldownMs: deps.cooldownMs,
+      ...(build.quoteSqrtPrice !== undefined ? { quoteSqrtPrice: build.quoteSqrtPrice } : {}),
       ...(deps.restoreTimeoutMs ? { restoreTimeoutMs: deps.restoreTimeoutMs } : {}),
       ...(deps.schedule ? { schedule: deps.schedule } : {}),
       ...(deps.log ? { log: deps.log } : {}),

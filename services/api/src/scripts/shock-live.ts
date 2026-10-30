@@ -24,6 +24,12 @@ if (process.env.RESTORE_TO) {
 }
 
 const shock = await steps.shock();
-console.log("shock:", shock.priceBefore, "->", shock.priceAfter, explorerTx(shock.signature));
+console.log(
+  "shock:",
+  shock.priceBefore,
+  "->",
+  shock.priceAfter,
+  shock.signature ? explorerTx(shock.signature) : "(nothing to sell)",
+);
 await steps.restore();
 console.log("restored");

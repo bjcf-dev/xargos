@@ -13,10 +13,11 @@ const fixtureBuild = {
   },
   agent: AGENT,
   position: "p",
+  quoteSqrtPrice: 123n,
 } as never;
 
 const steps = (overrides: Partial<ShockSteps> = {}): ShockSteps => ({
-  shock: async () => ({ signature: "sig", priceBefore: "150", priceAfter: "141" }),
+  shock: async (_quote) => ({ signature: "sig", priceBefore: "150", priceAfter: "141" }),
   restore: async () => {},
   ...overrides,
 });
@@ -183,5 +184,26 @@ describe("POST /demo/price-shock", () => {
     scheduled[1]?.task();
     await vi.waitFor(async () => expect((await post()).status).toBe(202));
     expect(calls).toBe(2);
+  });
+
+  it("aims the shock at the price the agent was quoted", async () => {
+    const shock = vi.fn(async (_quote?: bigint) => ({
+      signature: "sig",
+      priceBefore: "150",
+      priceAfter: "141",
+    }));
+    const { post, status } = setup({ steps: steps({ shock }) });
+    const { shockId } = (await (await post()).json()) as { shockId: string };
+    await vi.waitFor(async () => expect((await status(shockId)).status).toBe("confirmed"));
+    expect(shock).toHaveBeenCalledWith(123n);
+  });
+
+  it("confirms a shock that sold nothing because the pool was already low", async () => {
+    const { post, status } = setup({
+      steps: steps({ shock: async () => ({ priceBefore: "126", priceAfter: "126" }) }),
+    });
+    const { shockId } = (await (await post()).json()) as { shockId: string };
+    await vi.waitFor(async () => expect((await status(shockId)).status).toBe("confirmed"));
+    expect((await status(shockId)).signature).toBeUndefined();
   });
 });
