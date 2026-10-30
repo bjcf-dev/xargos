@@ -73,7 +73,7 @@ export function ResultCard({ state, mode, price }: ResultCardProps) {
 
   if (state.status === "reverted") {
     const revert = describeRevert(state.run, state.failure);
-    const spent = describeSpent(price, null);
+    const spent = describeSpent(price, state.failure.networkFeeLamports ?? null);
     return (
       // Un revert del guard es la garantía funcionando: no va en rojo (el rojo queda en el paso).
       <Alert variant={revert.byGuard ? "default" : "destructive"} role="presentation">
@@ -104,7 +104,7 @@ export function ResultCard({ state, mode, price }: ResultCardProps) {
           ) : (
             <p>
               Spent: {spent.recipeFee} recipe fee (x402) ·{" "}
-              {spent.networkFee ?? "network fee pending, read from the transaction"}.
+              {spent.networkFee ? `${spent.networkFee} network fee` : "network fee not available"}.
             </p>
           )}
           <p>Your position and funds are otherwise intact.</p>

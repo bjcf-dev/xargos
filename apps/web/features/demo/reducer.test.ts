@@ -347,6 +347,32 @@ describe("demoReducer: price shock (demo B, D10) and signing", () => {
 });
 
 describe("demoReducer: expiry and free rebuild (D19)", () => {
+  it("keeps the free rebuild after a passing failure, with the error to show", () => {
+    const rebuilding: DemoState = { status: "rebuilding", run };
+    const error = { code: "INTERNAL", message: "Network error", unreachable: true } as const;
+    expect(demoReducer(rebuilding, { type: "FAILED", error })).toEqual({
+      status: "expired",
+      run,
+      error,
+    });
+  });
+
+  it("still ends the run when the backend says the rebuild window has closed", () => {
+    const rebuilding: DemoState = { status: "rebuilding", run };
+    const error = { code: "REBUILD_WINDOW_CLOSED", message: "Closed", rejected: true } as const;
+    expect(demoReducer(rebuilding, { type: "FAILED", error }).status).toBe("error");
+  });
+
+  it("moves a signing run whose blockhash the chain no longer knows to expired", () => {
+    const error = { code: "BUILD_EXPIRED", message: "Expired before it landed" } as const;
+    expect(demoReducer(signing, { type: "FAILED", error })).toEqual({ status: "expired", run });
+  });
+
+  it("keeps any other signing failure an error", () => {
+    const error = { code: "INTERNAL", message: "Could not reach Solana devnet" } as const;
+    expect(demoReducer(signing, { type: "FAILED", error }).status).toBe("error");
+  });
+
   const expired: DemoState = { status: "expired", run };
   const rebuilding: DemoState = { status: "rebuilding", run };
 

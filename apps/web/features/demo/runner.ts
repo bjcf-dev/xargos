@@ -138,3 +138,27 @@ export function runSign(
     );
   });
 }
+
+/**
+ * Rebuild gratis (D19): mismo buildId, tx nueva, sin pagar. Con la ventana ya cerrada solo se
+ * despacha REBUILD (el reducer lo convierte en REBUILD_WINDOW_CLOSED) y no se llama a la API.
+ */
+export function runRebuild(
+  { api, recipeId }: RunnerDeps,
+  run: Run,
+  rawDispatch: Dispatch<DemoEvent>,
+  signal: AbortSignal,
+  now = Date.now(),
+): Promise<void> {
+  const dispatch = unlessAborted(rawDispatch, signal);
+  dispatch({ type: "REBUILD", now });
+  if (now >= Date.parse(run.build.rebuildUntil)) return Promise.resolve();
+  return step(dispatch, signal, async () => {
+    const { data } = await api.build(
+      recipeId,
+      { agent: run.agent, position: run.position, buildId: run.build.buildId },
+      { signal },
+    );
+    dispatch({ type: "BUILT", build: data });
+  });
+}

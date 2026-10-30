@@ -35,21 +35,21 @@ function contextOf(state: DemoState): { agent?: string; position?: string } {
   return {};
 }
 
-function toError(state: DemoState, error: DemoError): DemoState {
+/** Solo los campos de DemoError: lo que llegue de más no entra en el estado. */
+function copyError(error: DemoError): DemoError {
   return {
-    status: "error",
-    error: {
-      code: error.code,
-      message: error.message,
-      ...(error.retryAfterSeconds !== undefined
-        ? { retryAfterSeconds: error.retryAfterSeconds }
-        : {}),
-      ...(error.unreachable ? { unreachable: true as const } : {}),
-      ...(error.rejected ? { rejected: true as const } : {}),
-    },
-    failedAt: state.status,
-    ...contextOf(state),
+    code: error.code,
+    message: error.message,
+    ...(error.retryAfterSeconds !== undefined
+      ? { retryAfterSeconds: error.retryAfterSeconds }
+      : {}),
+    ...(error.unreachable ? { unreachable: true as const } : {}),
+    ...(error.rejected ? { rejected: true as const } : {}),
   };
+}
+
+function toError(state: DemoState, error: DemoError): DemoState {
+  return { status: "error", error: copyError(error), failedAt: state.status, ...contextOf(state) };
 }
 
 /**
@@ -173,6 +173,17 @@ export function demoReducer(state: DemoState, event: DemoEvent): DemoState {
       return { status: "rebuilding", run: state.run };
 
     case "FAILED":
+      // La cadena ya no conoce el blockhash: nada entró, así que es una caducidad con rebuild
+      // gratis, no un error. El signer solo da BUILD_EXPIRED antes de enviar; una tx enviada
+      // sin confirmar llega como INTERNAL con su firma (send.ts) y no abre el rebuild.
+      if (state.status === "signing" && event.error.code === "BUILD_EXPIRED") {
+        return { status: "expired", run: state.run };
+      }
+      // Un fallo pasajero del rebuild (red, 502, 429) no gasta la ventana gratis: se vuelve a
+      // caducada con el error a la vista. Solo el 410 del backend la cierra.
+      if (state.status === "rebuilding" && event.error.code !== "REBUILD_WINDOW_CLOSED") {
+        return { status: "expired", run: state.run, error: copyError(event.error) };
+      }
       return IN_FLIGHT.has(state.status) ? toError(state, event.error) : state;
 
     case "RESET":
