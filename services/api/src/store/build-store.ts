@@ -6,6 +6,11 @@ export type StoredBuild = {
   position: string;
   /** PAYMENT-RESPONSE of the paid request: the free rebuild (D19) reuses it, nobody pays twice. */
   paymentResponse?: string | undefined;
+  /**
+   * sqrtPrice of the pool when the quote was made (lesson 10). The price shock aims below THIS
+   * price, so it works whatever state the pool is in when the shock is requested.
+   */
+  quoteSqrtPrice?: bigint | undefined;
 };
 
 /**
@@ -39,6 +44,21 @@ export class BuildStore {
       if (build.agent === agent && this.get(id)) return true;
     }
     return false;
+  }
+
+  /** The newest build of this agent that is still inside its window. */
+  latestLiveBuildFor(agent: string): StoredBuild | undefined {
+    let latest: StoredBuild | undefined;
+    for (const [id, build] of this.builds) {
+      if (build.agent !== agent || !this.get(id)) continue;
+      if (
+        !latest ||
+        Date.parse(build.response.expiresAt) >= Date.parse(latest.response.expiresAt)
+      ) {
+        latest = build;
+      }
+    }
+    return latest;
   }
 
   get size(): number {

@@ -22,6 +22,8 @@ export type BuildContext = {
 };
 
 export type BuiltRecipe = {
+  /** Pool sqrtPrice used for the quote; the shock aims below it. */
+  quoteSqrtPrice?: bigint;
   steps: RecipeStep[];
   quote: BuildResponse["quote"];
   guard: Omit<BuildResponse["guard"], "snapshotIndex" | "assertIndex">;

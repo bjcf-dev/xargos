@@ -11,7 +11,7 @@ import {
   setTransactionMessageLifetimeUsingBlockhash,
 } from "@solana/kit";
 import { BuildResponse } from "@xargos/shared";
-import type { BuildContext, Recipe } from "../recipes/types";
+import type { BuildContext, BuiltRecipe, Recipe } from "../recipes/types";
 import type { LookupTables } from "./lookup-table";
 
 /** Largest serialized transaction Solana accepts (lesson 16). */
@@ -30,6 +30,8 @@ export type BuildParams = {
   lookupTables?: LookupTables;
   /** A free rebuild keeps the window of the first build (D19) instead of opening a new one. */
   rebuildUntil?: Date;
+  /** Called with what the recipe built, before the response is validated. */
+  onBuilt?: (built: BuiltRecipe) => void;
 };
 
 /** Builds the unsigned v0 transaction for a recipe and validates the whole response against the contract. */
@@ -41,8 +43,10 @@ export async function buildResponse({
   now = new Date(),
   lookupTables,
   rebuildUntil,
+  onBuilt,
 }: BuildParams) {
   const built = await recipe.build(context);
+  onBuilt?.(built);
   const { value: blockhash } = await rpc.getLatestBlockhash({ commitment: "confirmed" }).send();
 
   const message = pipe(

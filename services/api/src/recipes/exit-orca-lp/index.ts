@@ -136,6 +136,7 @@ export function createExitOrcaLpRecipe(deps: ExitOrcaLpDeps): Recipe {
       ];
 
       return {
+        quoteSqrtPrice: pool.sqrtPrice,
         steps,
         quote: {
           tokenOut: deps.usdcMint,

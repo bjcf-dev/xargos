@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { amountToRestore, amountToSell, humanPrice, rawPrice } from "./shock";
+import {
+  amountToRestore,
+  amountToSell,
+  amountToSellTo,
+  humanPrice,
+  rawPrice,
+  targetSqrtPrice,
+} from "./shock";
 
 const Q64 = 2n ** 64n;
 // sqrtPrice for a human price of 150 USDC per SOL: raw = 150 * 1e6 / 1e9 = 0.15.
@@ -47,5 +54,22 @@ describe("price shock maths", () => {
     // Roughly the USDC the shock swap received, about 20 USDC for ~0.138 SOL at ~145.
     expect(Number(usdc)).toBeGreaterThan(1.5e7);
     expect(Number(usdc)).toBeLessThan(2.6e7);
+  });
+
+  it("aims below a reference price, whatever the pool price is now", () => {
+    const quote = sqrtAt(150);
+    const target = targetSqrtPrice(quote, 600);
+    expect(humanPrice(target, 9, 6)).toBeCloseTo(141, 1);
+    // pool at the quote: sells the usual amount
+    expect(amountToSellTo(LIQUIDITY, quote, target, 0)).toBe(
+      amountToSell(LIQUIDITY, quote, 600, 0),
+    );
+    // pool already low from another shock (126): it only has to go from 126 down to 141? it is below
+    // the target already, so there is nothing to sell
+    expect(amountToSellTo(LIQUIDITY, sqrtAt(126), target, 0)).toBe(0n);
+    // pool a bit above the quote: it sells more than for the quote
+    expect(amountToSellTo(LIQUIDITY, sqrtAt(155), target, 0)).toBeGreaterThan(
+      amountToSellTo(LIQUIDITY, quote, target, 0),
+    );
   });
 });

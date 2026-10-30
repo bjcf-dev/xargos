@@ -27,9 +27,28 @@ export function amountToSell(
   dropBps: number,
   feeRate: number,
 ): bigint {
+  return amountToSellTo(liquidity, sqrtPriceX64, targetSqrtPrice(sqrtPriceX64, dropBps), feeRate);
+}
+
+/** The sqrtPrice that sits `dropBps` below a reference sqrtPrice (price falls by dropBps). */
+export function targetSqrtPrice(referenceSqrtPriceX64: bigint, dropBps: number): bigint {
   if (dropBps <= 0 || dropBps >= 10_000) throw new RangeError("dropBps must be between 1 and 9999");
-  const s0 = sqrtOf(sqrtPriceX64);
-  const s1 = s0 * Math.sqrt(1 - dropBps / 10_000);
+  return BigInt(Math.round(Number(referenceSqrtPriceX64) * Math.sqrt(1 - dropBps / 10_000)));
+}
+
+/**
+ * Token A (lamports) to sell so the price falls from `sqrtNow` to `sqrtTarget`. 0 when the pool is
+ * already at or below the target (nothing to sell: the price is low enough).
+ */
+export function amountToSellTo(
+  liquidity: bigint,
+  sqrtNowX64: bigint,
+  sqrtTargetX64: bigint,
+  feeRate: number,
+): bigint {
+  const s0 = sqrtOf(sqrtNowX64);
+  const s1 = sqrtOf(sqrtTargetX64);
+  if (s1 >= s0) return 0n;
   const net = Number(liquidity) * (1 / s1 - 1 / s0);
   return BigInt(Math.ceil(net / (1 - feeRate / PPM)));
 }
