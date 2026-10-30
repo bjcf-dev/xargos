@@ -6,12 +6,13 @@ import { paymentMiddleware } from "@x402/hono";
 import { SOLANA_DEVNET_CAIP2 } from "@x402/svm";
 import { registerExactSvmScheme } from "@x402/svm/exact/server";
 import { BuildRequest } from "@xargos/shared";
+import type { Context } from "hono";
 import { Hono } from "hono";
 import type { Logger } from "../demo/setup-runner";
 import { errorResponse } from "../http/errors";
 import type { Recipe } from "../recipes/types";
 import { buildResponse } from "../solana/build-transaction";
-import type { BuildStore } from "../store/build-store";
+import type { BuildStore, StoredBuild } from "../store/build-store";
 
 export type RecipeRoutesDeps = {
   recipes: Recipe[];
@@ -43,37 +44,32 @@ export function createRecipeRoutes({
   const server = registerExactSvmScheme(new x402ResourceServer(facilitator), {
     networks: [SOLANA_DEVNET_CAIP2],
   });
+  const recipeById = (id: string) => recipes.find((r) => r.info.id === id);
 
-  app.use(
-    paymentMiddleware(
-      Object.fromEntries(
-        recipes.map((recipe) => [
-          `POST /recipes/${recipe.info.id}/build`,
-          {
-            accepts: { scheme: "exact", price, network: SOLANA_DEVNET_CAIP2, payTo },
-            description: recipe.info.name,
-          },
-        ]),
-      ),
-      server,
-    ),
-  );
-
-  app.get("/recipes", (c) => c.json(recipes.map((recipe) => recipe.info)));
-
-  app.post("/recipes/:id/build", async (c) => {
-    const recipe = recipes.find((r) => r.info.id === c.req.param("id"));
-    if (!recipe) return errorResponse(c, "VALIDATION_ERROR", "Unknown recipe");
-    const body = BuildRequest.safeParse(await c.req.json().catch(() => null));
-    if (!body.success) return errorResponse(c, "VALIDATION_ERROR", "Invalid build request");
-
-    const buildId = `bld_${randomUUID()}`;
+  /** Builds and simulates. `rebuildOf` is the first build when this is a free rebuild (D19). */
+  async function build(c: Context, recipe: Recipe, request: BuildRequest, rebuildOf?: StoredBuild) {
+    const buildId = rebuildOf?.response.buildId ?? `bld_${randomUUID()}`;
     try {
       const response = await buildResponse({
         recipe,
-        context: { agent: body.data.agent as never, position: body.data.position as never },
+        context: {
+          agent: request.agent as never,
+          position: request.position as never,
+          // A rebuild keeps the promise of the first payment: the same expectedOut and minDelta
+          // (lesson 10), so a price move between builds cannot loosen the guard.
+          ...(rebuildOf
+            ? {
+                fixed: {
+                  expectedOut: BigInt(rebuildOf.response.quote.expectedOut),
+                  minDelta: BigInt(rebuildOf.response.guard.minDelta),
+                },
+              }
+            : {}),
+        },
         buildId,
         rpc,
+        // ...and the window of the first build, it does not restart.
+        ...(rebuildOf ? { rebuildUntil: new Date(rebuildOf.response.rebuildUntil) } : {}),
       });
 
       // Simulate before settling: a transaction that would fail must not cost the agent a payment.
@@ -94,16 +90,67 @@ export function createRecipeRoutes({
 
       store.put({
         response,
-        agent: body.data.agent,
-        position: body.data.position,
+        agent: request.agent,
+        position: request.position,
         // The PAYMENT-RESPONSE receipt only exists after the middleware settles, which happens
-        // once this handler returns. B13 (free rebuild) needs it: attach it there.
+        // once this handler returns, so it cannot be kept here yet.
+        paymentResponse: rebuildOf?.paymentResponse,
       });
       return c.json(response);
     } catch (error) {
       log?.error({ buildId, error: String(error) }, "build failed");
       return errorResponse(c, "BUILD_FAILED", "The recipe could not be built");
     }
+  }
+
+  // Free rebuild (D19). It goes BEFORE the payment middleware: with a buildId still inside its
+  // window nobody verifies or settles a payment. Anything else falls through to the paid route.
+  app.post("/recipes/:id/build", async (c, next) => {
+    const recipe = recipeById(c.req.param("id"));
+    const request = BuildRequest.safeParse(
+      await c.req.raw
+        .clone()
+        .json()
+        .catch(() => null),
+    );
+    if (!recipe || !request.success || !request.data.buildId) return next();
+
+    const stored = store.get(request.data.buildId);
+    const sameBuild =
+      stored !== undefined &&
+      stored.response.recipeId === recipe.info.id &&
+      stored.agent === request.data.agent &&
+      stored.position === request.data.position;
+    // Unknown, expired or somebody else's build: the same answer, and no charge.
+    if (!stored || !sameBuild) {
+      return errorResponse(c, "REBUILD_WINDOW_CLOSED", "The free rebuild window is closed");
+    }
+    return build(c, recipe, request.data, stored);
+  });
+
+  app.use(
+    paymentMiddleware(
+      Object.fromEntries(
+        recipes.map((recipe) => [
+          `POST /recipes/${recipe.info.id}/build`,
+          {
+            accepts: { scheme: "exact", price, network: SOLANA_DEVNET_CAIP2, payTo },
+            description: recipe.info.name,
+          },
+        ]),
+      ),
+      server,
+    ),
+  );
+
+  app.get("/recipes", (c) => c.json(recipes.map((recipe) => recipe.info)));
+
+  app.post("/recipes/:id/build", async (c) => {
+    const recipe = recipeById(c.req.param("id"));
+    if (!recipe) return errorResponse(c, "VALIDATION_ERROR", "Unknown recipe");
+    const request = BuildRequest.safeParse(await c.req.json().catch(() => null));
+    if (!request.success) return errorResponse(c, "VALIDATION_ERROR", "Invalid build request");
+    return build(c, recipe, request.data);
   });
 
   return app;

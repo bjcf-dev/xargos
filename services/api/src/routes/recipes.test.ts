@@ -97,9 +97,11 @@ const fakeRpc = (simulationErr: unknown = null) =>
     }),
   }) as unknown as Rpc<SolanaRpcApi>;
 
-function setup(options: { build?: Recipe["build"]; simulationErr?: unknown } = {}) {
+function setup(
+  options: { build?: Recipe["build"]; simulationErr?: unknown; now?: () => number } = {},
+) {
   const { facilitator, calls } = fakeFacilitator();
-  const store = new BuildStore();
+  const store = new BuildStore(options.now);
   const app = createRecipeRoutes({
     recipes: [recipe(options.build)],
     rpc: fakeRpc(options.simulationErr),
@@ -206,5 +208,121 @@ describe("POST /recipes/:id/build with x402", () => {
     const res = await app.request("/recipes");
     expect(res.status).toBe(200);
     expect(((await res.json()) as Array<{ id: string }>)[0]?.id).toBe("exit-orca-lp-to-usdc");
+  });
+});
+
+describe("free rebuild with a buildId (D19)", () => {
+  /** Recipe whose fresh quote would be different, to prove a rebuild keeps the promised one. */
+  const quoting =
+    (seen: Array<bigint | undefined>): Recipe["build"] =>
+    async ({ fixed }) => {
+      seen.push(fixed?.minDelta);
+      return {
+        steps: [
+          step(
+            getSnapshotInstruction({ agentTokenAccount: WATCHED, snapshot: SNAPSHOT }, config),
+            "Record",
+          ),
+          step(
+            getAssertMinDeltaInstruction(
+              {
+                agentTokenAccount: WATCHED,
+                snapshot: SNAPSHOT,
+                minDelta: fixed?.minDelta ?? 9_900_000n,
+              },
+              config,
+            ),
+            "Check",
+          ),
+        ],
+        quote: {
+          tokenOut: MINT,
+          expectedOut: fixed ? String(fixed.expectedOut) : "10000000",
+          slippageBps: 100,
+        },
+        guard: {
+          programId: GUARD,
+          mint: MINT,
+          watchedAccount: WATCHED,
+          minDelta: String(fixed?.minDelta ?? 9_900_000n),
+        },
+      };
+    };
+
+  const rebuildBody = (buildId: string, agent = AGENT) =>
+    JSON.stringify({ agent, position: MINT, buildId });
+
+  it("rebuilds the same buildId without charging again", async () => {
+    const seen: Array<bigint | undefined> = [];
+    const { app, postPaid, calls } = setup({ build: quoting(seen) });
+    const first = BuildResponse.parse(await (await postPaid()).json());
+    expect(calls.settle).toBe(1);
+
+    const res = await app.request("/recipes/exit-orca-lp-to-usdc/build", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: rebuildBody(first.buildId),
+    });
+    expect(res.status).toBe(200);
+    const again = BuildResponse.parse(await res.json());
+    expect(again.buildId).toBe(first.buildId);
+    expect(calls.settle).toBe(1); // still the first payment only
+  });
+
+  it("keeps the promised minimum and the window of the first build", async () => {
+    const seen: Array<bigint | undefined> = [];
+    const { app, postPaid } = setup({ build: quoting(seen) });
+    const first = BuildResponse.parse(await (await postPaid()).json());
+
+    const again = BuildResponse.parse(
+      await (
+        await app.request("/recipes/exit-orca-lp-to-usdc/build", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: rebuildBody(first.buildId),
+        })
+      ).json(),
+    );
+    expect(seen).toEqual([undefined, BigInt(first.guard.minDelta)]); // the rebuild got the fixed quote
+    expect(again.guard.minDelta).toBe(first.guard.minDelta);
+    expect(again.rebuildUntil).toBe(first.rebuildUntil);
+  });
+
+  it("answers REBUILD_WINDOW_CLOSED for an unknown buildId, without building or charging", async () => {
+    const build = vi.fn();
+    const { app, calls } = setup({ build });
+    const res = await app.request("/recipes/exit-orca-lp-to-usdc/build", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: rebuildBody("bld_unknown"),
+    });
+    expect(res.status).toBe(410);
+    expect(ErrorResponse.parse(await res.json()).error.code).toBe("REBUILD_WINDOW_CLOSED");
+    expect(build).not.toHaveBeenCalled();
+    expect(calls.verify + calls.settle).toBe(0);
+  });
+
+  it("closes the window after rebuildUntil", async () => {
+    let clock = Date.now();
+    const { app, postPaid } = setup({ now: () => clock });
+    const first = BuildResponse.parse(await (await postPaid()).json());
+    clock += 121_000;
+    const res = await app.request("/recipes/exit-orca-lp-to-usdc/build", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: rebuildBody(first.buildId),
+    });
+    expect(res.status).toBe(410);
+  });
+
+  it("does not rebuild somebody else's build", async () => {
+    const { app, postPaid } = setup();
+    const first = BuildResponse.parse(await (await postPaid()).json());
+    const res = await app.request("/recipes/exit-orca-lp-to-usdc/build", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: rebuildBody(first.buildId, "SysvarC1ock11111111111111111111111111111111"),
+    });
+    expect(res.status).toBe(410);
   });
 });
