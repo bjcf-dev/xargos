@@ -33,6 +33,14 @@ export class BuildStore {
     return build;
   }
 
+  /** Whether this agent holds a build that is still inside its window (a shock needs one). */
+  hasLiveBuildFor(agent: string): boolean {
+    for (const [id, build] of this.builds) {
+      if (build.agent === agent && this.get(id)) return true;
+    }
+    return false;
+  }
+
   get size(): number {
     return this.builds.size;
   }
