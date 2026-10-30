@@ -57,10 +57,14 @@ export function createRpcProxy({
       signal: AbortSignal.timeout(timeoutMs),
     });
 
-  // Una vez por instancia; un fallo de red no se guarda, para volver a intentarlo.
+  // Solo se guarda el "sí": un fallo de red o una respuesta rara se vuelve a comprobar.
   function isDevnet(): Promise<boolean> {
     devnet ??= post(JSON.stringify({ jsonrpc: "2.0", id: 0, method: "getGenesisHash" }))
       .then(async (response) => (await response.json()).result === DEVNET_GENESIS_HASH)
+      .then((yes) => {
+        if (!yes) devnet = null;
+        return yes;
+      })
       .catch((error: unknown) => {
         devnet = null;
         throw error;
@@ -69,6 +73,11 @@ export function createRpcProxy({
   }
 
   return async function proxy(request: Request): Promise<Response> {
+    if (request.method !== "POST") {
+      const response = rpcError(405, null, -32600, "Use POST");
+      response.headers.set("allow", "POST");
+      return response;
+    }
     // Netlify pone la IP del cliente en x-nf-client-connection-ip (comprobarlo al desplegar, F7).
     const client = request.headers.get("x-nf-client-connection-ip") ?? "unknown";
     // Primero el del cliente: uno bloqueado no debe gastar el cupo total de los demás.
@@ -94,14 +103,23 @@ export function createRpcProxy({
     if (Array.isArray(message) || typeof message !== "object" || message === null) {
       return rpcError(400, null, -32600, "Send one JSON-RPC request, not a batch");
     }
-    const { id = null, method } = message as { id?: RequestId; method?: unknown };
+    const {
+      id = null,
+      method,
+      params,
+    } = message as { id?: unknown; method?: unknown; params?: unknown };
+    if (id !== null && typeof id !== "string" && typeof id !== "number") {
+      return rpcError(400, null, -32600, "Invalid id");
+    }
     if (typeof method !== "string" || !ALLOWED.has(method)) {
       return rpcError(403, id, -32601, "Method not allowed");
     }
+    // Se reenvía lo comprobado, no el texto: con claves repetidas el RPC podría leer otro método.
+    const checked = JSON.stringify({ jsonrpc: "2.0", id, method, params });
 
     try {
       if (!(await isDevnet())) return rpcError(502, id, -32603, "RPC is not devnet");
-      const upstream = await post(body);
+      const upstream = await post(checked);
       if (!upstream.ok) return rpcError(502, id, -32603, "RPC unavailable");
       return new Response(await upstream.text(), {
         status: 200,

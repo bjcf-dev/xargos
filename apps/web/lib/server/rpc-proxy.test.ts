@@ -7,16 +7,19 @@ const UPSTREAM = "https://rpc.example/?api-key=secret-value";
 type Call = { url: string; body: string };
 
 function fakeFetch({
-  genesis = DEVNET_GENESIS_HASH,
+  genesis = DEVNET_GENESIS_HASH as string | string[],
   answer = { result: "ok" },
   fail = false,
 } = {}) {
   const calls: Call[] = [];
+  // Con una lista, cada consulta del genesis contesta el siguiente valor.
+  const geneses = Array.isArray(genesis) ? [...genesis] : null;
   const fetch = (async (url: string, init: RequestInit) => {
     const body = String(init.body);
     calls.push({ url, body });
     if (body.includes("getGenesisHash")) {
-      return Response.json({ jsonrpc: "2.0", id: 0, result: genesis });
+      const result = geneses ? geneses.shift() : genesis;
+      return Response.json({ jsonrpc: "2.0", id: 0, result });
     }
     if (fail) throw new Error(`connect ECONNREFUSED ${url}`);
     return Response.json({ jsonrpc: "2.0", id: 1, ...answer });
@@ -56,12 +59,54 @@ describe("createRpcProxy", () => {
     expect(calls).toHaveLength(0);
   });
 
+  it("forwards the checked request, never the original text", async () => {
+    const { fetch, calls } = fakeFetch();
+    // JSON.parse se queda con la última clave; un RPC que tomara la primera se saltaría la lista.
+    const duplicated =
+      '{"jsonrpc":"2.0","id":7,"method":"requestAirdrop","method":"getTransaction","params":["sig"],"extra":true}';
+    const response = await createRpcProxy({ upstreamUrl: UPSTREAM, fetch })(rpcRequest(duplicated));
+    expect(response.status).toBe(200);
+    expect(calls.at(-1)?.body).toBe(
+      JSON.stringify({ jsonrpc: "2.0", id: 7, method: "getTransaction", params: ["sig"] }),
+    );
+  });
+
   it("rejects a batch", async () => {
     const { fetch } = fakeFetch();
     const response = await createRpcProxy({ upstreamUrl: UPSTREAM, fetch })(
       rpcRequest([call("getTransaction")]),
     );
     expect(response.status).toBe(400);
+  });
+
+  it.each(["1", "null", '"getTransaction"'])(
+    "rejects a body that is not an object: %s",
+    async (body) => {
+      const { fetch, calls } = fakeFetch();
+      const response = await createRpcProxy({ upstreamUrl: UPSTREAM, fetch })(rpcRequest(body));
+      expect(response.status).toBe(400);
+      expect(calls).toHaveLength(0);
+    },
+  );
+
+  it("rejects an id that is not a string, a number or null", async () => {
+    const { fetch, calls } = fakeFetch();
+    const response = await createRpcProxy({ upstreamUrl: UPSTREAM, fetch })(
+      rpcRequest({ ...call("getTransaction"), id: { nested: true } }),
+    );
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ id: null, error: { code: -32600 } });
+    expect(calls).toHaveLength(0);
+  });
+
+  it("only accepts POST", async () => {
+    const { fetch, calls } = fakeFetch();
+    const response = await createRpcProxy({ upstreamUrl: UPSTREAM, fetch })(
+      new Request("http://localhost/api/xargos/rpc", { method: "GET" }),
+    );
+    expect(response.status).toBe(405);
+    expect(response.headers.get("allow")).toBe("POST");
+    expect(calls).toHaveLength(0);
   });
 
   it("rejects a body over 64 KB", async () => {
@@ -93,6 +138,13 @@ describe("createRpcProxy", () => {
     expect(text).not.toContain("secret-value");
   });
 
+  it("checks the genesis again after an answer that is not devnet", async () => {
+    const { fetch } = fakeFetch({ genesis: ["not-devnet", DEVNET_GENESIS_HASH] });
+    const proxy = createRpcProxy({ upstreamUrl: UPSTREAM, fetch });
+    expect((await proxy(rpcRequest(call("getTransaction")))).status).toBe(502);
+    expect((await proxy(rpcRequest(call("getTransaction")))).status).toBe(200);
+  });
+
   it("checks the genesis only once", async () => {
     const { fetch, calls } = fakeFetch();
     const proxy = createRpcProxy({ upstreamUrl: UPSTREAM, fetch });
@@ -115,6 +167,17 @@ describe("createRpcProxy", () => {
     expect(await limited.json()).toMatchObject({ error: { code: -32005 } });
     expect((await proxy(rpcRequest(call("getTransaction"), "2.2.2.2"))).status).toBe(200);
     expect(calls.filter((c) => c.body.includes("getTransaction"))).toHaveLength(2);
+  });
+
+  it("puts every request without a client IP in one shared bucket", async () => {
+    const { fetch } = fakeFetch();
+    const proxy = createRpcProxy({
+      upstreamUrl: UPSTREAM,
+      fetch,
+      perClient: { max: 1, windowMs: 60_000 },
+    });
+    expect((await proxy(rpcRequest(call("getTransaction")))).status).toBe(200);
+    expect((await proxy(rpcRequest(call("getTransaction")))).status).toBe(429);
   });
 
   it("limits the total across clients", async () => {
