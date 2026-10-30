@@ -50,6 +50,7 @@ beforeAll(async () => {
 
 type FakeOptions = {
   simulationErr?: unknown;
+  simulationLogs?: string[];
   /** Lo que lanza cada método del RPC; statuses: cuántas veces seguidas lanza ("always" = siempre). */
   throws?: {
     simulate?: unknown;
@@ -60,7 +61,13 @@ type FakeOptions = {
   meta?: { err: unknown; logMessages: string[] };
 };
 
-function fakeRpc({ simulationErr = null, statuses, meta, throws = {} }: FakeOptions = {}) {
+function fakeRpc({
+  simulationErr = null,
+  simulationLogs = ["sim log"],
+  statuses,
+  meta,
+  throws = {},
+}: FakeOptions = {}) {
   const sent: Array<{ wire: string; config: unknown }> = [];
   const queue = statuses ?? [{ confirmationStatus: "confirmed", err: null }];
   const reply = <T>(value: T) => ({ send: async () => value });
@@ -74,7 +81,7 @@ function fakeRpc({ simulationErr = null, statuses, meta, throws = {} }: FakeOpti
     simulateTransaction: () =>
       throws.simulate
         ? fail(throws.simulate)
-        : reply({ value: { err: simulationErr, logs: ["sim log"] } }),
+        : reply({ value: { err: simulationErr, logs: simulationLogs } }),
     sendTransaction: (wire: string, config: unknown) => {
       if (throws.send) return fail(throws.send);
       sent.push({ wire, config });
@@ -118,6 +125,7 @@ describe("signAndSend", () => {
     const guardErr = { InstructionError: [7, { Custom: 6004 }] };
     const { rpc, sent } = fakeRpc({
       simulationErr: guardErr,
+      simulationLogs: ["Program log: GUARD_FAIL received=1 min=2"],
       statuses: [{ confirmationStatus: "confirmed", err: guardErr }],
       meta: { err: guardErr, logMessages: ["Program log: GUARD_FAIL received=1 min=2"] },
     });
@@ -125,6 +133,18 @@ describe("signAndSend", () => {
     expect(sent[0]?.config).toMatchObject({ encoding: "base64", skipPreflight: true });
     expect(result.err).toEqual(guardErr);
     expect(result.logs).toEqual(["Program log: GUARD_FAIL received=1 min=2"]);
+  });
+
+  it("does not send when the assert step fails without GUARD_FAIL in the logs", async () => {
+    const { rpc, sent } = fakeRpc({
+      simulationErr: { InstructionError: [7, "InvalidAccountData"] },
+      simulationLogs: ["Program log: Instruction: AssertMinDelta"],
+    });
+    const error = await signAndSend({ rpc, ...base() }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ApiClientError);
+    expect((error as ApiClientError).code).toBe("INTERNAL");
+    expect((error as ApiClientError).message).toContain("step 7");
+    expect(sent).toHaveLength(0);
   });
 
   it("does not send when simulation fails at a non-guard step", async () => {
@@ -142,10 +162,17 @@ describe("signAndSend", () => {
     expect(sent).toHaveLength(0);
   });
 
-  it("gives up with BUILD_EXPIRED after timeoutMs", async () => {
-    const { rpc } = fakeRpc({ statuses: [null] });
-    const error = await signAndSend({ rpc, ...base(), timeoutMs: 20 }).catch((e: unknown) => e);
-    expect((error as ApiClientError).code).toBe("BUILD_EXPIRED");
+  it("after timeoutMs keeps the signature and never says BUILD_EXPIRED", async () => {
+    // Enviada y sin estado: puede entrar después, así que no se puede dar por caducada.
+    const { rpc, sent } = fakeRpc({ statuses: [null] });
+    const error = (await signAndSend({ rpc, ...base(), timeoutMs: 20 }).catch(
+      (e: unknown) => e,
+    )) as ApiClientError;
+    expect(sent).toHaveLength(1);
+    expect(error).toBeInstanceOf(ApiClientError);
+    expect(error.code).not.toBe("BUILD_EXPIRED");
+    expect(error.details).toMatchObject({ signature: expect.any(String) });
+    expect(error.message).toContain((error.details as { signature: string }).signature);
   });
 
   it("stops when the signal aborts", async () => {
@@ -153,7 +180,9 @@ describe("signAndSend", () => {
     const controller = new AbortController();
     const pending = signAndSend({ rpc, ...base(), signal: controller.signal, timeoutMs: 5_000 });
     controller.abort();
-    await expect(pending).rejects.toThrow();
+    const error = await pending.catch((e: unknown) => e);
+    expect(error).toBe(controller.signal.reason);
+    expect((error as DOMException).name).toBe("AbortError");
   });
 });
 

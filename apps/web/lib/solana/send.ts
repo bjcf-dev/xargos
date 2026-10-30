@@ -15,6 +15,7 @@ import {
   SOLANA_ERROR__TRANSACTION_ERROR__BLOCKHASH_NOT_FOUND,
   signTransaction,
 } from "@solana/kit";
+import { parseGuardFail } from "@xargos/shared";
 import { ApiClientError } from "@/lib/api/errors";
 import { sleep } from "@/lib/api/poll";
 
@@ -23,6 +24,7 @@ export type SendRpc = Rpc<
   SimulateTransactionApi & SendTransactionApi & GetSignatureStatusesApi & GetTransactionApi
 >;
 
+/** `err` puede traer bigint (Kit los usa): no pasa por JSON.stringify sin un replacer. */
 export type SendResult = { signature: string; err: unknown | null; logs: readonly string[] };
 
 type SignAndSendArgs = {
@@ -72,9 +74,10 @@ function toSendError(error: unknown, signal: AbortSignal): unknown {
 }
 
 /**
- * Firma con la clave del agente, simula y envía. Si la simulación falla por el guard, se
- * envía igual para que revierta en la cadena (contrato: "La tx revierte on-chain"; D16).
- * Si falla por otra cosa, no se envía: no se paga la comisión de una tx que no aporta nada.
+ * Firma con la clave del agente, simula y envía. Si la simulación falla por el guard (su
+ * índice y su log GUARD_FAIL), se envía igual para que revierta en la cadena (contrato: "La
+ * tx revierte on-chain"; D16). Si falla por otra cosa, no se envía: no se paga la comisión
+ * de una tx que no aporta nada.
  */
 export async function signAndSend({
   rpc,
@@ -120,7 +123,11 @@ async function signSimulateAndSend({
   const simErr = simulation.value.err;
   if (simErr === "BlockhashNotFound") throw expired();
   const failedAt = failedInstructionIndex(simErr);
-  const guardFailed = simErr !== null && failedAt !== null && failedAt === guardAssertIndex;
+  const guardFailed =
+    simErr !== null &&
+    failedAt !== null &&
+    failedAt === guardAssertIndex &&
+    parseGuardFail(simulation.value.logs) !== null;
   if (simErr !== null && !guardFailed) {
     const where = failedAt === null ? "" : ` at step ${failedAt}`;
     throw new ApiClientError("INTERNAL", `The transaction would fail${where}; nothing was sent`);
@@ -133,8 +140,10 @@ async function signSimulateAndSend({
 }
 
 /**
- * Ya enviada, la tx puede entrar aunque falle una consulta (429, 502, red): se sigue
- * preguntando hasta el plazo y, si no se pudo leer, el error lleva la firma para buscarla.
+ * Ya enviada, la tx puede entrar aunque falle una consulta (429, 502, red) o tarde más que
+ * el plazo: se sigue preguntando hasta el plazo y, si no se vio el resultado, el error lleva
+ * la firma para buscarla. Nunca BUILD_EXPIRED: invitaría a reconstruir y pagar otra vez una
+ * tx que aún puede entrar. Ese código solo sale de BlockhashNotFound, antes de enviar.
  */
 async function confirm({
   rpc,
@@ -150,7 +159,6 @@ async function confirm({
   timeoutMs: number;
 }): Promise<SendResult> {
   const deadline = Date.now() + timeoutMs;
-  let unreadable = false;
   while (Date.now() < deadline) {
     try {
       const { value } = await rpc.getSignatureStatuses([signature]).send({ abortSignal: signal });
@@ -174,16 +182,12 @@ async function confirm({
       }
     } catch (error) {
       if (signal.aborted) throw error;
-      unreadable = true;
     }
     await sleep(pollIntervalMs, signal);
   }
-  if (unreadable) {
-    throw new ApiClientError(
-      "INTERNAL",
-      `The transaction was sent but its result could not be read. Look up ${signature} in the explorer.`,
-      { details: { signature } },
-    );
-  }
-  throw expired();
+  throw new ApiClientError(
+    "INTERNAL",
+    `The transaction was sent but its result was not seen in time. Look up ${signature} in the explorer before trying again.`,
+    { details: { signature } },
+  );
 }
