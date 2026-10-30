@@ -14,7 +14,17 @@ export type RunnerDeps = {
 };
 
 function toDemoError(error: unknown): DemoError {
-  if (error instanceof ApiClientError) return { code: error.code, message: error.message };
+  if (error instanceof ApiClientError) {
+    return {
+      code: error.code,
+      message: error.message,
+      ...(error.retryAfterSeconds !== undefined
+        ? { retryAfterSeconds: error.retryAfterSeconds }
+        : {}),
+      ...(error.unreachable ? { unreachable: true as const } : {}),
+      ...(error.rejected ? { rejected: true as const } : {}),
+    };
+  }
   return { code: "INTERNAL", message: error instanceof Error ? error.message : "Unexpected error" };
 }
 
@@ -48,7 +58,19 @@ export function runSetup(
   const dispatch = unlessAborted(rawDispatch, signal);
   dispatch({ type: "SETUP_STARTED", agent });
   return step(dispatch, signal, async () => {
-    await api.startSetup({ agent }, { signal });
+    // Primero se pregunta: un agente que sobrevivió a la recarga no gasta otro setup ni el
+    // límite por IP. Desconocido (servidor reiniciado, job caducado) o fallido: POST con el
+    // mismo agente; el backend se salta lo que ya está hecho (#52).
+    const known = await api.getSetupStatus(agent, { signal }).catch((error: unknown) => {
+      if (
+        error instanceof ApiClientError &&
+        error.code === "VALIDATION_ERROR" &&
+        error.status === 400
+      )
+        return null;
+      throw error;
+    });
+    if (!known || known.phase === "failed") await api.startSetup({ agent }, { signal });
     await pollUntil(
       async () => {
         const setup = await api.getSetupStatus(agent, { signal });
@@ -114,5 +136,29 @@ export function runSign(
         ? { type: "CONFIRMED", signature: result.signature }
         : { type: "REVERTED", signature: result.signature, failure: result.failure },
     );
+  });
+}
+
+/**
+ * Rebuild gratis (D19): mismo buildId, tx nueva, sin pagar. Con la ventana ya cerrada solo se
+ * despacha REBUILD (el reducer lo convierte en REBUILD_WINDOW_CLOSED) y no se llama a la API.
+ */
+export function runRebuild(
+  { api, recipeId }: RunnerDeps,
+  run: Run,
+  rawDispatch: Dispatch<DemoEvent>,
+  signal: AbortSignal,
+  now = Date.now(),
+): Promise<void> {
+  const dispatch = unlessAborted(rawDispatch, signal);
+  dispatch({ type: "REBUILD", now });
+  if (now >= Date.parse(run.build.rebuildUntil)) return Promise.resolve();
+  return step(dispatch, signal, async () => {
+    const { data } = await api.build(
+      recipeId,
+      { agent: run.agent, position: run.position, buildId: run.build.buildId },
+      { signal },
+    );
+    dispatch({ type: "BUILT", build: data });
   });
 }

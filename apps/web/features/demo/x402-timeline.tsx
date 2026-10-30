@@ -35,7 +35,9 @@ export function X402Timeline({
   return (
     <Card size="sm">
       <CardHeader>
-        <CardTitle>x402 payment</CardTitle>
+        <CardTitle data-step-title tabIndex={-1}>
+          x402 payment
+        </CardTitle>
         <CardDescription>
           {mode === "mock"
             ? mockPaymentNote(fee)
