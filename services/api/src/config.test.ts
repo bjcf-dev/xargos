@@ -20,6 +20,15 @@ describe("parseConfig", () => {
     expect(config.DEMO_ACCESS_CODE).toBeUndefined();
   });
 
+  it("needs the payer key from a path or from PAYER_KEYPAIR", () => {
+    expect(() => parseConfig({ ...valid, PAYER_KEYPAIR_PATH: undefined })).toThrow(
+      /PAYER_KEYPAIR_PATH/,
+    );
+    expect(
+      parseConfig({ ...valid, PAYER_KEYPAIR_PATH: undefined, PAYER_KEYPAIR: "[1]" }),
+    ).toBeTruthy();
+  });
+
   it("refuses any cluster that is not devnet", () => {
     expect(() => parseConfig({ ...valid, SOLANA_CLUSTER: "mainnet-beta" })).toThrow(
       /SOLANA_CLUSTER/,

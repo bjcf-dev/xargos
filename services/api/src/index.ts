@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { serve } from "@hono/node-server";
 import {
   address,
@@ -19,6 +18,7 @@ import { asFacilitatorClient } from "./payment/local-facilitator";
 import { createExitOrcaLpRecipe } from "./recipes/exit-orca-lp";
 import { createRecipeRoutes } from "./routes/recipes";
 import { createShockRoutes } from "./routes/shock";
+import { readPayerBytes } from "./solana/payer";
 import { createSender } from "./solana/send";
 import { BuildStore } from "./store/build-store";
 
@@ -27,9 +27,7 @@ if (!config.DEMO_ACCESS_CODE) {
   // Without the code anyone can start setups that cost the payer SOL: fine locally, not in Railway.
   console.warn("DEMO_ACCESS_CODE is not set: /demo/setup is open to anyone");
 }
-const payer = await createKeyPairSignerFromBytes(
-  Uint8Array.from(JSON.parse(readFileSync(config.PAYER_KEYPAIR_PATH, "utf8"))),
-);
+const payer = await createKeyPairSignerFromBytes(readPayerBytes(config));
 const rpc = createSolanaRpc(config.RPC_URL);
 const rpcSubscriptions = createSolanaRpcSubscriptions(config.RPC_URL.replace(/^http/, "ws"));
 
