@@ -2,6 +2,7 @@ import { fixtureBuildResponse, fixtureRecipe, fixtureSetupReady } from "@xargos/
 import { describe, expect, it } from "vitest";
 import {
   canShock,
+  chargeLine,
   chargeNote,
   DEMO_PATHS,
   describeRevert,
@@ -10,6 +11,7 @@ import {
   formatFee,
   humanError,
   mockPaymentNote,
+  paymentMayHaveSettled,
   secondsLeft,
   shockTrend,
   slippageLabel,
@@ -288,6 +290,8 @@ describe("chargeNote", () => {
     const note = chargeNote("paying", error);
     expect(note).not.toMatch(/nothing was charged/i);
     expect(note).toMatch(/could not confirm/i);
+    // Sin "Try again" en este caso (#44): la nota explica por qué se empieza de nuevo.
+    expect(note).toMatch(/start over/i);
   });
 
   it.each(["shocking", "signing", "expired", "rebuilding"] as const)(
@@ -375,5 +379,45 @@ describe("x402Timeline", () => {
     expect(new Set(Object.values(byKey(states(run).idle, "staging")))).toEqual(
       new Set(["pending"]),
     );
+  });
+});
+
+describe("paymentMayHaveSettled (D17)", () => {
+  it("is true when paying failed without a clear rejection from the backend", () => {
+    expect(
+      paymentMayHaveSettled("paying", { code: "INTERNAL", message: "", unreachable: true }),
+    ).toBe(true);
+    expect(paymentMayHaveSettled("paying", { code: "INTERNAL", message: "Does not match" })).toBe(
+      true,
+    );
+  });
+
+  it("is false when the backend rejected the build, or the failure was not in paying", () => {
+    expect(
+      paymentMayHaveSettled("paying", { code: "BUILD_FAILED", message: "", rejected: true }),
+    ).toBe(false);
+    expect(
+      paymentMayHaveSettled("setup", { code: "INTERNAL", message: "", unreachable: true }),
+    ).toBe(false);
+  });
+});
+
+describe("chargeLine", () => {
+  const fee = "0.01 USDC";
+  const rejected = { code: "BUILD_FAILED", message: "", rejected: true } as const;
+
+  it("says the charge is simulated in mock mode when paying failed", () => {
+    const line = chargeLine("paying", rejected, "mock", fee);
+    expect(line).toMatch(/^Simulated in mock mode\./);
+    expect(line).toContain(chargeNote("paying", rejected));
+  });
+
+  it("uses the mock payment note after the build in mock mode", () => {
+    expect(chargeLine("signing", rejected, "mock", fee)).toBe(mockPaymentNote(fee));
+  });
+
+  it("is the plain note outside mock mode, and null when there is nothing to say", () => {
+    expect(chargeLine("paying", rejected, "staging", fee)).toBe(chargeNote("paying", rejected));
+    expect(chargeLine("setup", rejected, "mock", fee)).toBeNull();
   });
 });

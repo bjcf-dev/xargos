@@ -6,7 +6,7 @@ import type { ApiMode } from "@/lib/api/mode";
 import { formatUnits, USDC_DECIMALS } from "@/lib/format";
 import { ellipsify, getExplorerUrl } from "@/lib/solana/explorer";
 import {
-  chargeNote,
+  chargeLine,
   describeRevert,
   describeSpent,
   FAILED_PAYMENTS_HREF,
@@ -121,12 +121,7 @@ export function ResultCard({ state, mode, price }: ResultCardProps) {
 
   // Errores para personas: la frase arriba y el código del contrato en pequeño, para soporte.
   const human = humanError(state.error);
-  // En mock no se cobra nada: tras el build, lo dice la nota de mock en vez de "ya pagada".
-  const afterBuild = state.failedAt !== "paying";
-  const charge =
-    mode === "mock" && afterBuild && chargeNote(state.failedAt, state.error)
-      ? mockPaymentNote(formatFee(price))
-      : chargeNote(state.failedAt, state.error);
+  const charge = chargeLine(state.failedAt, state.error, mode, formatFee(price));
   return (
     <Alert variant="destructive" role="presentation">
       <AlertTriangleIcon />

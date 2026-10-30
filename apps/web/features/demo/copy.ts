@@ -154,12 +154,33 @@ export const FAILED_PAYMENTS_HREF = "/failed-payments";
  */
 export function chargeNote(failedAt: DemoStatus, error: DemoError): string | null {
   if (failedAt === "idle" || failedAt === "setup") return null;
+  if (paymentMayHaveSettled(failedAt, error)) {
+    return "We could not confirm whether the payment settled: x402 only charges when the build succeeds. Start over instead of trying again, so the agent is not charged twice.";
+  }
   if (failedAt === "paying") {
-    return error.rejected
-      ? "Nothing was charged: x402 only settles the payment when the build succeeds."
-      : "We could not confirm whether the payment settled: x402 only charges when the build succeeds.";
+    return "Nothing was charged: x402 only settles the payment when the build succeeds.";
   }
   return "The recipe fee was already paid when this transaction was built.";
+}
+
+/**
+ * Falló al pagar sin un rechazo claro del backend (D17): el pago pudo liquidarse. Entonces no
+ * se ofrece "Try again", que volvería a pagar (#44); solo "Start over".
+ */
+export function paymentMayHaveSettled(failedAt: DemoStatus, error: DemoError): boolean {
+  return failedAt === "paying" && !error.rejected;
+}
+
+/** La nota de cobro de la tarjeta de error; en mock dice que no se cobra de verdad. */
+export function chargeLine(
+  failedAt: DemoStatus,
+  error: DemoError,
+  mode: ApiMode,
+  fee: string,
+): string | null {
+  const note = chargeNote(failedAt, error);
+  if (mode !== "mock" || note === null) return note;
+  return failedAt === "paying" ? `Simulated in mock mode. ${note}` : mockPaymentNote(fee);
 }
 
 /**

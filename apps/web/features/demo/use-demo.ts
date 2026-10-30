@@ -3,6 +3,7 @@ import { api as defaultApi } from "@/lib/api";
 import type { ApiClient } from "@/lib/api/client";
 import { ApiClientError } from "@/lib/api/errors";
 import { apiMode } from "@/lib/api/mode";
+import { paymentMayHaveSettled } from "./copy";
 import { createMockSigner } from "./mock-signer";
 import { type RunnerDeps, runPay, runSetup, runShock, runSign } from "./runner";
 import type { DemoSigner } from "./signer";
@@ -76,7 +77,10 @@ export function useDemo({
     if (state.status === "built") void runSign(deps, state.run, dispatch, begin());
   }
 
-  const canRetry = state.status === "error" && RETRYABLE.has(state.failedAt);
+  const canRetry =
+    state.status === "error" &&
+    RETRYABLE.has(state.failedAt) &&
+    !paymentMayHaveSettled(state.failedAt, state.error);
 
   /** Vuelve a pagar si se conoce la posición; si no, repite el setup. */
   function retry() {

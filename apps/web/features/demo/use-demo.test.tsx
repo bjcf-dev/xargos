@@ -131,6 +131,23 @@ describe("useDemo", () => {
     expect(result.current.state.status).toBe("paying");
   });
 
+  // Sin respuesta del backend no se sabe si x402 liquidó (D17): reintentar podría cobrar dos veces.
+  it("does not offer a retry when the payment may have settled", async () => {
+    server.use(
+      http.post("*/api/xargos/recipes/:recipeId/build", () => HttpResponse.error(), { once: true }),
+    );
+    const { result } = renderDemo();
+    act(() => result.current.start());
+    await waitFor(() => expect(result.current.state).toMatchObject({ setup: { phase: "ready" } }));
+    act(() => result.current.pay());
+    await waitFor(() => expect(result.current.state).toMatchObject({ failedAt: "paying" }));
+
+    expect(result.current.state).toMatchObject({ error: { unreachable: true } });
+    expect(result.current.canRetry).toBe(false);
+    act(() => result.current.retry());
+    expect(result.current.state.status).toBe("error");
+  });
+
   // Con x402 real (F8), volver a pagar tras un fallo de la firma o del shock cobraría dos veces.
   it("does not pay again when the failure came after the payment", async () => {
     const { result } = renderDemo(null);
