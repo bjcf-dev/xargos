@@ -2,8 +2,9 @@
 import { fixtureBuildResponse, fixtureRecipe, fixtureShockConfirmed } from "@xargos/shared";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { createApiClient } from "@/lib/api/client";
+import { ApiClientError } from "@/lib/api/errors";
 import { pollUntil } from "@/lib/api/poll";
 import { createHandlers } from "./handlers";
 
@@ -120,5 +121,51 @@ describe("mock handlers", () => {
 
     expect(first.status).toBe("pending");
     expect(second).toEqual({ ...fixtureShockConfirmed, shockId });
+  });
+
+  it("rebuilds for free with the same buildId and a new expiry (D19)", async () => {
+    useFreshHandlers();
+    const { data: first } = await api.build(fixtureRecipe.id, { agent: AGENT, position: AGENT });
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(Date.parse(first.expiresAt) + 1_000);
+      const { data: again } = await api.build(fixtureRecipe.id, {
+        agent: AGENT,
+        position: AGENT,
+        buildId: first.buildId,
+      });
+
+      expect(again.buildId).toBe(first.buildId);
+      expect(Date.parse(again.expiresAt)).toBeGreaterThan(Date.parse(first.expiresAt));
+      expect(again.rebuildUntil).toBe(first.rebuildUntil);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("answers REBUILD_WINDOW_CLOSED once rebuildUntil has passed", async () => {
+    useFreshHandlers();
+    const { data: first } = await api.build(fixtureRecipe.id, { agent: AGENT, position: AGENT });
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(Date.parse(first.rebuildUntil));
+      const error = await api
+        .build(fixtureRecipe.id, { agent: AGENT, position: AGENT, buildId: first.buildId })
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ApiClientError);
+      expect(error).toMatchObject({ code: "REBUILD_WINDOW_CLOSED", status: 410 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("rejects a rebuild of an unknown buildId", async () => {
+    useFreshHandlers();
+    const error = await api
+      .build(fixtureRecipe.id, { agent: AGENT, position: AGENT, buildId: "bld_unknown" })
+      .catch((e: unknown) => e);
+
+    expect(error).toMatchObject({ code: "VALIDATION_ERROR", status: 400 });
   });
 });

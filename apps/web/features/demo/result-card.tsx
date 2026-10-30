@@ -1,10 +1,20 @@
 import type { Recipe } from "@xargos/shared";
 import { AlertTriangleIcon, CheckCircle2Icon, ShieldCheckIcon, XCircleIcon } from "lucide-react";
+import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { ApiMode } from "@/lib/api/mode";
 import { formatUnits, USDC_DECIMALS } from "@/lib/format";
 import { ellipsify, getExplorerUrl } from "@/lib/solana/explorer";
-import { describeRevert, describeSpent, humanError, mockPaymentNote, POOL_TOKEN } from "./copy";
+import {
+  chargeLine,
+  describeRevert,
+  describeSpent,
+  FAILED_PAYMENTS_HREF,
+  formatFee,
+  humanError,
+  mockPaymentNote,
+  POOL_TOKEN,
+} from "./copy";
 import type { DemoState } from "./types";
 
 type ResultState = Extract<DemoState, { status: "confirmed" | "reverted" | "error" }>;
@@ -26,6 +36,14 @@ function Signature({ signature, mode }: { signature: string; mode: ApiMode }) {
     >
       {ellipsify(signature, 8)}
     </a>
+  );
+}
+
+function FailedPaymentsLink() {
+  return (
+    <Link className="underline underline-offset-4" href={FAILED_PAYMENTS_HREF}>
+      How failed payments work
+    </Link>
   );
 }
 
@@ -55,7 +73,7 @@ export function ResultCard({ state, mode, price }: ResultCardProps) {
 
   if (state.status === "reverted") {
     const revert = describeRevert(state.run, state.failure);
-    const spent = describeSpent(price, null);
+    const spent = describeSpent(price, state.failure.networkFeeLamports ?? null);
     return (
       // Un revert del guard es la garantía funcionando: no va en rojo (el rojo queda en el paso).
       <Alert variant={revert.byGuard ? "default" : "destructive"} role="presentation">
@@ -86,12 +104,15 @@ export function ResultCard({ state, mode, price }: ResultCardProps) {
           ) : (
             <p>
               Spent: {spent.recipeFee} recipe fee (x402) ·{" "}
-              {spent.networkFee ?? "network fee pending, read from the transaction"}.
+              {spent.networkFee ? `${spent.networkFee} network fee` : "network fee not available"}.
             </p>
           )}
           <p>Your position and funds are otherwise intact.</p>
           <p>
             <Signature signature={state.signature} mode={mode} />
+          </p>
+          <p>
+            <FailedPaymentsLink />
           </p>
         </AlertDescription>
       </Alert>
@@ -100,6 +121,7 @@ export function ResultCard({ state, mode, price }: ResultCardProps) {
 
   // Errores para personas: la frase arriba y el código del contrato en pequeño, para soporte.
   const human = humanError(state.error);
+  const charge = chargeLine(state.failedAt, state.error, mode, formatFee(price));
   return (
     <Alert variant="destructive" role="presentation">
       <AlertTriangleIcon />
@@ -108,6 +130,11 @@ export function ResultCard({ state, mode, price }: ResultCardProps) {
       </AlertTitle>
       <AlertDescription>
         <p>{human.hint}</p>
+        {charge ? (
+          <p>
+            {charge} <FailedPaymentsLink />
+          </p>
+        ) : null}
         <p className="font-mono text-xs text-muted-foreground">{state.error.code}</p>
       </AlertDescription>
     </Alert>
