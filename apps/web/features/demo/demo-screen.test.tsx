@@ -246,7 +246,7 @@ describe("ResultCard for a revert outside the guard", () => {
     const title = screen.getByText(/Step 3 · Collect fees/);
     expect(title.closest('[data-slot="alert"]')?.className).toContain("text-destructive");
     expect(document.body.textContent).not.toMatch(/guard/i);
-    expect(screen.queryByText(/loss avoided/i)).toBeNull();
+    expect(screen.queryByText(/shortfall/i)).toBeNull();
   });
 });
 

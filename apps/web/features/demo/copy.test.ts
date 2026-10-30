@@ -9,6 +9,7 @@ import {
   formatFee,
   mockPaymentNote,
   secondsLeft,
+  shockTrend,
   slippageLabel,
   stepTag,
   x402Timeline,
@@ -110,7 +111,16 @@ describe("describeRevert (D15)", () => {
     expect(copy.detail).toContain("9.95 demo USDC");
   });
 
-  it("never reports a negative loss avoided", () => {
+  it("takes the minimum the chain read, not the one the build promised", () => {
+    const copy = describeRevert(run, {
+      instructionIndex: guard.assertIndex,
+      guard: { received: 9_100_000n, min: 9_500_000n },
+    });
+    expect(copy.figures).toEqual({ received: "9.1", minimum: "9.5", shortfall: "0.4" });
+    expect(copy.detail).toContain("9.5 demo USDC minimum");
+  });
+
+  it("never reports a negative shortfall", () => {
     const copy = describeRevert(run, {
       instructionIndex: guard.assertIndex,
       guard: { received: 10_000_000n, min: 9_950_000n },
@@ -149,6 +159,19 @@ describe("describeShock", () => {
   it("leaves the change out when a price is not usable", () => {
     expect(describeShock("abc", "141.00")).toBe("SOL/demo USDC abc → 141.00");
     expect(describeShock("0", "1")).toBe("SOL/demo USDC 0 → 1");
+  });
+});
+
+describe("shockTrend", () => {
+  it("says which way the price moved", () => {
+    expect(shockTrend("150.00", "141.00")).toBe("down");
+    expect(shockTrend("150.00", "155.00")).toBe("up");
+  });
+
+  it("gives no direction when a price is not a number or nothing moved", () => {
+    expect(shockTrend("abc", "141.00")).toBeNull();
+    expect(shockTrend("150.00", "")).toBeNull();
+    expect(shockTrend("150.00", "150.00")).toBeNull();
   });
 });
 

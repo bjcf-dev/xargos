@@ -71,7 +71,7 @@ export function ResultCard({ state, mode, price }: ResultCardProps) {
               <dd className="font-mono tabular-nums">
                 {revert.figures.minimum} {POOL_TOKEN}
               </dd>
-              <dt>Loss avoided</dt>
+              <dt>Shortfall vs. minimum</dt>
               <dd className="font-mono tabular-nums">
                 {revert.figures.shortfall} {POOL_TOKEN}
               </dd>

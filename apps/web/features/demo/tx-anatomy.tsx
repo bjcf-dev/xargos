@@ -17,7 +17,14 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { formatUnits, USDC_DECIMALS } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { describeShock, POOL_TOKEN, type StepTag, slippageLabel, stepTag } from "./copy";
+import {
+  describeShock,
+  POOL_TOKEN,
+  type StepTag,
+  shockTrend,
+  slippageLabel,
+  stepTag,
+} from "./copy";
 import type { Run } from "./types";
 
 const TAG_VARIANT: Record<StepTag, "default" | "secondary" | "outline"> = {
@@ -40,6 +47,10 @@ export function TxAnatomy({ run, secondsLeft, failedIndex = null }: TxAnatomyPro
   const { quote, guard, steps } = run.build;
   const expected = formatUnits(quote.expectedOut, USDC_DECIMALS);
   const minimum = formatUnits(guard.minDelta, USDC_DECIMALS);
+  const trend =
+    run.shock?.priceBefore && run.shock.priceAfter
+      ? shockTrend(run.shock.priceBefore, run.shock.priceAfter)
+      : null;
 
   return (
     <Card>
@@ -79,11 +90,8 @@ export function TxAnatomy({ run, secondsLeft, failedIndex = null }: TxAnatomyPro
         </p>
         {run.shock?.priceBefore && run.shock.priceAfter ? (
           <Badge variant="destructive">
-            {Number(run.shock.priceAfter) < Number(run.shock.priceBefore) ? (
-              <TrendingDownIcon data-icon="inline-start" />
-            ) : (
-              <TrendingUpIcon data-icon="inline-start" />
-            )}
+            {trend === "down" ? <TrendingDownIcon data-icon="inline-start" /> : null}
+            {trend === "up" ? <TrendingUpIcon data-icon="inline-start" /> : null}
             {describeShock(run.shock.priceBefore, run.shock.priceAfter)}
           </Badge>
         ) : null}

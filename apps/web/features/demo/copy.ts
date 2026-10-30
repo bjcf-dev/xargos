@@ -65,6 +65,14 @@ export function describeShock(priceBefore: string, priceAfter: string): string {
   return `${pair} (${SHOCK_CHANGE.format((after - before) / before)})`;
 }
 
+/** Hacia dónde movió el shock el precio; null si algún precio no es un número o no cambió. */
+export function shockTrend(priceBefore: string, priceAfter: string): "up" | "down" | null {
+  const before = priceBefore.trim() === "" ? Number.NaN : Number(priceBefore);
+  const after = priceAfter.trim() === "" ? Number.NaN : Number(priceAfter);
+  if (!Number.isFinite(before) || !Number.isFinite(after) || before === after) return null;
+  return after < before ? "down" : "up";
+}
+
 export type RevertCopy = {
   title: string;
   detail: string;
@@ -75,9 +83,8 @@ export type RevertCopy = {
 /** D15: "guard" solo si la cadena dice que falló el guard; si no, el paso que falló. */
 export function describeRevert(run: Run, failure: RevertFailure): RevertCopy {
   if (failure.guard) {
-    // Lo recibido lo mide la cadena (GUARD_FAIL); el mínimo es el que prometió el build.
-    const received = failure.guard.received;
-    const minimum = BigInt(run.build.guard.minDelta);
+    // D15: las dos cifras salen de lo que leyó la cadena (GUARD_FAIL), no del build.
+    const { received, min: minimum } = failure.guard;
     const shortfall = minimum > received ? minimum - received : 0n;
     const figures = {
       received: formatUnits(received, USDC_DECIMALS),
