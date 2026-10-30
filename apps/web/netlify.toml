@@ -1,13 +1,15 @@
-# Netlify — frontend de xARGOS (monorepo pnpm, package directory = apps/web)
-# Verificad en la UI de Netlify que detecta el monorepo y Next.js; el runtime de
-# Next.js en Netlify se aplica solo, no hace falta plugin manual.
+# Netlify — frontend de xARGOS (monorepo pnpm). En la UI: base directory vacío (la raíz)
+# y package directory = apps/web; este archivo se lee desde ahí. El install, el build y el
+# ignore corren en la raíz, así que las rutas van desde la raíz, no desde apps/web.
+# El runtime de Next.js en Netlify se aplica solo, no hace falta plugin manual.
 
 [build]
+  # Solo @xargos/web tiene script de build: `pnpm -r build` construye solo la web.
   command = "pnpm build"
-  publish = ".next"
+  publish = "apps/web/.next"
   # Salta el build si el commit no toca el front, el contrato ni el lockfile.
   # Exit 0 = no construir. Ahorra créditos (cada deploy de producción gasta 15).
-  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- ../../apps/web ../../packages/shared ../../pnpm-lock.yaml"
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- apps/web packages/shared pnpm-lock.yaml"
 
 [build.environment]
   NODE_VERSION = "22"
