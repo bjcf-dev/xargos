@@ -22,6 +22,11 @@ export const ConfigSchema = z.object({
   SETUP_MAX_JOBS: z.coerce.number().int().min(1).default(200),
   FUND_SOL_LAMPORTS: BaseUnitsNumber.default(20_000_000n),
   FUND_USDC_BASE: BaseUnitsNumber.default(50_000n),
+  /** How far the shock drops the pool price. 600 = 6%: well above the guard's 1% (D10). */
+  SHOCK_DROP_BPS: z.coerce.number().int().min(100).max(5_000).default(600),
+  /** Time the pool stays shocked before it is restored: longer than the 120 s free rebuild. */
+  SHOCK_COOLDOWN_MS: z.coerce.number().int().min(1_000).default(150_000),
+  SHOCK_RATE_LIMIT_PER_HOUR: z.coerce.number().int().min(1).default(30),
   POSITION_SOL_LAMPORTS: BaseUnitsNumber.default(50_000_000n),
 });
 export type Config = z.infer<typeof ConfigSchema>;
