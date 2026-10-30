@@ -101,6 +101,9 @@ if (DEMO === "B") {
       CODE ? { "x-xargos-access-code": CODE } : {},
     );
   }
+  if (shockRes.status !== 202) {
+    throw new Error(`price shock refused: ${shockRes.status} ${await shockRes.text()}`);
+  }
   const { shockId } = (await shockRes.json()) as { shockId: string };
   const shock = await until(
     async () =>

@@ -39,9 +39,6 @@ export function createShockRoutes(deps: ShockRoutesDeps) {
     if (deps.accessCode && !codeIsValid)
       return errorResponse(c, "ACCESS_DENIED", "Invalid access code");
 
-    if (!deps.limiter.allow(clientKey(c, codeIsValid))) {
-      return errorResponse(c, "RATE_LIMITED", "Too many price shocks, try later");
-    }
     const build = deps.store.latestLiveBuildFor(request.data.agent);
     if (!build) {
       return errorResponse(
@@ -50,8 +47,14 @@ export function createShockRoutes(deps: ShockRoutesDeps) {
         "Build the recipe first: the shock needs a live build",
       );
     }
+    // The gate comes BEFORE the rate limit: a client that is only waiting for the pool to recover
+    // must not use up its quota with every poll. Only a shock that really starts is counted.
     if (!deps.gate.tryStart()) {
       return errorResponse(c, "RATE_LIMITED", "The pool is busy or recovering, try again soon");
+    }
+    if (!deps.limiter.allow(clientKey(c, codeIsValid))) {
+      deps.gate.release();
+      return errorResponse(c, "RATE_LIMITED", "Too many price shocks, try later");
     }
 
     const shockId = `shk_${randomUUID()}`;

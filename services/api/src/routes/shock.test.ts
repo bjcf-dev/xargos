@@ -157,10 +157,28 @@ describe("POST /demo/price-shock", () => {
     expect((await post({ "x-xargos-access-code": "secret-code" })).status).toBe(202);
   });
 
-  it("rate limits requests", async () => {
-    const { post } = setup({ limit: 1 });
-    expect((await post()).status).toBe(202);
-    expect((await post()).status).toBe(429);
+  it("rate limits the shocks that really start", async () => {
+    const failing = steps({
+      shock: async () => {
+        throw new Error("rpc down");
+      },
+    });
+    const { post, status } = setup({ limit: 1, steps: failing });
+    const first = (await (await post()).json()) as { shockId: string };
+    await vi.waitFor(async () => expect((await status(first.shockId)).status).toBe("failed"));
+    const second = await post(); // the gate is free again, so this one is stopped by the limit
+    expect(second.status).toBe(429);
+    expect(ErrorResponse.parse(await second.json()).error.message).toMatch(/too many/i);
+  });
+
+  it("does not use up the quota while it only waits for the pool to recover", async () => {
+    const { post, status, scheduled } = setup({ limit: 2 });
+    const first = (await (await post()).json()) as { shockId: string };
+    await vi.waitFor(async () => expect((await status(first.shockId)).status).toBe("confirmed"));
+
+    for (let i = 0; i < 5; i++) expect((await post()).status).toBe(429); // busy: not counted
+    scheduled[0]?.task(); // the restore finishes and the gate opens
+    await vi.waitFor(async () => expect((await post()).status).toBe(202)); // 2nd of 2: allowed
   });
 
   it("rejects a malformed body and an unknown shock", async () => {
