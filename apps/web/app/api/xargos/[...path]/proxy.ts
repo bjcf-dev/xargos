@@ -14,6 +14,13 @@ export type ProxyConfig = {
 /** Netlify corta las funciones a ~10 s y el backend responde en < 8 s (D25). */
 export const UPSTREAM_TIMEOUT_MS = 9_000;
 
+/** Cabecera con la que el backend recibe el código en el price shock (B12). */
+export const ACCESS_CODE_HEADER = "x-xargos-access-code";
+/** Cabecera con la IP del navegador para el límite del backend; solo la pone el proxy. */
+export const CLIENT_IP_HEADER = "x-xargos-client-ip";
+/** Netlify pone aquí la IP de la conexión. */
+const NETLIFY_CLIENT_IP = "x-nf-client-connection-ip";
+
 /** Primer segmento de las rutas del contrato; lo demás no sale hacia el backend. */
 const ALLOWED_ROOTS = new Set(["recipes", "demo", "executions"]);
 
@@ -46,6 +53,29 @@ function errorResponse(code: ErrorCode, message: string): Response {
     status: ERROR_HTTP[code].status,
     headers: { "cache-control": "no-store" },
   });
+}
+
+/**
+ * El backend no contestó: un 502/504 sin cuerpo del contrato. Con un error del contrato el cliente
+ * creería que el backend rechazó la petición y que x402 no cobró (D17), y tras un build que se
+ * pasó de tiempo ofrecería "Try again", que podría cobrar otra vez.
+ */
+function gatewayResponse(status: 502 | 504): Response {
+  return new Response(null, { status, headers: { "cache-control": "no-store" } });
+}
+
+/** Las cabeceras que salen hacia el backend: las de la lista y las que pone solo el proxy. */
+function upstreamHeaders(
+  request: Request,
+  path: string[],
+  accessCode: string | undefined,
+): Headers {
+  const headers = pickHeaders(request.headers, FORWARDED_REQUEST_HEADERS);
+  const ip = request.headers.get(NETLIFY_CLIENT_IP);
+  if (ip) headers.set(CLIENT_IP_HEADER, ip);
+  const isShock = request.method === "POST" && path.join("/") === "demo/price-shock";
+  if (isShock && accessCode) headers.set(ACCESS_CODE_HEADER, accessCode);
+  return headers;
 }
 
 function upstreamUrl(backendUrl: string, path: string[], search: string): string {
@@ -93,13 +123,13 @@ export function createXargosProxy(config: ProxyConfig) {
     try {
       upstream = await doFetch(upstreamUrl(backendUrl, path, new URL(request.url).search), {
         method,
-        headers: pickHeaders(request.headers, FORWARDED_REQUEST_HEADERS),
+        headers: upstreamHeaders(request, path, accessCode),
         signal: AbortSignal.timeout(timeoutMs),
         ...(hasBody ? { body: await requestBody(request, path, accessCode) } : {}),
       });
     } catch (e) {
       const timedOut = e instanceof DOMException && e.name === "TimeoutError";
-      return errorResponse("INTERNAL", timedOut ? "Backend timed out." : "Backend is unreachable.");
+      return gatewayResponse(timedOut ? 504 : 502);
     }
 
     return new Response(upstream.body, {

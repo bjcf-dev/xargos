@@ -1,7 +1,11 @@
 // @vitest-environment node
-import { ErrorResponse } from "@xargos/shared";
+import { ErrorResponse, fixtureSetupReady } from "@xargos/shared";
 import { describe, expect, it } from "vitest";
+import { createApiClient } from "@/lib/api/client";
+import { ApiClientError } from "@/lib/api/errors";
 import { createXargosProxy } from "./proxy";
+
+const AGENT = fixtureSetupReady.agent;
 
 const WEB = "http://web.local/api/xargos";
 const BACK = "http://back.local";
@@ -262,32 +266,118 @@ describe("createXargosProxy access code", () => {
   });
 });
 
-describe("createXargosProxy backend failures", () => {
-  it("answers 500 INTERNAL when the backend is unreachable", async () => {
-    const fetch = (async () => {
-      throw new TypeError("fetch failed");
-    }) as typeof globalThis.fetch;
-    const proxy = createXargosProxy({ backendUrl: BACK, fetch });
+describe("createXargosProxy demo headers", () => {
+  const shock = (headers: Record<string, string> = {}) =>
+    new Request(`${WEB}/demo/price-shock`, {
+      method: "POST",
+      body: JSON.stringify({ agent: "A" }),
+      headers,
+    });
 
-    const res = await proxy(new Request(`${WEB}/recipes`), ["recipes"]);
+  it("sends the access code in x-xargos-access-code on POST /demo/price-shock", async () => {
+    const { fetch, calls } = fakeFetch();
+    const proxy = createXargosProxy({ backendUrl: BACK, accessCode: "s3cret", fetch });
 
-    expect(res.status).toBe(500);
-    expect(ErrorResponse.parse(await res.json()).error.code).toBe("INTERNAL");
+    await proxy(shock(), ["demo", "price-shock"]);
+
+    expect(calls[0]?.headers.get("x-xargos-access-code")).toBe("s3cret");
+    expect(calls[0]?.body).toBe(JSON.stringify({ agent: "A" }));
   });
 
-  it("answers 500 INTERNAL when the backend is too slow", async () => {
-    const fetch = ((_input: RequestInfo | URL, init?: RequestInit) =>
-      new Promise((_resolve, reject) => {
-        init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
-      })) as typeof globalThis.fetch;
-    const proxy = createXargosProxy({ backendUrl: BACK, fetch, timeoutMs: 20 });
+  it("sends the access code nowhere else", async () => {
+    const { fetch, calls } = fakeFetch();
+    const proxy = createXargosProxy({ backendUrl: BACK, accessCode: "s3cret", fetch });
+    const body = JSON.stringify({ agent: "A", position: "P" });
+
+    await proxy(new Request(`${WEB}/recipes/r1/build`, { method: "POST", body }), [
+      "recipes",
+      "r1",
+      "build",
+    ]);
+    await proxy(new Request(`${WEB}/demo/price-shock/s1`), ["demo", "price-shock", "s1"]);
+
+    expect(calls.map((c) => c.headers.get("x-xargos-access-code"))).toEqual([null, null]);
+  });
+
+  it("never forwards an access code or client IP the browser sends", async () => {
+    const { fetch, calls } = fakeFetch();
+    const proxy = createXargosProxy({ backendUrl: BACK, fetch });
+
+    await proxy(shock({ "x-xargos-access-code": "guess", "x-xargos-client-ip": "1.2.3.4" }), [
+      "demo",
+      "price-shock",
+    ]);
+
+    expect(calls[0]?.headers.get("x-xargos-access-code")).toBeNull();
+    expect(calls[0]?.headers.get("x-xargos-client-ip")).toBeNull();
+  });
+
+  // El backend cuenta su límite por esta IP, y solo se fía de ella si el código es válido.
+  it("passes the IP Netlify saw as x-xargos-client-ip", async () => {
+    const { fetch, calls } = fakeFetch();
+    const proxy = createXargosProxy({ backendUrl: BACK, accessCode: "s3cret", fetch });
+    const ip = { "x-nf-client-connection-ip": "203.0.113.7" };
+
+    await proxy(shock(ip), ["demo", "price-shock"]);
+    await proxy(new Request(`${WEB}/demo/setup`, { method: "POST", body: "{}", headers: ip }), [
+      "demo",
+      "setup",
+    ]);
+
+    expect(calls.map((c) => c.headers.get("x-xargos-client-ip"))).toEqual([
+      "203.0.113.7",
+      "203.0.113.7",
+    ]);
+  });
+});
+
+describe("createXargosProxy backend failures", () => {
+  const unreachable = (async () => {
+    throw new TypeError("fetch failed");
+  }) as typeof globalThis.fetch;
+  const hanging = ((_input: RequestInfo | URL, init?: RequestInit) =>
+    new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+    })) as typeof globalThis.fetch;
+
+  // Sin respuesta del backend no se sabe si x402 liquidó: no puede ir un error del contrato,
+  // que el cliente leería como rechazo y ofrecería "Try again" (cobraría otra vez, D17).
+  it("answers 502 without a contract body when the backend is unreachable", async () => {
+    const proxy = createXargosProxy({ backendUrl: BACK, fetch: unreachable });
 
     const res = await proxy(new Request(`${WEB}/recipes`), ["recipes"]);
 
-    expect(res.status).toBe(500);
-    const { error } = ErrorResponse.parse(await res.json());
-    expect(error.code).toBe("INTERNAL");
-    expect(error.message).toMatch(/time/i);
+    expect(res.status).toBe(502);
+    expect(await res.text()).toBe("");
+    expect(res.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("answers 504 without a contract body when the backend is too slow", async () => {
+    const proxy = createXargosProxy({ backendUrl: BACK, fetch: hanging, timeoutMs: 20 });
+
+    const res = await proxy(new Request(`${WEB}/recipes`), ["recipes"]);
+
+    expect(res.status).toBe(504);
+    expect(await res.text()).toBe("");
+  });
+
+  it("reaches the client as unreachable, not as a rejected payment", async () => {
+    const proxy = createXargosProxy({ backendUrl: BACK, fetch: hanging, timeoutMs: 20 });
+    const api = createApiClient({
+      baseUrl: WEB,
+      fetch: (input, init) => {
+        const request = new Request(input, init);
+        const path = new URL(request.url).pathname.replace("/api/xargos/", "").split("/");
+        return proxy(request, path);
+      },
+    });
+
+    const error = await api
+      .build("r1", { agent: AGENT, position: AGENT })
+      .catch((e: unknown) => e as ApiClientError);
+
+    expect(error).toBeInstanceOf(ApiClientError);
+    expect(error).toMatchObject({ unreachable: true, rejected: false });
   });
 });
 
