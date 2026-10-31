@@ -146,4 +146,59 @@ describe("verifyRecipeTransaction", () => {
   it("rejects garbage", () => {
     expect(verifyRecipeTransaction("AAAA", build(), AGENT).ok).toBe(false);
   });
+
+  it("rejects a second snapshot, which would reset the base after a theft", () => {
+    const steal: Instruction = {
+      programAddress: address("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"),
+      accounts,
+      data: new Uint8Array([3]),
+    };
+    const result = verifyRecipeTransaction(
+      tx([snapshot, steal, snapshot, assertMin(9_900_000n)]),
+      build(3),
+      AGENT,
+    );
+    expect(result).toMatchObject({ ok: false, reason: expect.stringMatching(/guard must run/) });
+  });
+
+  const TOKEN = address("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+  const TOKEN_2022 = address("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
+  it.each([
+    ["System Assign", SYSTEM, [1, 0, 0, 0]],
+    ["System AssignWithSeed", SYSTEM, [10, 0, 0, 0]],
+    ["Token Approve", TOKEN, [4]],
+    ["Token SetAuthority", TOKEN, [6]],
+    ["Token ApproveChecked", TOKEN, [13]],
+    ["Token-2022 Approve", TOKEN_2022, [4]],
+    ["Token-2022 SetAuthority", TOKEN_2022, [6]],
+    ["Token-2022 ApproveChecked", TOKEN_2022, [13]],
+  ] as const)(
+    "rejects %s, which gives an account away without moving a balance",
+    (_n, program, data) => {
+      const evil: Instruction = {
+        programAddress: program,
+        accounts: [],
+        data: new Uint8Array(data),
+      };
+      const result = verifyRecipeTransaction(
+        tx([snapshot, evil, assertMin(9_900_000n)]),
+        build(),
+        AGENT,
+      );
+      expect(result).toMatchObject({
+        ok: false,
+        reason: expect.stringMatching(/Forbidden instruction/),
+      });
+    },
+  );
+
+  it("still lets through what the recipe needs: a SOL transfer, wrapping and closing", () => {
+    const close: Instruction = { programAddress: TOKEN, accounts: [], data: new Uint8Array([9]) };
+    const result = verifyRecipeTransaction(
+      tx([snapshot, middle, close, assertMin(9_900_000n)]),
+      build(3),
+      AGENT,
+    );
+    expect(result).toEqual({ ok: true });
+  });
 });
