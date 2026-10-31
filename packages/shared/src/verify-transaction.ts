@@ -19,6 +19,32 @@ export const RECIPE_PROGRAMS = [
 const SNAPSHOT = [144, 236, 6, 133, 233, 160, 21, 94];
 const ASSERT_MIN_DELTA = [250, 209, 147, 108, 157, 58, 206, 34];
 
+const SYSTEM_PROGRAM = "11111111111111111111111111111111";
+const TOKEN_PROGRAMS = new Set<string>([
+  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+]);
+// These move no balance, so a simulation does not show them, but they hand over the account.
+const SYSTEM_FORBIDDEN = new Map([
+  [1, "Assign"],
+  [10, "AssignWithSeed"],
+]);
+const TOKEN_FORBIDDEN = new Map([
+  [4, "Approve"],
+  [6, "SetAuthority"],
+  [13, "ApproveChecked"],
+]);
+
+/** The name of an instruction that gives away control of an account, if `data` is one. */
+function forbiddenInstruction(program: string, data: ArrayLike<number>): string | undefined {
+  if (program === SYSTEM_PROGRAM) {
+    // System instructions start with a little-endian u32.
+    const type = (data[0] ?? 0) + (data[1] ?? 0) * 256 + (data[2] ?? 0) * 65_536;
+    return (data[3] ?? 0) === 0 ? SYSTEM_FORBIDDEN.get(type) : undefined;
+  }
+  return TOKEN_PROGRAMS.has(program) ? TOKEN_FORBIDDEN.get(data[0] ?? -1) : undefined;
+}
+
 const startsWith = (data: ArrayLike<number>, prefix: number[]) =>
   prefix.every((b, i) => data[i] === b);
 
@@ -33,7 +59,8 @@ export type RecipeCheck = { ok: true } | { ok: false; reason: string };
  * What an agent checks before signing, so it does not have to trust the service: the agent is the
  * only signer, only known programs run, the guard opens and closes the tx over the agent's token
  * account, and the minimum on-chain is the one in the response. It does NOT prove what happens to
- * the agent's other balances: simulate the tx and compare `watchAccounts` for that.
+ * the agent's other balances: simulate the tx and compare `watchAccounts` for that. It also
+ * refuses the instructions a simulation cannot show, the ones that hand over control of an account.
  */
 export function verifyRecipeTransaction(
   transaction: string,
@@ -64,11 +91,22 @@ export function verifyRecipeTransaction(
   for (const ix of instructions) {
     const program = accounts[ix.programAddressIndex];
     if (!program || !allowed.has(program)) return fail(`Unexpected program: ${program}`);
+    const forbidden = forbiddenInstruction(program, ix.data ?? []);
+    if (forbidden) return fail(`Forbidden instruction: ${forbidden}`);
   }
 
   const { snapshotIndex, assertIndex, watchedAccount, minDelta, programId } = build.guard;
   const watchedAt = (ix: (typeof instructions)[number], position: number) =>
     accounts[ix.accountIndices?.[position] ?? -1] === watchedAccount;
+
+  // A second `snapshot` needs no signature and would reset the base after a theft: the guard may
+  // appear only where the response says.
+  const guardCalls = instructions.flatMap((ix, index) =>
+    accounts[ix.programAddressIndex] === programId ? [index] : [],
+  );
+  if (guardCalls.length !== 2 || guardCalls[0] !== snapshotIndex || guardCalls[1] !== assertIndex) {
+    return fail("The guard must run exactly at the snapshot and at the assert");
+  }
 
   const snapshot = instructions[snapshotIndex];
   if (
