@@ -14,9 +14,16 @@ export type BuildContext = {
   agent: Address;
   /** Mint of the position NFT (the contract calls it `position`). */
   position: Address;
+  /**
+   * Set on a free rebuild (D19): the quote promised at the first payment. Prices may have moved
+   * since, and re-quoting would move the guard's minimum with them and defeat it (lesson 10).
+   */
+  fixed?: { expectedOut: bigint; minDelta: bigint };
 };
 
 export type BuiltRecipe = {
+  /** Pool sqrtPrice used for the quote; the shock aims below it. */
+  quoteSqrtPrice?: bigint;
   steps: RecipeStep[];
   quote: BuildResponse["quote"];
   guard: Omit<BuildResponse["guard"], "snapshotIndex" | "assertIndex">;

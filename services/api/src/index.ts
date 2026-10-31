@@ -6,11 +6,22 @@ import {
   createSolanaRpc,
   createSolanaRpcSubscriptions,
 } from "@solana/kit";
+import { x402Facilitator } from "@x402/core/facilitator";
+import { SOLANA_DEVNET_CAIP2, toFacilitatorSvmSigner } from "@x402/svm";
+import { registerExactSvmScheme as registerFacilitator } from "@x402/svm/exact/facilitator";
 import { createApp } from "./app";
 import { parseConfig } from "./config";
+import { ShockGate, ShockJobs } from "./demo/shock";
+import { createShockSteps } from "./demo/shock-steps";
 import { createSetupSteps } from "./demo/steps";
+import { RateLimiter } from "./http/rate-limit";
+import { asFacilitatorClient } from "./payment/local-facilitator";
+import { createExitOrcaLpRecipe } from "./recipes/exit-orca-lp";
+import { createRecipeRoutes } from "./routes/recipes";
+import { createShockRoutes } from "./routes/shock";
 import { assertDevnet } from "./solana/assert-devnet";
 import { createSender } from "./solana/send";
+import { BuildStore } from "./store/build-store";
 
 const config = parseConfig(process.env);
 if (!config.DEMO_ACCESS_CODE) {
@@ -25,7 +36,52 @@ const payer = await createKeyPairSignerFromBytes(
 );
 const rpcSubscriptions = createSolanaRpcSubscriptions(config.RPC_URL.replace(/^http/, "ws"));
 
+// x402: the backend settles its own payments with the payer key (ADR 0001, D18).
+const facilitator = new x402Facilitator();
+registerFacilitator(facilitator, {
+  signer: toFacilitatorSvmSigner(payer),
+  networks: SOLANA_DEVNET_CAIP2,
+});
+const recipe = createExitOrcaLpRecipe({
+  rpc,
+  whirlpool: address(config.WHIRLPOOL_ADDRESS),
+  usdcMint: address(config.DEMO_USDC_MINT),
+  guardProgram: address(config.GUARD_PROGRAM_ID),
+  priceAmount: config.RECIPE_PRICE_BASE_UNITS.toString(),
+  priceMint: address(config.USDC_MINT),
+});
+const dollars = (Number(config.RECIPE_PRICE_BASE_UNITS) / 1_000_000).toFixed(6);
+
+const buildStore = new BuildStore();
+const log = { error: (data: object, message: string) => console.error(message, data) };
+
 const app = createApp({
+  shockRoutes: createShockRoutes({
+    jobs: new ShockJobs(),
+    gate: new ShockGate(),
+    steps: createShockSteps({
+      rpc,
+      send: createSender(rpc, rpcSubscriptions, payer),
+      payer,
+      whirlpool: address(config.WHIRLPOOL_ADDRESS),
+      demoUsdc: address(config.DEMO_USDC_MINT),
+      dropBps: config.SHOCK_DROP_BPS,
+    }),
+    store: buildStore,
+    limiter: new RateLimiter(config.SHOCK_RATE_LIMIT_PER_HOUR, 60 * 60 * 1000),
+    cooldownMs: config.SHOCK_COOLDOWN_MS,
+    accessCode: config.DEMO_ACCESS_CODE,
+    log,
+  }),
+  recipeRoutes: createRecipeRoutes({
+    recipes: [recipe],
+    rpc,
+    store: buildStore,
+    facilitator: asFacilitatorClient(facilitator),
+    payTo: config.PAY_TO_ADDRESS,
+    price: `$${dollars}`,
+    log: { error: (data, message) => console.error(message, data) },
+  }),
   steps: createSetupSteps({
     rpc,
     send: createSender(rpc, rpcSubscriptions, payer),

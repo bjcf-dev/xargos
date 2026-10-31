@@ -25,7 +25,7 @@ export const CLIENT_IP_HEADER = "x-xargos-client-ip";
  * never used. The proxy's header is trusted only with a valid access code; otherwise it is the
  * address of the connection itself.
  */
-function clientKey(c: Context, trustedProxy: boolean): string {
+export function clientKey(c: Context, trustedProxy: boolean): string {
   const forwarded = trustedProxy ? c.req.header(CLIENT_IP_HEADER)?.trim() : undefined;
   if (forwarded) return forwarded;
   try {
@@ -35,7 +35,7 @@ function clientKey(c: Context, trustedProxy: boolean): string {
   }
 }
 
-function sameCode(given: string | undefined, expected: string): boolean {
+export function sameCode(given: string | undefined, expected: string): boolean {
   const a = Buffer.from(given ?? "");
   const b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);
