@@ -19,6 +19,7 @@ import { asFacilitatorClient } from "./payment/local-facilitator";
 import { createExitOrcaLpRecipe } from "./recipes/exit-orca-lp";
 import { createRecipeRoutes } from "./routes/recipes";
 import { createShockRoutes } from "./routes/shock";
+import { assertDevnet } from "./solana/assert-devnet";
 import { createSender } from "./solana/send";
 import { BuildStore } from "./store/build-store";
 
@@ -27,10 +28,12 @@ if (!config.DEMO_ACCESS_CODE) {
   // Without the code anyone can start setups that cost the payer SOL: fine locally, not in Railway.
   console.warn("DEMO_ACCESS_CODE is not set: /demo/setup is open to anyone");
 }
+const rpc = createSolanaRpc(config.RPC_URL);
+// SOLANA_CLUSTER is only an env var: ask the RPC itself before any key is read or any SOL moves.
+await assertDevnet(rpc);
 const payer = await createKeyPairSignerFromBytes(
   Uint8Array.from(JSON.parse(readFileSync(config.PAYER_KEYPAIR_PATH, "utf8"))),
 );
-const rpc = createSolanaRpc(config.RPC_URL);
 const rpcSubscriptions = createSolanaRpcSubscriptions(config.RPC_URL.replace(/^http/, "ws"));
 
 // x402: the backend settles its own payments with the payer key (ADR 0001, D18).

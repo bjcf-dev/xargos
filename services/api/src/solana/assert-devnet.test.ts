@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertDevnet, DEVNET_GENESIS_HASH } from "./common";
+import { assertDevnet, DEVNET_GENESIS_HASH } from "./assert-devnet";
 
 const answering = (hash: string) => ({ getGenesisHash: () => ({ send: async () => hash }) });
 
