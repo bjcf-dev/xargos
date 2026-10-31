@@ -20,7 +20,6 @@ export const DEFAULT_BASE_URL = "/api/xargos";
 export type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
 export type ApiClientOptions = {
-  /** Inyectable: en F8 será el fetch envuelto por @x402/fetch. */
   fetch?: FetchLike;
   baseUrl?: string;
 };
@@ -28,6 +27,14 @@ export type ApiClientOptions = {
 export type CallOptions = {
   /** Para cancelar la petición en vuelo (p. ej. al desmontar la pantalla). */
   signal?: AbortSignal;
+};
+
+export type BuildCallOptions = CallOptions & {
+  /**
+   * El fetch que paga x402 (lib/x402/payer, F8). Solo lo pasa un build nuevo: el rebuild gratis
+   * (D19) va sin él, así que no puede pagar aunque el backend pidiera un 402.
+   */
+  pay?: FetchLike;
 };
 
 export type BuildResult = {
@@ -62,11 +69,11 @@ export function createApiClient({
     schema: S,
     path: string,
     body: unknown,
-    { signal }: CallOptions = {},
+    { signal, pay }: BuildCallOptions = {},
   ): Promise<{ data: z.output<S>; headers: Headers }> {
     let response: Response;
     try {
-      response = await fetch(
+      response = await (pay ?? fetch)(
         `${baseUrl}${path}`,
         body === undefined
           ? { method: "GET", signal: signal ?? null }
@@ -80,6 +87,8 @@ export function createApiClient({
     } catch (cause) {
       // Cancelar no es un error de red: se propaga tal cual, como en pollUntil.
       if (signal?.aborted) throw cause;
+      // El agente no quiso o no pudo pagar (lib/x402/payer): ya trae su código, no es la red.
+      if (cause instanceof ApiClientError) throw cause;
       throw new ApiClientError("INTERNAL", "Network error", { cause, unreachable: true });
     }
 
@@ -144,7 +153,7 @@ export function createApiClient({
     build: async (
       recipeId: string,
       body: BuildRequest,
-      options?: CallOptions,
+      options?: BuildCallOptions,
     ): Promise<BuildResult> => {
       const { data, headers } = await send(BuildResponse, routes.build(recipeId), body, options);
       const paymentResponse = headers.get("PAYMENT-RESPONSE");

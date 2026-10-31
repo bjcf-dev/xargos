@@ -59,7 +59,7 @@ All on **Solana devnet**. Contribution flow: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Allowed by the organizers as long as it is disclosed (confirmed by Encode, Oct 20, 2026).
 - Tooling and libraries: pnpm, TypeScript, Biome, Vitest, Zod, lefthook (see `package.json` files).
-  Frontend (`apps/web`): Next.js, React, Tailwind CSS, next-themes, Base UI, lucide-react, class-variance-authority, cn, tw-animate-css, `@solana/kit`, `@solana-program/system`, Testing Library, jsdom, MSW.
+  Frontend (`apps/web`): Next.js, React, Tailwind CSS, next-themes, Base UI, lucide-react, class-variance-authority, cn, tw-animate-css, `@solana/kit`, `@solana-program/system`, the official x402 client packages `@x402/core`, `@x402/svm`, `@x402/fetch` (the agent pays the recipe from the browser), Testing Library, jsdom, MSW.
   Backend (`services/api`): Hono, `@hono/node-server`, tsx, `@solana/kit`, `@solana-program/token`, and the official x402 packages `@x402/core`, `@x402/svm`, `@x402/hono`, `@x402/fetch`, and the Orca SDK `@orca-so/whirlpools` (devnet pool scripts in `services/api/src/scripts/orca`).
   Guard program (`programs/guard`): Rust, Anchor (`anchor-lang`, `anchor-spl`), tests with LiteSVM (`litesvm`, `litesvm-token`), built with `anchor build`; the layout follows the `anchor init` template (Anchor CLI 1.0.1), with all program code written during the hackathon. Guard client (`packages/guard-client`): generated with [Codama](https://github.com/codama-idl/codama) (`codama`, `@codama/nodes-from-anchor`, `@codama/renderers-js`); `src/generated` is Codama output (MIT), regenerated with `pnpm --filter @xargos/guard-client generate`.
 - Scaffolds:
