@@ -36,8 +36,12 @@ export function createShockRoutes(deps: ShockRoutesDeps) {
 
     const code = c.req.header("x-xargos-access-code");
     const codeIsValid = deps.accessCode !== undefined && sameCode(code, deps.accessCode);
-    if (deps.accessCode && !codeIsValid)
+    if (deps.accessCode && !codeIsValid) {
+      // Wrong codes do use up the quota: otherwise this is a free way to guess the code.
+      const allowed = deps.limiter.allow(clientKey(c, false));
+      if (!allowed) return errorResponse(c, "RATE_LIMITED", "Too many price shocks, try later");
       return errorResponse(c, "ACCESS_DENIED", "Invalid access code");
+    }
 
     const build = deps.store.latestLiveBuildFor(request.data.agent);
     if (!build) {
@@ -71,7 +75,7 @@ export function createShockRoutes(deps: ShockRoutesDeps) {
 
   app.get("/demo/price-shock/:shockId", (c) => {
     const job = deps.jobs.get(c.req.param("shockId"));
-    if (!job) return errorResponse(c, "VALIDATION_ERROR", "Unknown shock");
+    if (!job) return errorResponse(c, "NOT_FOUND", "Unknown shock");
     return c.json(job);
   });
 

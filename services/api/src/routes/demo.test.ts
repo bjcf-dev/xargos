@@ -18,7 +18,14 @@ const steps = (overrides: Partial<SetupSteps> = {}): SetupSteps => ({
 });
 
 function setup(
-  options: { accessCode?: string; limit?: number; maxJobs?: number; steps?: SetupSteps } = {},
+  options: {
+    accessCode?: string;
+    limit?: number;
+    maxJobs?: number;
+    steps?: SetupSteps;
+    global?: number;
+    hasFunds?: () => Promise<boolean>;
+  } = {},
 ) {
   const jobs = new SetupJobs(options.maxJobs);
   const app = createDemoRoutes({
@@ -26,6 +33,8 @@ function setup(
     steps: options.steps ?? steps(),
     limiter: new RateLimiter(options.limit ?? 10, 60_000),
     accessCode: options.accessCode,
+    ...(options.global ? { globalLimiter: new RateLimiter(options.global, 60_000) } : {}),
+    ...(options.hasFunds ? { hasFunds: options.hasFunds } : {}),
   });
   const post = (body: unknown, headers: Record<string, string> = {}) =>
     app.request("/demo/setup", {
@@ -106,6 +115,43 @@ describe("POST /demo/setup", () => {
     await post({ agent: AGENT });
     await post({ agent: AGENT });
     await vi.waitFor(() => expect(fundSol).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe("limits of POST /demo/setup (P0-1, P1-6)", () => {
+  const other = "Vote111111111111111111111111111111111111111";
+
+  it("counts wrong access codes, so 20 guesses end in RATE_LIMITED", async () => {
+    const { post } = setup({ accessCode: "secret-code", limit: 5 });
+    const codes: number[] = [];
+    for (let i = 0; i < 20; i++) {
+      codes.push((await post({ agent: AGENT, accessCode: `guess-${i}` })).status);
+    }
+    expect(codes.slice(0, 5).every((status) => status === 403)).toBe(true);
+    expect(codes.slice(5).every((status) => status === 429)).toBe(true);
+  });
+
+  it("caps setups across every client, on top of the limit per IP", async () => {
+    const { post } = setup({ accessCode: "c", global: 1 });
+    const send = (agent: string, ip: string) =>
+      post({ agent, accessCode: "c" }, { "x-xargos-client-ip": ip });
+    expect((await send(AGENT, "1.1.1.1")).status).toBe(202);
+    expect((await send(other, "2.2.2.2")).status).toBe(429);
+  });
+
+  it("does not use up the global cap by polling the same running setup", async () => {
+    const never = () => new Promise<void>(() => {});
+    const { post } = setup({ global: 1, steps: steps({ fundSol: never }) });
+    expect((await post({ agent: AGENT })).status).toBe(202);
+    expect((await post({ agent: AGENT })).status).toBe(202);
+  });
+
+  it("refuses a new setup with a clear error when the payer is short of funds", async () => {
+    const { post, jobs } = setup({ hasFunds: async () => false });
+    const res = await post({ agent: AGENT });
+    expect(res.status).toBe(500);
+    expect((await errorBody(res)).error.code).toBe("SETUP_FAILED");
+    expect(jobs.get(AGENT)).toBeUndefined();
   });
 });
 
@@ -204,6 +250,6 @@ describe("GET /demo/setup/:agent", () => {
   it("rejects an invalid or unknown agent", async () => {
     const { app } = setup();
     expect((await app.request("/demo/setup/xyz")).status).toBe(400);
-    expect((await app.request(`/demo/setup/${AGENT}`)).status).toBe(400);
+    expect((await app.request(`/demo/setup/${AGENT}`)).status).toBe(404);
   });
 });
