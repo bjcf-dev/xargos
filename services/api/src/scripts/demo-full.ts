@@ -14,7 +14,12 @@ import { x402Client } from "@x402/core/client";
 import { wrapFetchWithPayment } from "@x402/fetch";
 import { toClientSvmSigner } from "@x402/svm";
 import { registerExactSvmScheme } from "@x402/svm/exact/client";
-import { BuildResponse, DemoSetupStatus, PriceShockStatus } from "@xargos/shared";
+import {
+  BuildResponse,
+  DemoSetupStatus,
+  PriceShockStatus,
+  verifyRecipeTransaction,
+} from "@xargos/shared";
 import { explorerTx, RPC_URL } from "./orca/common";
 
 const API = process.env.API_URL ?? "http://localhost:8799";
@@ -88,6 +93,15 @@ console.log(
 if (!buildRes.ok) throw new Error(`build failed: ${await buildRes.text()}`);
 const build = BuildResponse.parse(await buildRes.json());
 console.log(at(), "minDelta", build.guard.minDelta, "expectedOut", build.quote.expectedOut);
+const check = verifyRecipeTransaction(build.transaction, build, agent.address);
+console.log(
+  at(),
+  "verify before signing:",
+  JSON.stringify(check),
+  "watch",
+  build.watchAccounts.length,
+);
+if (!check.ok) throw new Error(`refusing to sign: ${check.reason}`);
 
 // 3. Demo B: move the pool between the quote and the execution.
 if (DEMO === "B") {

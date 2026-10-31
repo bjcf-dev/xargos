@@ -5,7 +5,7 @@ import {
   swapInstructions,
   WhirlpoolDeployment,
 } from "@orca-so/whirlpools";
-import { type Address, createNoopSigner, type Rpc, type SolanaRpcApi } from "@solana/kit";
+import { type Address, address, createNoopSigner, type Rpc, type SolanaRpcApi } from "@solana/kit";
 import { findAssociatedTokenPda, TOKEN_PROGRAM_ADDRESS } from "@solana-program/token";
 import {
   findSnapshotStatePda,
@@ -24,6 +24,8 @@ import { withCollectFees } from "./collect-fees";
 import { tagStep } from "./steps";
 
 /** Same id as the contract fixture (packages/shared), which the front looks up. */
+const TOKEN_2022_PROGRAM = address("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
+
 export const EXIT_ORCA_LP_ID = "exit-orca-lp-to-usdc";
 
 export type ExitOrcaLpDeps = {
@@ -99,6 +101,16 @@ export function createExitOrcaLpRecipe(deps: ExitOrcaLpDeps): Recipe {
         mint: deps.usdcMint,
         tokenProgram: TOKEN_PROGRAM_ADDRESS,
       });
+      const [wsolAccount] = await findAssociatedTokenPda({
+        owner: agent,
+        mint: WSOL_MINT,
+        tokenProgram: TOKEN_PROGRAM_ADDRESS,
+      });
+      const [positionAccount] = await findAssociatedTokenPda({
+        owner: agent,
+        mint: position,
+        tokenProgram: TOKEN_2022_PROGRAM,
+      });
       const [snapshot] = await findSnapshotStatePda(
         { agent, mint: deps.usdcMint },
         { programAddress: deps.guardProgram },
@@ -134,6 +146,8 @@ export function createExitOrcaLpRecipe(deps: ExitOrcaLpDeps): Recipe {
 
       return {
         quoteSqrtPrice: pool.sqrtPrice,
+        // SOL (the wallet), demo USDC, wSOL and the position NFT: all the agent has at stake here.
+        watchAccounts: [watchedAccount, agent, wsolAccount, positionAccount],
         steps,
         quote: {
           tokenOut: deps.usdcMint,
