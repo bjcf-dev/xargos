@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api as defaultApi } from "@/lib/api";
-import type { ApiClient } from "@/lib/api/client";
+import type { ApiClient, FetchLike } from "@/lib/api/client";
 import { ApiClientError } from "@/lib/api/errors";
 import { apiMode } from "@/lib/api/mode";
 import { paymentMayHaveSettled } from "./copy";
@@ -21,6 +21,8 @@ type UseDemoOptions = {
   recipeId: string;
   /** recipe.price.mint: el signer vigila la cuenta del agente con la que paga x402. */
   paymentMint?: string | undefined;
+  /** El fetch que paga x402 con la clave del agente (F8); sin él, el build no paga (mock). */
+  payer?: FetchLike | undefined;
   /** Dirección del agente: la de las fixtures en mock, la de este navegador fuera (useAgent). */
   agent: string;
   api?: ApiClient;
@@ -36,6 +38,7 @@ type UseDemoOptions = {
 export function useDemo({
   recipeId,
   paymentMint,
+  payer,
   agent,
   api = defaultApi,
   signer,
@@ -50,6 +53,7 @@ export function useDemo({
     signer: (signer === undefined ? modeSigner : signer) ?? noSigner,
     recipeId,
     ...(paymentMint ? { paymentMint } : {}),
+    ...(payer ? { payer } : {}),
     ...(pollIntervalMs ? { pollIntervalMs } : {}),
   };
 

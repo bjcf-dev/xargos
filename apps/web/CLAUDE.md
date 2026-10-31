@@ -30,6 +30,7 @@ components/ui/              # shadcn
 - **Ninguna cifra escrita a mano:** todo sale de `quote` y `guard`.
 - **Solo decir "guard" si falló el guard:** leer `meta.err` y el log `GUARD_FAIL` (D15).
 - **Antes de enviar, comparar las cuentas del agente** (`lib/solana/check-accounts.ts`): estado antes (`getMultipleAccounts`) y tras simular, de las que deriva el navegador (también la de USDC con la que paga x402, por `recipe.price.mint`) más las `watchAccounts` del backend. Si la tx diera el control de una cuenta (Assign, Approve, SetAuthority), tocara la cuenta de pago, diera menos USDC demo que `minDelta` o sacara SOL más allá del margen, no se envía.
+- **El agente paga x402 desde el navegador** (`lib/x402/payer.ts`, F8): `@x402/fetch` con su clave y el esquema `exact` leyendo el mint por `/api/xargos/rpc`. Solo paga `exact` en devnet, en `recipe.price.mint` y como mucho `recipe.price.amount`. Solo un build nuevo pasa el `payer`; el rebuild gratis (D19) nunca. Si el agente no paga, el error va `rejected` (no se cobró) con el motivo.
 - `/demo/setup` y `/demo/price-shock` son asíncronos: progreso por fases con polling, y mensajes claros para `RATE_LIMITED` y `ACCESS_DENIED`.
 - `NEXT_PUBLIC_API_MODE=mock | local | staging`; por defecto `mock`, que funciona sin backend ni secretos.
 
