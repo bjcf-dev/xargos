@@ -104,7 +104,7 @@ Toda respuesta de error (4xx/5xx salvo el 402 de x402) tiene la forma `{ error: 
 | Sin pago                                         | 402 con `PAYMENT-REQUIRED`                                                  |
 | Pago inválido o insuficiente                     | 402 + `PAYMENT_INVALID`                                                     |
 | Falla el build o la simulación (no por el guard) | 5xx + `BUILD_FAILED`; **no se liquida**                                     |
-| Tx caducada                                      | Rebuild con `buildId` hasta `rebuildUntil`; después `REBUILD_WINDOW_CLOSED` |
+| Tx caducada                                      | Rebuild con `buildId` hasta `rebuildUntil`; después `REBUILD_WINDOW_CLOSED`. Se permite antes de `expiresAt` (no hace daño: la posición solo se cierra una vez), con un máximo de 5 por build |
 | El resultado no llega a `minDelta`               | La tx revierte on-chain; la UI lo detecta con `getTransaction`              |
 
 ## Errores HTTP

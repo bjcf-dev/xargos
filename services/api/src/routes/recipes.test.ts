@@ -339,6 +339,22 @@ describe("free rebuild with a buildId (D19)", () => {
     expect(calls.verify + calls.settle).toBe(0);
   });
 
+  it("caps the free rebuilds of one build", async () => {
+    const { app, postPaid } = setup();
+    const first = BuildResponse.parse(await (await postPaid()).json());
+    const rebuild = () =>
+      app.request("/recipes/exit-orca-lp-to-usdc/build", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: rebuildBody(first.buildId),
+      });
+    for (let i = 0; i < 5; i++) expect((await rebuild()).status).toBe(200);
+    const blocked = await rebuild();
+    expect(blocked.status).toBe(429);
+    expect(ErrorResponse.parse(await blocked.json()).error.code).toBe("RATE_LIMITED");
+    expect(Number(blocked.headers.get("Retry-After"))).toBeGreaterThan(0);
+  });
+
   it("closes the window after rebuildUntil", async () => {
     let clock = Date.now();
     const { app, postPaid } = setup({ now: () => clock });

@@ -36,6 +36,9 @@ export type RecipeRoutesDeps = {
  * and the middleware settles only if the handler answers below 400. So a failed build or a failed
  * simulation never charges the agent.
  */
+/** Enough for any honest retry; each rebuild costs a quote, a blockhash and a simulation. */
+const MAX_FREE_REBUILDS = 5;
+
 export function createRecipeRoutes({
   recipes,
   rpc,
@@ -107,6 +110,7 @@ export function createRecipeRoutes({
         position: request.position,
         quoteSqrtPrice,
         paymentResponse: rebuildOf?.paymentResponse,
+        rebuilds: rebuildOf ? (rebuildOf.rebuilds ?? 0) + 1 : 0,
       });
       if (!rebuildOf) unsettled.set(c.req.raw, buildId);
       return c.json(response);
@@ -137,6 +141,11 @@ export function createRecipeRoutes({
     // Unknown, expired or somebody else's build: the same answer, and no charge.
     if (!stored || !sameBuild) {
       return errorResponse(c, "REBUILD_WINDOW_CLOSED", "The free rebuild window is closed");
+    }
+    if ((stored.rebuilds ?? 0) >= MAX_FREE_REBUILDS) {
+      return errorResponse(c, "RATE_LIMITED", "Too many rebuilds of this transaction", {
+        retryAfterSeconds: (Date.parse(stored.response.rebuildUntil) - Date.now()) / 1000,
+      });
     }
     return build(c, recipe, request.data, stored);
   });

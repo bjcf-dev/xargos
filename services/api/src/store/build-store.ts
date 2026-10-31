@@ -11,6 +11,8 @@ export type StoredBuild = {
    * price, so it works whatever state the pool is in when the shock is requested.
    */
   quoteSqrtPrice?: bigint | undefined;
+  /** Free rebuilds used: each one costs RPC calls, so they are capped. */
+  rebuilds?: number | undefined;
 };
 
 /**
