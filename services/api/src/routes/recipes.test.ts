@@ -18,7 +18,7 @@ const SNAPSHOT = address("SysvarRent111111111111111111111111111111111");
 const GUARD = address("97YMLtF9e6tW3e2ynHASe4qCB2e8uGnyGh5AmJNkJmCm");
 const config = { programAddress: GUARD };
 
-function fakeFacilitator() {
+function fakeFacilitator(failures: string[] = []) {
   const calls = { verify: 0, settle: 0 };
   const facilitator: FacilitatorClient = {
     verify: async () => {
@@ -27,6 +27,16 @@ function fakeFacilitator() {
     },
     settle: async () => {
       calls.settle++;
+      const errorReason = failures[calls.settle - 1];
+      if (errorReason) {
+        return {
+          success: false,
+          errorReason,
+          transaction: "",
+          network: SOLANA_DEVNET_CAIP2,
+          payer: PAYER,
+        };
+      }
       return {
         success: true,
         transaction: "fake-signature",
@@ -101,11 +111,12 @@ function setup(
   options: {
     build?: Recipe["build"];
     simulationErr?: unknown;
+    settleFailures?: string[];
     now?: () => number;
     publicUrl?: string;
   } = {},
 ) {
-  const { facilitator, calls } = fakeFacilitator();
+  const { facilitator, calls } = fakeFacilitator(options.settleFailures);
   const store = new BuildStore(options.now);
   const app = createRecipeRoutes({
     recipes: [recipe(options.build)],
@@ -350,5 +361,33 @@ describe("free rebuild with a buildId (D19)", () => {
       body: rebuildBody(first.buildId, "SysvarC1ock11111111111111111111111111111111"),
     });
     expect(res.status).toBe(410);
+  });
+});
+
+describe("a build only counts once its payment settled (P1-4)", () => {
+  it("keeps the x402 receipt with a settled build", async () => {
+    const { postPaid, store } = setup();
+    const response = BuildResponse.parse(await (await postPaid()).json());
+    expect(store.get(response.buildId)?.paymentResponse).toBeTruthy();
+  });
+
+  it("forgets the build when the settlement fails: no rebuild and no shock from it", async () => {
+    const { postPaid, store } = setup({ settleFailures: ["insufficient_funds"] });
+    const res = await postPaid();
+    expect(res.ok).toBe(false);
+    expect(store.size).toBe(0);
+    expect(store.latestLiveBuildFor(AGENT)).toBeUndefined();
+  });
+
+  it("does not sell a second recipe for a payment sent twice", async () => {
+    // The real facilitator answers duplicate_settlement (@x402/svm's SettlementCache).
+    const { postPaid, calls, store } = setup({ settleFailures: ["", "duplicate_settlement"] });
+    const first = await postPaid();
+    expect(first.status).toBe(200);
+    const second = await postPaid();
+    expect(second.ok).toBe(false);
+    expect(await second.text()).not.toContain('transaction":"');
+    expect(calls.settle).toBe(2);
+    expect(store.size).toBe(1);
   });
 });
