@@ -1,7 +1,6 @@
 import {
   fetchPositionsForOwner,
   openPositionInstructions,
-  setNativeMintWrappingStrategy,
   WhirlpoolDeployment,
 } from "@orca-so/whirlpools";
 import {
@@ -21,6 +20,7 @@ import {
 } from "@solana-program/token";
 import { findSnapshotStatePda, getInitSnapshotInstruction } from "@xargos/guard-client";
 import type { SendInstructions } from "../solana/send";
+import type { Serial } from "../solana/serial";
 import type { SetupSteps } from "./setup-runner";
 
 const TOKEN_2022_PROGRAM = address("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
@@ -39,6 +39,8 @@ export type SetupStepsDeps = {
   /** 0 skips the transfer (useful before the treasury has USDC); accounts are still created. */
   fundUsdcBase: bigint;
   positionSolLamports: bigint;
+  /** Queue for whatever wraps the payer's SOL: it has one wSOL account (see solana/serial). */
+  serial: Serial;
 };
 
 const ata = (owner: Address, mint: Address, tokenProgram: Address = TOKEN_PROGRAM_ADDRESS) =>
@@ -113,26 +115,27 @@ export function createSetupSteps(d: SetupStepsDeps): SetupSteps {
     },
 
     async openPosition(agent) {
-      // The SDK would otherwise wrap SOL with throwaway keypairs; the payer's wSOL ATA is simpler.
-      setNativeMintWrappingStrategy("ata");
       const owner = address(agent);
       // A retry must not open a second position: reuse the one the agent already holds.
       const held = (await fetchPositionsForOwner(d.rpc, owner, WhirlpoolDeployment.devnet)).find(
         (p) => !p.isPositionBundle && p.data.whirlpool === d.whirlpool && p.data.liquidity > 0n,
       );
       if (held && !held.isPositionBundle) return { position: held.data.positionMint };
-      const { instructions, positionMint } = await openPositionInstructions(
-        d.rpc,
-        d.whirlpool,
-        {
-          tokenMaxA: d.positionSolLamports,
-          tokenMaxB: (d.positionSolLamports * 300_000_000n) / 1_000_000_000n,
-        },
-        range.lower,
-        range.upper,
-        { funder: d.payer, whirlpoolDeployment: WhirlpoolDeployment.devnet },
-      );
-      await d.send(instructions);
+      const { positionMint } = await d.serial(async () => {
+        const opened = await openPositionInstructions(
+          d.rpc,
+          d.whirlpool,
+          {
+            tokenMaxA: d.positionSolLamports,
+            tokenMaxB: (d.positionSolLamports * 300_000_000n) / 1_000_000_000n,
+          },
+          range.lower,
+          range.upper,
+          { funder: d.payer, whirlpoolDeployment: WhirlpoolDeployment.devnet },
+        );
+        await d.send(opened.instructions);
+        return opened;
+      });
 
       // The position NFT is a Token-2022 mint with 0 decimals: hand it to the agent.
       await d.send([
