@@ -64,8 +64,8 @@ export function runSetup(
     const known = await api.getSetupStatus(agent, { signal }).catch((error: unknown) => {
       if (
         error instanceof ApiClientError &&
-        error.code === "VALIDATION_ERROR" &&
-        error.status === 400
+        // VALIDATION_ERROR: backends anteriores a NOT_FOUND (#78).
+        (error.code === "NOT_FOUND" || error.code === "VALIDATION_ERROR")
       )
         return null;
       throw error;
