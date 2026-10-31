@@ -9,6 +9,7 @@ const valid = {
   DEMO_USDC_MINT: "D1PzuAbRJB1io3awJX2GDoiL1ihwK9Kt9yfciLrgJFss",
   GUARD_PROGRAM_ID: "97YMLtF9e6tW3e2ynHASe4qCB2e8uGnyGh5AmJNkJmCm",
   WHIRLPOOL_ADDRESS: "3qTZVVZbPmCGE3h3GpGxNw6B3F6Z2NdYJeWiv4Kw38pS",
+  PAY_TO_ADDRESS: "3NxLt5rLgsT46ngFjUj2VQhsfhu1miEmARUTS8gN1MYw",
 };
 
 describe("parseConfig", () => {

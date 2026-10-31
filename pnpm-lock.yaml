@@ -23,6 +23,12 @@ importers:
       '@base-ui/react':
         specifier: ^1.9.0
         version: 1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@solana-program/system':
+        specifier: ^0.16.0
+        version: 0.16.0(@solana/kit@6.10.0(typescript@5.9.3))
+      '@solana/kit':
+        specifier: ^6.10.0
+        version: 6.10.0(typescript@5.9.3)
       '@xargos/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -140,6 +146,9 @@ importers:
       '@orca-so/whirlpools':
         specifier: 8.0.1
         version: 8.0.1(@solana/kit@6.10.0(typescript@5.9.3))(typescript@5.9.3)
+      '@orca-so/whirlpools-client':
+        specifier: 7.0.0
+        version: 7.0.0(@solana/kit@6.10.0(typescript@5.9.3))
       '@solana-program/address-lookup-table':
         specifier: 0.12.0
         version: 0.12.0(@solana/kit@6.10.0(typescript@5.9.3))

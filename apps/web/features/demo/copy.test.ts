@@ -2,11 +2,21 @@ import { fixtureBuildResponse, fixtureRecipe, fixtureSetupReady } from "@xargos/
 import { describe, expect, it } from "vitest";
 import {
   canShock,
+  chargeLine,
+  chargeNote,
+  DEMO_PATHS,
   describeRevert,
+  describeShock,
   describeSpent,
   formatFee,
+  humanError,
+  mockPaymentNote,
+  paymentMayHaveSettled,
+  runAgainNote,
   secondsLeft,
+  shockTrend,
   slippageLabel,
+  stepAnnouncement,
   stepTag,
   x402Timeline,
 } from "./copy";
@@ -34,10 +44,20 @@ describe("stepTag", () => {
     [0, "setup"],
     [2, "guard"],
     [3, "action"],
-    [6, "cleanup"],
+    [6, "setup"],
     [7, "guard"],
   ] as const)("tags step %i as %s", (index, tag) => {
     expect(stepTag(step(index), guard)).toBe(tag);
+  });
+
+  it("tags a setup after the assert as cleanup", () => {
+    const late = { ...step(0), index: guard.assertIndex + 1 };
+    expect(stepTag(late, guard)).toBe("cleanup");
+  });
+
+  it("keeps token setup between snapshot and assert as setup (real tx of PR #51)", () => {
+    const real = { ...guard, snapshotIndex: 0, assertIndex: 10 };
+    expect(stepTag({ ...step(0), index: 1 }, real)).toBe("setup");
   });
 });
 
@@ -87,11 +107,39 @@ describe("describeRevert (D15)", () => {
     expect(copy.detail).toContain("9.95 demo USDC minimum");
   });
 
+  it("tells a guard revert as protection, with what it stopped", () => {
+    const copy = describeRevert(run, {
+      instructionIndex: guard.assertIndex,
+      guard: { received: 9_100_000n, min: 9_950_000n },
+    });
+    expect(copy.title).toBe("The guard protected the agent");
+    expect(copy.figures).toEqual({ received: "9.1", minimum: "9.95", shortfall: "0.85" });
+    expect(copy.detail).toContain("9.95 demo USDC");
+  });
+
+  it("takes the minimum the chain read, not the one the build promised", () => {
+    const copy = describeRevert(run, {
+      instructionIndex: guard.assertIndex,
+      guard: { received: 9_100_000n, min: 9_500_000n },
+    });
+    expect(copy.figures).toEqual({ received: "9.1", minimum: "9.5", shortfall: "0.4" });
+    expect(copy.detail).toContain("9.5 demo USDC minimum");
+  });
+
+  it("never reports a negative shortfall", () => {
+    const copy = describeRevert(run, {
+      instructionIndex: guard.assertIndex,
+      guard: { received: 10_000_000n, min: 9_950_000n },
+    });
+    expect(copy.figures?.shortfall).toBe("0");
+  });
+
   it("names the failed step and never says guard when another instruction failed", () => {
     const copy = describeRevert(run, { instructionIndex: 3, guard: null });
     expect(copy.byGuard).toBe(false);
     expect(copy.title).toContain("Step 3");
     expect(copy.title).toContain("Collect fees");
+    expect(copy.figures).toBeNull();
     expect(`${copy.title} ${copy.detail}`).not.toMatch(/guard/i);
   });
 
@@ -108,6 +156,46 @@ describe("formatFee", () => {
   });
 });
 
+describe("describeShock", () => {
+  it("names the pair and the change", () => {
+    expect(describeShock("150.00", "141.00")).toBe("SOL/demo USDC 150.00 → 141.00 (-6%)");
+    expect(describeShock("150.00", "155.00")).toBe("SOL/demo USDC 150.00 → 155.00 (+3.3%)");
+  });
+
+  it("leaves the change out when a price is not usable", () => {
+    expect(describeShock("abc", "141.00")).toBe("SOL/demo USDC abc → 141.00");
+    expect(describeShock("0", "1")).toBe("SOL/demo USDC 0 → 1");
+  });
+});
+
+describe("shockTrend", () => {
+  it("says which way the price moved", () => {
+    expect(shockTrend("150.00", "141.00")).toBe("down");
+    expect(shockTrend("150.00", "155.00")).toBe("up");
+  });
+
+  it("gives no direction when a price is not a number or nothing moved", () => {
+    expect(shockTrend("abc", "141.00")).toBeNull();
+    expect(shockTrend("150.00", "")).toBeNull();
+    expect(shockTrend("150.00", "150.00")).toBeNull();
+  });
+});
+
+describe("DEMO_PATHS", () => {
+  // D15 y D10: el camino B no promete el revert; solo la cadena dice si el guard revirtió.
+  it("does not promise a revert before the chain says so", () => {
+    expect(DEMO_PATHS.B.line).toMatch(/if the agent would receive less than the minimum/);
+  });
+});
+
+describe("mockPaymentNote", () => {
+  it("says once what mock mode charges and what devnet would", () => {
+    expect(mockPaymentNote("0.01 USDC")).toBe(
+      "Simulated: mock mode charges nothing. In devnet mode the agent pays 0.01 USDC per request.",
+    );
+  });
+});
+
 describe("describeSpent (D16)", () => {
   it("states the recipe fee and leaves the network fee open until it is read", () => {
     expect(describeSpent(fixtureRecipe.price, null)).toEqual({
@@ -118,6 +206,139 @@ describe("describeSpent (D16)", () => {
 
   it("formats the network fee in SOL once known", () => {
     expect(describeSpent(fixtureRecipe.price, 5000n).networkFee).toBe("0.000005 SOL");
+  });
+});
+
+describe("humanError", () => {
+  it("explains a known code in plain words and ignores the raw message", () => {
+    expect(humanError({ code: "RATE_LIMITED", message: "429 from upstream" })).toEqual({
+      title: "Too many demos right now",
+      hint: "Wait a moment, then try again.",
+    });
+  });
+
+  it("keeps our own message for INTERNAL errors", () => {
+    expect(humanError({ code: "INTERNAL", message: "Signing arrives with F6" })).toEqual({
+      title: "Something went wrong",
+      hint: "Signing arrives with F6",
+    });
+  });
+
+  it("never leaves the hint empty", () => {
+    expect(humanError({ code: "INTERNAL", message: "" }).hint).toBe(
+      "Try again in a moment, or start over.",
+    );
+  });
+
+  // No prometer lo que el código o la cadena no garantizan (D15; ERROR_HTTP: retryable false).
+  it("does not promise what it cannot know", () => {
+    expect(humanError({ code: "SHOCK_FAILED", message: "" }).hint).toBe(
+      "The price shock could not be applied.",
+    );
+    expect(humanError({ code: "PAYMENT_INVALID", message: "" }).hint).not.toMatch(/try again/i);
+    expect(humanError({ code: "PAYMENT_REQUIRED", message: "" }).hint).not.toMatch(/try again/i);
+  });
+});
+
+describe("humanError: wait and backend down (F12)", () => {
+  it("says the backend is not responding, whatever the code", () => {
+    expect(humanError({ code: "INTERNAL", message: "Network error", unreachable: true })).toEqual({
+      title: "The demo backend is not responding",
+      hint: "It may be starting up or down. Try again in a minute.",
+    });
+  });
+
+  it("tells the Retry-After wait in seconds, or in minutes when it is long", () => {
+    expect(humanError({ code: "RATE_LIMITED", message: "", retryAfterSeconds: 20 }).hint).toBe(
+      "Wait 20 seconds, then try again.",
+    );
+    expect(humanError({ code: "RATE_LIMITED", message: "", retryAfterSeconds: 1 }).hint).toBe(
+      "Wait 1 second, then try again.",
+    );
+    expect(humanError({ code: "RATE_LIMITED", message: "", retryAfterSeconds: 90 }).hint).toBe(
+      "Wait about 2 minutes, then try again.",
+    );
+  });
+
+  it("keeps the generic wait when there is no Retry-After or it is zero", () => {
+    for (const retryAfterSeconds of [undefined, 0]) {
+      const error = {
+        code: "RATE_LIMITED" as const,
+        message: "",
+        ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
+      };
+      expect(humanError(error).hint).toBe("Wait a moment, then try again.");
+    }
+  });
+});
+
+// Criterio del jurado (pagos fallidos): x402 solo liquida si el build sale bien (D17).
+describe("chargeNote", () => {
+  it("says nothing before there is anything to pay", () => {
+    expect(chargeNote("setup", { code: "SETUP_FAILED", message: "" })).toBeNull();
+  });
+
+  it("says nothing was charged when the backend rejected the build", () => {
+    expect(chargeNote("paying", { code: "BUILD_FAILED", message: "", rejected: true })).toMatch(
+      /nothing was charged/i,
+    );
+  });
+
+  it.each([
+    ["the backend did not answer", { code: "INTERNAL", message: "", unreachable: true }],
+    ["the answer could not be read", { code: "INTERNAL", message: "Does not match" }],
+  ] as const)("does not claim nothing was charged when %s", (_, error) => {
+    const note = chargeNote("paying", error);
+    expect(note).not.toMatch(/nothing was charged/i);
+    expect(note).toMatch(/could not confirm/i);
+    // Sin "Try again" en este caso (#44): la nota explica por qué se empieza de nuevo.
+    expect(note).toMatch(/start over/i);
+  });
+
+  it.each(["shocking", "signing", "expired", "rebuilding"] as const)(
+    "after the build (%s) says the fee was already paid, never that nothing was charged",
+    (failedAt) => {
+      const note = chargeNote(failedAt, { code: "INTERNAL", message: "" });
+      expect(note).toMatch(/already paid/i);
+      expect(note).not.toMatch(/nothing was charged/i);
+    },
+  );
+});
+
+// Un solo canal por paso: el foco ya dice el título; la región solo dice lo que el título no dice.
+describe("stepAnnouncement", () => {
+  it.each([
+    ["idle", { status: "idle" }],
+    ["paying", { status: "paying", agent: run.agent, position: run.position }],
+    ["shocking", { status: "shocking", run, shockId: null }],
+    ["signing", { status: "signing", run }],
+    ["setup", { status: "setup", agent: run.agent, setup: fixtureSetupReady }],
+    ["confirmed", { status: "confirmed", run, signature: "sig" }],
+    ["rebuilding", { status: "rebuilding", run }],
+  ] as const)("stays silent while %s (Busy or the focused title says it)", (_, state) => {
+    expect(stepAnnouncement(state)).toBe("");
+  });
+
+  it.each([
+    ["built", { status: "built", run }, "Transaction ready to sign"],
+    ["expired", { status: "expired", run }, "Rebuild it for free, or start over."],
+    [
+      "error",
+      { status: "error", error: { code: "RATE_LIMITED", message: "x" }, failedAt: "paying" },
+      "Wait a moment, then try again.",
+    ],
+  ] as const)("announces %s", (_, state, text) => {
+    expect(stepAnnouncement(state)).toBe(text);
+  });
+
+  it("announces the detail of a guard revert, not its title again", () => {
+    const state: DemoState = {
+      status: "reverted",
+      run,
+      signature: "sig",
+      failure: { instructionIndex: guard.assertIndex, guard: { received: 1n, min: 2n } },
+    };
+    expect(stepAnnouncement(state)).toBe(describeRevert(run, state.failure).detail);
   });
 });
 
@@ -159,6 +380,68 @@ describe("x402Timeline", () => {
   it("shows nothing done before paying", () => {
     expect(new Set(Object.values(byKey(states(run).idle, "staging")))).toEqual(
       new Set(["pending"]),
+    );
+  });
+});
+
+describe("paymentMayHaveSettled (D17)", () => {
+  it("is true when paying failed without a clear rejection from the backend", () => {
+    expect(
+      paymentMayHaveSettled("paying", { code: "INTERNAL", message: "", unreachable: true }),
+    ).toBe(true);
+    expect(paymentMayHaveSettled("paying", { code: "INTERNAL", message: "Does not match" })).toBe(
+      true,
+    );
+  });
+
+  it("is false when the backend rejected the build, or the failure was not in paying", () => {
+    expect(
+      paymentMayHaveSettled("paying", { code: "BUILD_FAILED", message: "", rejected: true }),
+    ).toBe(false);
+    expect(
+      paymentMayHaveSettled("setup", { code: "INTERNAL", message: "", unreachable: true }),
+    ).toBe(false);
+  });
+});
+
+describe("chargeLine", () => {
+  const fee = "0.01 USDC";
+  const rejected = { code: "BUILD_FAILED", message: "", rejected: true } as const;
+
+  it("says the charge is simulated in mock mode when paying failed", () => {
+    const line = chargeLine("paying", rejected, "mock", fee);
+    expect(line).toMatch(/^Simulated in mock mode\./);
+    expect(line).toContain(chargeNote("paying", rejected));
+  });
+
+  it("uses the mock payment note after the build in mock mode", () => {
+    expect(chargeLine("signing", rejected, "mock", fee)).toBe(mockPaymentNote(fee));
+  });
+
+  it("is the plain note outside mock mode, and null when there is nothing to say", () => {
+    expect(chargeLine("paying", rejected, "staging", fee)).toBe(chargeNote("paying", rejected));
+    expect(chargeLine("setup", rejected, "mock", fee)).toBeNull();
+  });
+});
+
+describe("runAgainNote", () => {
+  it("says the fee is charged again in devnet mode", () => {
+    expect(runAgainNote("0.01 USDC", "staging")).toBe(
+      "Run again pays 0.01 USDC again for a new transaction.",
+    );
+  });
+
+  it("in mock mode says nothing is charged now, and what devnet would charge", () => {
+    expect(runAgainNote("0.01 USDC", "mock")).toBe(
+      "Run again builds a new transaction. Mock mode charges nothing; in devnet mode it pays 0.01 USDC again.",
+    );
+  });
+});
+
+describe("humanError for a closed rebuild window", () => {
+  it("points to Run again, the button next to it, not only to start over", () => {
+    expect(humanError({ code: "REBUILD_WINDOW_CLOSED", message: "" }).hint).toBe(
+      "Run again to build and pay for a new transaction, or start over.",
     );
   });
 });

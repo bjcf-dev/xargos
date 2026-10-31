@@ -11,7 +11,7 @@ import {
   setTransactionMessageLifetimeUsingBlockhash,
 } from "@solana/kit";
 import { BuildResponse } from "@xargos/shared";
-import type { BuildContext, Recipe } from "../recipes/types";
+import type { BuildContext, BuiltRecipe, Recipe } from "../recipes/types";
 import type { LookupTables } from "./lookup-table";
 
 /** Largest serialized transaction Solana accepts (lesson 16). */
@@ -28,6 +28,10 @@ export type BuildParams = {
   now?: Date;
   /** Needed when the recipe does not fit in 1232 bytes (lesson 16). */
   lookupTables?: LookupTables;
+  /** A free rebuild keeps the window of the first build (D19) instead of opening a new one. */
+  rebuildUntil?: Date;
+  /** Called with what the recipe built, before the response is validated. */
+  onBuilt?: (built: BuiltRecipe) => void;
 };
 
 /** Builds the unsigned v0 transaction for a recipe and validates the whole response against the contract. */
@@ -38,8 +42,11 @@ export async function buildResponse({
   rpc,
   now = new Date(),
   lookupTables,
+  rebuildUntil,
+  onBuilt,
 }: BuildParams) {
   const built = await recipe.build(context);
+  onBuilt?.(built);
   const { value: blockhash } = await rpc.getLatestBlockhash({ commitment: "confirmed" }).send();
 
   const message = pipe(
@@ -68,7 +75,7 @@ export async function buildResponse({
     recipeId: recipe.info.id,
     transaction,
     expiresAt: new Date(now.getTime() + EXPIRES_IN_MS).toISOString(),
-    rebuildUntil: new Date(now.getTime() + REBUILD_WINDOW_MS).toISOString(),
+    rebuildUntil: (rebuildUntil ?? new Date(now.getTime() + REBUILD_WINDOW_MS)).toISOString(),
     quote: built.quote,
     guard: {
       ...built.guard,
