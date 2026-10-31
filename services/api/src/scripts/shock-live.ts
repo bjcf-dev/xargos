@@ -3,6 +3,7 @@
 import { address, createSolanaRpc, createSolanaRpcSubscriptions } from "@solana/kit";
 import { createShockSteps } from "../demo/shock-steps";
 import { createSender } from "../solana/send";
+import { createSerial } from "../solana/serial";
 import { DEMO_USDC_MINT, explorerTx, RPC_URL, useFacilitator } from "./orca/common";
 
 const payer = await useFacilitator();
@@ -15,6 +16,7 @@ const steps = createShockSteps({
   whirlpool: address(process.env.WHIRLPOOL_ADDRESS ?? ""),
   demoUsdc: DEMO_USDC_MINT,
   dropBps: Number(process.env.SHOCK_DROP_BPS ?? 600),
+  serial: createSerial(),
 });
 
 if (process.env.RESTORE_TO) {

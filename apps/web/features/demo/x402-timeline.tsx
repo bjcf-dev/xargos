@@ -3,7 +3,7 @@ import { CheckCircle2Icon, CircleDashedIcon, CircleIcon } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import type { ApiMode } from "@/lib/api/mode";
-import { formatFee, type X402StepState, x402Timeline } from "./copy";
+import { formatFee, mockPaymentNote, type X402StepState, x402Timeline } from "./copy";
 import type { DemoState } from "./types";
 
 const STATE_TEXT: Record<X402StepState, string> = {
@@ -35,10 +35,12 @@ export function X402Timeline({
   return (
     <Card size="sm">
       <CardHeader>
-        <CardTitle>x402 payment</CardTitle>
+        <CardTitle data-step-title tabIndex={-1}>
+          x402 payment
+        </CardTitle>
         <CardDescription>
           {mode === "mock"
-            ? "Simulated: mock mode skips the 402 handshake and charges nothing."
+            ? mockPaymentNote(fee)
             : `The agent pays ${fee} per request, inside the HTTP call.`}
         </CardDescription>
       </CardHeader>

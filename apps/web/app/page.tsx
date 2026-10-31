@@ -10,9 +10,14 @@ export default function Home() {
         Multi-step DeFi recipes for AI agents, paid per request with x402 on Solana devnet. The
         transaction either delivers what was promised or does not execute at all.
       </p>
-      <Link href="/demo" className={buttonVariants({ className: "mt-6" })}>
-        Open the demo
-      </Link>
+      <div className="mt-6 flex flex-wrap items-center gap-4">
+        <Link href="/demo" className={buttonVariants()}>
+          Open the demo
+        </Link>
+        <Link href="/failed-payments" className="text-sm underline underline-offset-4">
+          How failed payments work
+        </Link>
+      </div>
       <RecipeList />
     </main>
   );
