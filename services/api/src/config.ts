@@ -7,7 +7,10 @@ const BaseUnitsNumber = z.string().regex(/^\d+$/).transform(BigInt);
 export const ConfigSchema = z.object({
   SOLANA_CLUSTER: z.literal("devnet"),
   RPC_URL: z.url(),
-  PAYER_KEYPAIR_PATH: z.string().min(1),
+  /** Local runs: path to the payer keypair file. Railway has no files: use PAYER_KEYPAIR there. */
+  PAYER_KEYPAIR_PATH: z.string().min(1).optional(),
+  /** The payer keypair as a JSON array of bytes, set only in the host's variables panel. */
+  PAYER_KEYPAIR: z.string().min(1).optional(),
   USDC_MINT: Address,
   DEMO_USDC_MINT: Address,
   GUARD_PROGRAM_ID: Address,
@@ -39,6 +42,9 @@ export function parseConfig(env: Record<string, string | undefined>): Config {
     // Names of the bad variables only: never the values (they may hold keys or API tokens).
     const names = [...new Set(result.error.issues.map((i) => i.path.join(".")))];
     throw new Error(`Invalid configuration: ${names.join(", ")}`);
+  }
+  if (!result.data.PAYER_KEYPAIR_PATH && !result.data.PAYER_KEYPAIR) {
+    throw new Error("Invalid configuration: PAYER_KEYPAIR_PATH or PAYER_KEYPAIR");
   }
   return result.data;
 }

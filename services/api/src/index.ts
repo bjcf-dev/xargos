@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { serve } from "@hono/node-server";
 import {
   address,
@@ -20,6 +19,7 @@ import { createExitOrcaLpRecipe } from "./recipes/exit-orca-lp";
 import { createRecipeRoutes } from "./routes/recipes";
 import { createShockRoutes } from "./routes/shock";
 import { assertDevnet } from "./solana/assert-devnet";
+import { readPayerBytes } from "./solana/payer";
 import { createSender } from "./solana/send";
 import { BuildStore } from "./store/build-store";
 
@@ -31,9 +31,7 @@ if (!config.DEMO_ACCESS_CODE) {
 const rpc = createSolanaRpc(config.RPC_URL);
 // SOLANA_CLUSTER is only an env var: ask the RPC itself before any key is read or any SOL moves.
 await assertDevnet(rpc);
-const payer = await createKeyPairSignerFromBytes(
-  Uint8Array.from(JSON.parse(readFileSync(config.PAYER_KEYPAIR_PATH, "utf8"))),
-);
+const payer = await createKeyPairSignerFromBytes(readPayerBytes(config));
 const rpcSubscriptions = createSolanaRpcSubscriptions(config.RPC_URL.replace(/^http/, "ws"));
 
 // x402: the backend settles its own payments with the payer key (ADR 0001, D18).
