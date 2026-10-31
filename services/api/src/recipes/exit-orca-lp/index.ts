@@ -111,6 +111,11 @@ export function createExitOrcaLpRecipe(deps: ExitOrcaLpDeps): Recipe {
         mint: position,
         tokenProgram: TOKEN_2022_PROGRAM,
       });
+      const [paymentAccount] = await findAssociatedTokenPda({
+        owner: agent,
+        mint: deps.priceMint,
+        tokenProgram: TOKEN_PROGRAM_ADDRESS,
+      });
       const [snapshot] = await findSnapshotStatePda(
         { agent, mint: deps.usdcMint },
         { programAddress: deps.guardProgram },
@@ -146,8 +151,9 @@ export function createExitOrcaLpRecipe(deps: ExitOrcaLpDeps): Recipe {
 
       return {
         quoteSqrtPrice: pool.sqrtPrice,
-        // SOL (the wallet), demo USDC, wSOL and the position NFT: all the agent has at stake here.
-        watchAccounts: [watchedAccount, agent, wsolAccount, positionAccount],
+        // Everything the agent has at stake: demo USDC, SOL (the wallet), wSOL, the position NFT and
+        // the Circle USDC it pays x402 with, which this tx has no reason to touch.
+        watchAccounts: [watchedAccount, agent, wsolAccount, positionAccount, paymentAccount],
         steps,
         quote: {
           tokenOut: deps.usdcMint,
