@@ -120,6 +120,19 @@ describe("runner", () => {
     expect(events.map((e) => e.type)).toEqual(["SIGN", "CONFIRMED"]);
   });
 
+  it("tells the signer which mint the recipe is paid with", async () => {
+    const contexts: unknown[] = [];
+    const signer: DemoSigner = async (_run, _signal, context) => {
+      contexts.push(context);
+      return { outcome: "confirmed", signature: "sig" };
+    };
+    const run: Run = { agent: AGENT, position: POSITION, build: fixtureBuildResponse };
+    const paymentMint = fixtureRecipe.price.mint;
+    await runSign({ ...deps, signer, paymentMint }, run, recorder().dispatch, live());
+
+    expect(contexts).toEqual([{ paymentMint }]);
+  });
+
   it("turns an API error into FAILED with the contract code", async () => {
     server.use(
       http.post("*/api/xargos/recipes/:id/build", () =>

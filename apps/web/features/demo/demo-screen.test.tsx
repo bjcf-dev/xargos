@@ -17,6 +17,7 @@ import { mockPaymentNote } from "./copy";
 import { DemoScreen } from "./demo-screen";
 import { createMockSigner } from "./mock-signer";
 import { ResultCard } from "./result-card";
+import type { DemoSigner } from "./signer";
 import { initialDemoState } from "./types";
 import type { UseAgentOptions } from "./use-agent";
 
@@ -81,6 +82,19 @@ describe("DemoScreen (mock mode)", () => {
       await screen.findByText("Executed as promised", { selector: "[data-step-title]" }),
     ).toBeDefined();
     expect(screen.queryByText(/reverted/i)).toBeNull();
+  });
+
+  it("gives the signer the mint the recipe is paid with", async () => {
+    const mock = createMockSigner({ latencyMs: 0 });
+    const signer = vi.fn<DemoSigner>((run, signal) => mock(run, signal));
+    render(<DemoScreen api={api} signer={signer} pollIntervalMs={1} />);
+
+    await click(/happy path/i);
+    await click(/pay & build/i);
+    await click(/sign & send/i);
+
+    await screen.findByText("Executed as promised", { selector: "[data-step-title]" });
+    expect(signer.mock.lastCall?.[2]).toEqual({ paymentMint: fixtureRecipe.price.mint });
   });
 
   it("describes each demo path", async () => {

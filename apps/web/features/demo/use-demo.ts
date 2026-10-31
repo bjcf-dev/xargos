@@ -19,6 +19,8 @@ const RETRYABLE: ReadonlySet<DemoStatus> = new Set(["setup", "paying"]);
 
 type UseDemoOptions = {
   recipeId: string;
+  /** recipe.price.mint: el signer vigila la cuenta del agente con la que paga x402. */
+  paymentMint?: string | undefined;
   /** Dirección del agente: la de las fixtures en mock, la de este navegador fuera (useAgent). */
   agent: string;
   api?: ApiClient;
@@ -33,6 +35,7 @@ type UseDemoOptions = {
  */
 export function useDemo({
   recipeId,
+  paymentMint,
   agent,
   api = defaultApi,
   signer,
@@ -46,6 +49,7 @@ export function useDemo({
     api,
     signer: (signer === undefined ? modeSigner : signer) ?? noSigner,
     recipeId,
+    ...(paymentMint ? { paymentMint } : {}),
     ...(pollIntervalMs ? { pollIntervalMs } : {}),
   };
 
