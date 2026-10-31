@@ -11,6 +11,8 @@ export type StoredBuild = {
    * price, so it works whatever state the pool is in when the shock is requested.
    */
   quoteSqrtPrice?: bigint | undefined;
+  /** Free rebuilds used: each one costs RPC calls, so they are capped. */
+  rebuilds?: number | undefined;
 };
 
 /**
@@ -36,6 +38,17 @@ export class BuildStore {
       return undefined;
     }
     return build;
+  }
+
+  /** Records the x402 receipt once the payment settled. */
+  confirmPayment(buildId: string, paymentResponse: string): void {
+    const build = this.builds.get(buildId);
+    if (build) this.builds.set(buildId, { ...build, paymentResponse });
+  }
+
+  /** A build whose payment did not settle never existed: no rebuild, no shock. */
+  delete(buildId: string): void {
+    this.builds.delete(buildId);
   }
 
   /** Whether this agent holds a build that is still inside its window (a shock needs one). */

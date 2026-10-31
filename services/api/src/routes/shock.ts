@@ -36,8 +36,16 @@ export function createShockRoutes(deps: ShockRoutesDeps) {
 
     const code = c.req.header("x-xargos-access-code");
     const codeIsValid = deps.accessCode !== undefined && sameCode(code, deps.accessCode);
-    if (deps.accessCode && !codeIsValid)
+    if (deps.accessCode && !codeIsValid) {
+      // Wrong codes do use up the quota: otherwise this is a free way to guess the code.
+      const stranger = clientKey(c, false);
+      if (!deps.limiter.allow(stranger)) {
+        return errorResponse(c, "RATE_LIMITED", "Too many price shocks, try later", {
+          retryAfterSeconds: deps.limiter.retryAfterSeconds(stranger),
+        });
+      }
       return errorResponse(c, "ACCESS_DENIED", "Invalid access code");
+    }
 
     const build = deps.store.latestLiveBuildFor(request.data.agent);
     if (!build) {
@@ -50,11 +58,16 @@ export function createShockRoutes(deps: ShockRoutesDeps) {
     // The gate comes BEFORE the rate limit: a client that is only waiting for the pool to recover
     // must not use up its quota with every poll. Only a shock that really starts is counted.
     if (!deps.gate.tryStart()) {
-      return errorResponse(c, "RATE_LIMITED", "The pool is busy or recovering, try again soon");
+      return errorResponse(c, "RATE_LIMITED", "The pool is busy or recovering, try again soon", {
+        retryAfterSeconds: deps.gate.retryAfterSeconds(),
+      });
     }
-    if (!deps.limiter.allow(clientKey(c, codeIsValid))) {
+    const client = clientKey(c, codeIsValid);
+    if (!deps.limiter.allow(client)) {
       deps.gate.release();
-      return errorResponse(c, "RATE_LIMITED", "Too many price shocks, try later");
+      return errorResponse(c, "RATE_LIMITED", "Too many price shocks, try later", {
+        retryAfterSeconds: deps.limiter.retryAfterSeconds(client),
+      });
     }
 
     const shockId = `shk_${randomUUID()}`;
@@ -71,7 +84,7 @@ export function createShockRoutes(deps: ShockRoutesDeps) {
 
   app.get("/demo/price-shock/:shockId", (c) => {
     const job = deps.jobs.get(c.req.param("shockId"));
-    if (!job) return errorResponse(c, "VALIDATION_ERROR", "Unknown shock");
+    if (!job) return errorResponse(c, "NOT_FOUND", "Unknown shock");
     return c.json(job);
   });
 

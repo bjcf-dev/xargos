@@ -104,7 +104,7 @@ Toda respuesta de error (4xx/5xx salvo el 402 de x402) tiene la forma `{ error: 
 | Sin pago                                         | 402 con `PAYMENT-REQUIRED`                                                  |
 | Pago inválido o insuficiente                     | 402 + `PAYMENT_INVALID`                                                     |
 | Falla el build o la simulación (no por el guard) | 5xx + `BUILD_FAILED`; **no se liquida**                                     |
-| Tx caducada                                      | Rebuild con `buildId` hasta `rebuildUntil`; después `REBUILD_WINDOW_CLOSED` |
+| Tx caducada                                      | Rebuild con `buildId` hasta `rebuildUntil`; después `REBUILD_WINDOW_CLOSED`. Se permite antes de `expiresAt` (no hace daño: la posición solo se cierra una vez), con un máximo de 5 por build |
 | El resultado no llega a `minDelta`               | La tx revierte on-chain; la UI lo detecta con `getTransaction`              |
 
 ## Errores HTTP
@@ -115,6 +115,7 @@ El status de cada código vive en `ERROR_HTTP` (`packages/shared/src/errors.ts`)
 | --------------------------------------- | ---- | ----------------------------------------------------------- | ------------------ |
 | `PAYMENT_REQUIRED` / `PAYMENT_INVALID`  | 402  | Sin pago / pago inválido o insuficiente                     | No                 |
 | `VALIDATION_ERROR`                      | 400  | Petición mal formada                                        | No                 |
+| `NOT_FOUND`                             | 404  | Ruta o recurso desconocido (agente sin setup, shock sin id) | No                 |
 | `ACCESS_DENIED`                         | 403  | Código de acceso de la demo incorrecto                      | No                 |
 | `REBUILD_WINDOW_CLOSED`                 | 410  | Ya pasó `rebuildUntil`: hay que pedir un build nuevo (pago) | No                 |
 | `RATE_LIMITED`                          | 429  | Demasiadas peticiones; cabecera `Retry-After`               | Sí, tras esperar   |

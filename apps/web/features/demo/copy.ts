@@ -106,6 +106,10 @@ const HUMAN_ERRORS: Record<ErrorCode, HumanError | null> = {
     title: "The request was not valid",
     hint: "Start over. If it keeps happening, the demo may need an update.",
   },
+  NOT_FOUND: {
+    title: "This demo session no longer exists",
+    hint: "Start over to prepare the agent again.",
+  },
   SETUP_FAILED: {
     title: "The agent could not be prepared",
     hint: "Setting up the demo agent on devnet failed. Try again in a moment.",

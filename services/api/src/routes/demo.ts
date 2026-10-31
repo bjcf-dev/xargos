@@ -12,6 +12,10 @@ export type DemoRoutesDeps = {
   jobs: SetupJobs;
   steps: SetupSteps;
   limiter: RateLimiter;
+  /** Cap on setups across every client, on top of the one per IP. */
+  globalLimiter?: RateLimiter;
+  /** False when the payer is short of funds: better a clear error than a half-made setup. */
+  hasFunds?: () => Promise<boolean>;
   /** DEMO_ACCESS_CODE. When unset, the code is not required (local development). */
   accessCode?: string | undefined;
   log?: Logger;
@@ -41,22 +45,50 @@ export function sameCode(given: string | undefined, expected: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-export function createDemoRoutes({ jobs, steps, limiter, accessCode, log }: DemoRoutesDeps) {
+const NO_FUNDS_RETRY_SECONDS = 60 * 60;
+
+export function createDemoRoutes({
+  jobs,
+  steps,
+  limiter,
+  globalLimiter,
+  hasFunds,
+  accessCode,
+  log,
+}: DemoRoutesDeps) {
   const app = new Hono();
 
   app.post("/demo/setup", async (c) => {
     const body = DemoSetupRequest.safeParse(await c.req.json().catch(() => null));
     if (!body.success) return errorResponse(c, "VALIDATION_ERROR", "Invalid setup request");
     const codeIsValid = accessCode !== undefined && sameCode(body.data.accessCode, accessCode);
+    // The limit goes first, so guessing the access code also uses up the quota.
+    const client = clientKey(c, codeIsValid);
+    if (!limiter.allow(client)) {
+      return errorResponse(c, "RATE_LIMITED", "Too many setups, try later", {
+        retryAfterSeconds: limiter.retryAfterSeconds(client),
+      });
+    }
     if (accessCode && !codeIsValid) return errorResponse(c, "ACCESS_DENIED", "Invalid access code");
-
-    if (!limiter.allow(clientKey(c, codeIsValid)))
-      return errorResponse(c, "RATE_LIMITED", "Too many setups, try later");
 
     const { agent } = body.data;
     // Asking again for the same agent just returns 202: the client keeps polling the same job.
     // A failed one starts over (the steps skip what is already done), so "try again" works.
-    if (!jobs.get(agent)) {
+    const isNew = !jobs.get(agent);
+    if (isNew || jobs.get(agent)?.phase === "failed") {
+      if (globalLimiter && !globalLimiter.allow("all")) {
+        return errorResponse(c, "RATE_LIMITED", "The demo is busy, try later", {
+          retryAfterSeconds: globalLimiter.retryAfterSeconds("all"),
+        });
+      }
+      // Not SETUP_FAILED: "try again in a moment" would not help until someone tops the payer up.
+      if (hasFunds && !(await hasFunds())) {
+        return errorResponse(c, "RATE_LIMITED", "The demo is out of funds for now", {
+          retryAfterSeconds: NO_FUNDS_RETRY_SECONDS,
+        });
+      }
+    }
+    if (isNew) {
       if (!jobs.create(agent))
         return errorResponse(c, "RATE_LIMITED", "The demo is full, try later");
       void runSetup(jobs, steps, agent, log);
@@ -70,7 +102,7 @@ export function createDemoRoutes({ jobs, steps, limiter, accessCode, log }: Demo
     const agent = Address.safeParse(c.req.param("agent"));
     if (!agent.success) return errorResponse(c, "VALIDATION_ERROR", "Invalid agent address");
     const job = jobs.get(agent.data);
-    if (!job) return errorResponse(c, "VALIDATION_ERROR", "Unknown agent: start a setup first");
+    if (!job) return errorResponse(c, "NOT_FOUND", "Unknown agent: start a setup first");
     // A ready job outlives the demo that closes its position (the agent survives reloads, D30).
     // Reported as failed, the client posts again and the steps open a new position.
     if (job.phase === "ready" && job.position) {

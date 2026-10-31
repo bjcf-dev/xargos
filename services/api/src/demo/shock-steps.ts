@@ -46,6 +46,8 @@ export function createShockSteps(
     if (!state.initialized || state.address !== d.whirlpool) {
       throw new Error("The configured Whirlpool does not match the demo pool");
     }
+    // The maths sell token A to push the price down: a pool the other way round would shock upwards.
+    if (state.tokenMintA !== WSOL_MINT) throw new Error("The demo pool must have wSOL as token A");
     return state;
   }
 

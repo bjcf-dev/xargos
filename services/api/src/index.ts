@@ -11,6 +11,7 @@ import { SOLANA_DEVNET_CAIP2, toFacilitatorSvmSigner } from "@x402/svm";
 import { registerExactSvmScheme as registerFacilitator } from "@x402/svm/exact/facilitator";
 import { createApp } from "./app";
 import { parseConfig } from "./config";
+import { createPayerFunds } from "./demo/funds";
 import { ShockGate, ShockJobs } from "./demo/shock";
 import { createShockSteps } from "./demo/shock-steps";
 import { createSetupSteps } from "./demo/steps";
@@ -98,6 +99,13 @@ const app = createApp({
   }),
   accessCode: config.DEMO_ACCESS_CODE,
   setupRateLimitPerHour: config.SETUP_RATE_LIMIT_PER_HOUR,
+  setupGlobalLimitPerHour: config.SETUP_GLOBAL_LIMIT_PER_HOUR,
+  funds: createPayerFunds({
+    rpc,
+    payer: payer.address,
+    circleUsdc: address(config.USDC_MINT),
+    minLamports: config.MIN_PAYER_LAMPORTS,
+  }),
   setupMaxJobs: config.SETUP_MAX_JOBS,
   log: safeLog,
 });

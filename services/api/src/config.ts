@@ -37,7 +37,12 @@ export const ConfigSchema = z.object({
   /** Time the pool stays shocked before it is restored: longer than the 120 s free rebuild. */
   SHOCK_COOLDOWN_MS: z.coerce.number().int().min(1_000).default(150_000),
   SHOCK_RATE_LIMIT_PER_HOUR: z.coerce.number().int().min(1).default(30),
-  POSITION_SOL_LAMPORTS: BaseUnitsNumber.default(50_000_000n),
+  /** Enough for a clear demo; the payer does not get this back, so it sets the cost per run. */
+  POSITION_SOL_LAMPORTS: BaseUnitsNumber.default(20_000_000n),
+  /** Below this SOL balance the payer refuses new setups with a clear error. */
+  MIN_PAYER_LAMPORTS: BaseUnitsNumber.default(500_000_000n),
+  /** Setups per hour across every client, on top of the limit per IP. */
+  SETUP_GLOBAL_LIMIT_PER_HOUR: z.coerce.number().int().min(1).default(60),
 });
 export type Config = z.infer<typeof ConfigSchema>;
 

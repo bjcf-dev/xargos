@@ -36,6 +36,9 @@ export type RecipeRoutesDeps = {
  * and the middleware settles only if the handler answers below 400. So a failed build or a failed
  * simulation never charges the agent.
  */
+/** Enough for any honest retry; each rebuild costs a quote, a blockhash and a simulation. */
+const MAX_FREE_REBUILDS = 5;
+
 export function createRecipeRoutes({
   recipes,
   rpc,
@@ -51,6 +54,8 @@ export function createRecipeRoutes({
     networks: [SOLANA_DEVNET_CAIP2],
   });
   const recipeById = (id: string) => recipes.find((r) => r.info.id === id);
+  /** The build of a paid request, until the middleware says whether the payment settled. */
+  const unsettled = new WeakMap<Request, string>();
 
   /** Builds and simulates. `rebuildOf` is the first build when this is a free rebuild (D19). */
   async function build(c: Context, recipe: Recipe, request: BuildRequest, rebuildOf?: StoredBuild) {
@@ -104,10 +109,10 @@ export function createRecipeRoutes({
         agent: request.agent,
         position: request.position,
         quoteSqrtPrice,
-        // The PAYMENT-RESPONSE receipt only exists after the middleware settles, which happens
-        // once this handler returns, so it cannot be kept here yet.
         paymentResponse: rebuildOf?.paymentResponse,
+        rebuilds: rebuildOf ? (rebuildOf.rebuilds ?? 0) + 1 : 0,
       });
+      if (!rebuildOf) unsettled.set(c.req.raw, buildId);
       return c.json(response);
     } catch (error) {
       log?.error({ buildId, error: String(error) }, "build failed");
@@ -137,7 +142,23 @@ export function createRecipeRoutes({
     if (!stored || !sameBuild) {
       return errorResponse(c, "REBUILD_WINDOW_CLOSED", "The free rebuild window is closed");
     }
+    if ((stored.rebuilds ?? 0) >= MAX_FREE_REBUILDS) {
+      return errorResponse(c, "RATE_LIMITED", "Too many rebuilds of this transaction", {
+        retryAfterSeconds: (Date.parse(stored.response.rebuildUntil) - Date.now()) / 1000,
+      });
+    }
     return build(c, recipe, request.data, stored);
+  });
+
+  // Outside the payment middleware: it settles after the handler, so only here is the outcome
+  // known. Without a settled payment the build goes away, and with it the rebuild and the shock.
+  app.post("/recipes/:id/build", async (c, next) => {
+    await next();
+    const buildId = unsettled.get(c.req.raw);
+    if (!buildId) return;
+    const receipt = c.res.headers.get("PAYMENT-RESPONSE");
+    if (c.res.ok && receipt) store.confirmPayment(buildId, receipt);
+    else store.delete(buildId);
   });
 
   app.use(
@@ -162,7 +183,7 @@ export function createRecipeRoutes({
 
   app.post("/recipes/:id/build", async (c) => {
     const recipe = recipeById(c.req.param("id"));
-    if (!recipe) return errorResponse(c, "VALIDATION_ERROR", "Unknown recipe");
+    if (!recipe) return errorResponse(c, "NOT_FOUND", "Unknown recipe");
     const request = BuildRequest.safeParse(await c.req.json().catch(() => null));
     if (!request.success) return errorResponse(c, "VALIDATION_ERROR", "Invalid build request");
     return build(c, recipe, request.data);
