@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parseConfig } from "./config";
 
 const valid = {
+  APP_ENV: "local",
   SOLANA_CLUSTER: "devnet",
   RPC_URL: "https://devnet.helius-rpc.com/?api-key=SECRET",
   PAYER_KEYPAIR_PATH: "/keys/payer.json",
@@ -53,5 +54,29 @@ describe("parseConfig", () => {
 
   it("rejects a malformed address", () => {
     expect(() => parseConfig({ ...valid, WHIRLPOOL_ADDRESS: "xyz" })).toThrow(/WHIRLPOOL_ADDRESS/);
+  });
+
+  it("treats an empty variable as not set, like a .env copied from the example", () => {
+    const config = parseConfig({
+      ...valid,
+      PAYER_KEYPAIR: "",
+      PUBLIC_RESOURCE_URL: "",
+      DEMO_ACCESS_CODE: "",
+    });
+    expect(config.PAYER_KEYPAIR).toBeUndefined();
+    expect(config.PUBLIC_RESOURCE_URL).toBeUndefined();
+  });
+
+  it("refuses both payer keys, or none", () => {
+    expect(() => parseConfig({ ...valid, PAYER_KEYPAIR: "[1]" })).toThrow(/exactly one/);
+    expect(() => parseConfig({ ...valid, PAYER_KEYPAIR_PATH: undefined })).toThrow(/exactly one/);
+  });
+
+  it("requires the access code outside local, also when APP_ENV is forgotten", () => {
+    expect(() => parseConfig({ ...valid, APP_ENV: "staging" })).toThrow(/DEMO_ACCESS_CODE/);
+    expect(() => parseConfig({ ...valid, APP_ENV: undefined })).toThrow(/DEMO_ACCESS_CODE/);
+    expect(parseConfig({ ...valid, APP_ENV: "staging", DEMO_ACCESS_CODE: "c" }).APP_ENV).toBe(
+      "staging",
+    );
   });
 });

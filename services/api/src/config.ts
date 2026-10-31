@@ -6,6 +6,11 @@ const BaseUnitsNumber = z.string().regex(/^\d+$/).transform(BigInt);
 /** Environment of the API. Anything missing or malformed stops the boot (lesson 8). */
 export const ConfigSchema = z.object({
   SOLANA_CLUSTER: z.literal("devnet"),
+  /**
+   * Defaults to production on purpose: forgetting it must not open the paid endpoints. Only
+   * APP_ENV=local may run without DEMO_ACCESS_CODE.
+   */
+  APP_ENV: z.enum(["local", "staging", "production"]).default("production"),
   RPC_URL: z.url(),
   /** Local runs: path to the payer keypair file. Railway has no files: use PAYER_KEYPAIR there. */
   PAYER_KEYPAIR_PATH: z.string().min(1).optional(),
@@ -37,14 +42,20 @@ export const ConfigSchema = z.object({
 export type Config = z.infer<typeof ConfigSchema>;
 
 export function parseConfig(env: Record<string, string | undefined>): Config {
-  const result = ConfigSchema.safeParse(env);
+  // `NAME=` in a .env file reaches us as "", which means "not set", not an invalid value.
+  const present = Object.fromEntries(Object.entries(env).filter(([, value]) => value !== ""));
+  const result = ConfigSchema.safeParse(present);
   if (!result.success) {
     // Names of the bad variables only: never the values (they may hold keys or API tokens).
     const names = [...new Set(result.error.issues.map((i) => i.path.join(".")))];
     throw new Error(`Invalid configuration: ${names.join(", ")}`);
   }
-  if (!result.data.PAYER_KEYPAIR_PATH && !result.data.PAYER_KEYPAIR) {
-    throw new Error("Invalid configuration: PAYER_KEYPAIR_PATH or PAYER_KEYPAIR");
+  const { PAYER_KEYPAIR, PAYER_KEYPAIR_PATH, APP_ENV, DEMO_ACCESS_CODE } = result.data;
+  if (Boolean(PAYER_KEYPAIR) === Boolean(PAYER_KEYPAIR_PATH)) {
+    throw new Error("Invalid configuration: set exactly one of PAYER_KEYPAIR_PATH, PAYER_KEYPAIR");
+  }
+  if (APP_ENV !== "local" && !DEMO_ACCESS_CODE) {
+    throw new Error(`Invalid configuration: DEMO_ACCESS_CODE is required when APP_ENV=${APP_ENV}`);
   }
   return result.data;
 }
