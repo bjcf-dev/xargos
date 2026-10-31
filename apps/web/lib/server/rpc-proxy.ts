@@ -3,6 +3,8 @@ import { createRateLimiter } from "./rate-limit";
 /** Lo único que el navegador puede pedirle a Solana (F6, D30). */
 export const RPC_METHODS = [
   "getLatestBlockhash",
+  // Estado de las cuentas del agente antes de simular, para comparar (lib/solana/check-accounts).
+  "getMultipleAccounts",
   "simulateTransaction",
   "sendTransaction",
   "getSignatureStatuses",

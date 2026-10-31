@@ -49,6 +49,16 @@ describe("createRpcProxy", () => {
     expect(calls.at(-1)?.body).toContain("getSignatureStatuses");
   });
 
+  // El firmante lee las cuentas del agente antes de simular para comparar.
+  it("forwards getMultipleAccounts", async () => {
+    const { fetch, calls } = fakeFetch();
+    const response = await createRpcProxy({ upstreamUrl: UPSTREAM, fetch })(
+      rpcRequest(call("getMultipleAccounts")),
+    );
+    expect(response.status).toBe(200);
+    expect(calls.at(-1)?.body).toContain("getMultipleAccounts");
+  });
+
   it("rejects a method outside the list", async () => {
     const { fetch, calls } = fakeFetch();
     const response = await createRpcProxy({ upstreamUrl: UPSTREAM, fetch })(
