@@ -25,10 +25,10 @@ All on **devnet**. Evidence is a transaction signature or a test, never a claim.
 | Guard program (`snapshot`, `assert_min_delta`) | Deployed | `97YMLtF9e6tW3e2ynHASe4qCB2e8uGnyGh5AmJNkJmCm`; LiteSVM tests in `programs/guard/tests` |
 | Own Orca pool (wSOL / demo USDC) | Live | Pool `3qTZVVZbPmCGE3h3GpGxNw6B3F6Z2NdYJeWiv4Kw38pS`; creation, position and swap transactions in [ADR 0003](docs/adr/0003-own-demo-usdc-pool.md) |
 | x402 payment verified and settled | Done in the spike | [`3q2HbKhx…cSQRq`](https://explorer.solana.com/tx/3q2HbKhxgbRDW86HkNo3F1wPFUfSwcNHzmxaNY4SAZxFApWzz9Nh2K2nrfrL7uDKWkHMW4qRC1aU2tvZQFcfSQRq?cluster=devnet), see [ADR 0001](docs/adr/0001-x402-self-facilitation.md) |
-| Paid `POST /recipes/:id/build` (verify → build → simulate → settle) | Implemented, tested with a fake facilitator | `services/api/src/routes/recipes.test.ts` |
+| Paid `POST /recipes/:id/build` (verify → build → simulate → settle) | Implemented; real x402 payment settled on devnet | `pnpm --filter @xargos/api demo:full`; `services/api/src/routes/recipes.test.ts` |
 | Price shock (demo B) and free rebuild | Implemented, tested | `services/api/src/routes/shock.test.ts` |
-| Demo A end to end through the paid route | **Not demonstrated yet** | No signature to show; this README will link it when there is one |
-| Demo B revert on devnet | **Not demonstrated yet** | Same |
+| Demo A end to end through the paid route | Demonstrated by script against a local API | [`4Vn4sfLQ…xi67xcw`](https://explorer.solana.com/tx/4Vn4sfLQosq1RNw8McGbRM2vdhknrCnAn9f7wQ56agb3nSNKw9EoUyq22j7Xjo1o4nAQ1NtsVaoCZMucxxi67xcw?cluster=devnet) |
+| Demo B revert on devnet | Five runs in a row, all reverted by the guard with `GUARD_FAIL` | [1](https://explorer.solana.com/tx/iEjy2ksysir2sYv14cBRqakA3bwgLCUd52nbQkScEYeUYqKMckujw3Fokj8JcyVnq8bTjudXB49jk9DwVoKk1Zm?cluster=devnet), [2](https://explorer.solana.com/tx/TZyfcaBsV56aB4Jjfy3no8vih5EKCTR7cdojC7pqW4aNmVMRJWN8Gf2PGcphgrusjnuRFMeMg4S6YRSd1NjwPk5?cluster=devnet), [3](https://explorer.solana.com/tx/5PQRDmr1wACX3idxL7EjqB7av9LpDESJRKdM2QNwSrXgDsFvTyMZpH4NtYBxwENMRNr6RHajXKgk5mLDQYQY1eYy?cluster=devnet), [4](https://explorer.solana.com/tx/4mJW4FpEgGRnwAw6oy5U1XDnL6Nb4LC2gcUFSWktcW4T5QBZTsRR8j65bZbupkL7D7koxyydmew3jPwmVwMAsUkP?cluster=devnet), [5](https://explorer.solana.com/tx/5a5EBtWzDmYeXNwtaktgAj1Bi1DwoDFXp52PbqSzFuUumMm1SCxY166i1EsdLrr3viYNz7Z5t2gAduyQBYy9CJMc?cluster=devnet) |
 
 ## How Solana makes it possible
 
