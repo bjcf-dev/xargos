@@ -32,7 +32,11 @@ const token = (amount: string, info: Record<string, unknown> = {}): AccountState
   },
 });
 
-const before = { [AGENT]: wallet(40_000_000n), [USDC]: token("0"), [WSOL]: token("0") };
+const before: Record<string, AccountState | null> = {
+  [AGENT]: wallet(40_000_000n),
+  [USDC]: token("0"),
+  [WSOL]: token("0"),
+};
 const check = (after: Record<string, AccountState | null>, base = before) =>
   checkAgentAccounts({ agent: AGENT, watched: USDC, before: base, after });
 

@@ -11,7 +11,12 @@ export const SYSTEM_PROGRAM = "11111111111111111111111111111111";
  */
 export const MAX_SOL_DROP_LAMPORTS = 2_000_000n;
 
-type TokenInfo = { owner?: string; delegate?: string; closeAuthority?: string; amount?: string };
+type TokenInfo = {
+  owner: string | undefined;
+  delegate: string | undefined;
+  closeAuthority: string | undefined;
+  amount: string | undefined;
+};
 
 function tokenInfo(state: AccountState): TokenInfo | null {
   const { data } = state;

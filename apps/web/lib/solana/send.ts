@@ -1,4 +1,7 @@
 import {
+  type Address,
+  address,
+  type GetMultipleAccountsApi,
   type GetSignatureStatusesApi,
   type GetTransactionApi,
   getBase64EncodedWireTransaction,
@@ -18,11 +21,24 @@ import {
 import { parseGuardFail } from "@xargos/shared";
 import { ApiClientError } from "@/lib/api/errors";
 import { sleep } from "@/lib/api/poll";
+import { type AccountState, checkAgentAccounts } from "./check-accounts";
 
 /** Lo que el signer le pide a Solana, a través de /api/xargos/rpc. */
 export type SendRpc = Rpc<
-  SimulateTransactionApi & SendTransactionApi & GetSignatureStatusesApi & GetTransactionApi
+  GetMultipleAccountsApi &
+    SimulateTransactionApi &
+    SendTransactionApi &
+    GetSignatureStatusesApi &
+    GetTransactionApi
 >;
+
+/** Cuentas del agente que se comparan antes y después de simular (check-accounts.ts). */
+export type WatchedAccounts = {
+  agent: string;
+  /** La cuenta de USDC demo que vigila el guard. */
+  watched: string;
+  addresses: readonly string[];
+};
 
 /** `err` puede traer bigint (Kit los usa): no pasa por JSON.stringify sin un replacer. */
 export type SendResult = {
@@ -39,6 +55,8 @@ type SignAndSendArgs = {
   transactionBase64: string;
   /** Índice de assert_min_delta; null si la tx no lleva guard. */
   guardAssertIndex: number | null;
+  /** Sin él no se compara nada (la prueba de /dev/agent-check). */
+  watch?: WatchedAccounts | undefined;
   signal: AbortSignal;
   pollIntervalMs?: number;
   timeoutMs?: number;
@@ -90,6 +108,7 @@ export async function signAndSend({
   keyPair,
   transactionBase64,
   guardAssertIndex,
+  watch,
   signal,
   pollIntervalMs = 1_000,
   timeoutMs = 60_000,
@@ -101,6 +120,7 @@ export async function signAndSend({
       keyPair,
       transactionBase64,
       guardAssertIndex,
+      watch,
       signal,
     });
   } catch (error) {
@@ -114,18 +134,38 @@ async function signSimulateAndSend({
   keyPair,
   transactionBase64,
   guardAssertIndex,
+  watch,
   signal,
 }: Pick<
   SignAndSendArgs,
-  "rpc" | "keyPair" | "transactionBase64" | "guardAssertIndex" | "signal"
+  "rpc" | "keyPair" | "transactionBase64" | "guardAssertIndex" | "watch" | "signal"
 >): Promise<Signature> {
   const transaction = getTransactionDecoder().decode(getBase64Encoder().encode(transactionBase64));
   const signed = await signTransaction([keyPair], transaction);
   const wire = getBase64EncodedWireTransaction(signed);
 
-  const simulation = await rpc
-    .simulateTransaction(wire, { encoding: "base64", sigVerify: true })
-    .send({ abortSignal: signal });
+  const addresses = (watch?.addresses ?? []).map((a) => address(a));
+  const before = watch
+    ? byAddress(
+        addresses,
+        (
+          await rpc
+            .getMultipleAccounts(addresses, { encoding: "jsonParsed" })
+            .send({ abortSignal: signal })
+        ).value,
+      )
+    : null;
+  const simulation = watch
+    ? await rpc
+        .simulateTransaction(wire, {
+          encoding: "base64",
+          sigVerify: true,
+          accounts: { addresses, encoding: "jsonParsed" },
+        })
+        .send({ abortSignal: signal })
+    : await rpc
+        .simulateTransaction(wire, { encoding: "base64", sigVerify: true })
+        .send({ abortSignal: signal });
   const simErr = simulation.value.err;
   if (simErr === "BlockhashNotFound") throw expired();
   const failedAt = failedInstructionIndex(simErr);
@@ -138,11 +178,35 @@ async function signSimulateAndSend({
     const where = failedAt === null ? "" : ` at step ${failedAt}`;
     throw new ApiClientError("INTERNAL", `The transaction would fail${where}; nothing was sent`);
   }
+  // Solo con la simulación buena hay estado final: un fallo del guard revierte la tx entera.
+  if (watch && before && simErr === null) {
+    const problem = checkAgentAccounts({
+      agent: watch.agent,
+      watched: watch.watched,
+      before,
+      after: byAddress(addresses, simulation.value.accounts),
+    });
+    if (problem) {
+      throw new ApiClientError("INTERNAL", `The transaction would ${problem}; nothing was sent`);
+    }
+  }
 
   await rpc
     .sendTransaction(wire, { encoding: "base64", skipPreflight: guardFailed })
     .send({ abortSignal: signal });
   return getSignatureFromTransaction(signed);
+}
+
+/** Empareja cada dirección con su cuenta; si la respuesta no trae una, la dirección no aparece. */
+function byAddress(
+  addresses: readonly Address[],
+  accounts: ReadonlyArray<AccountState | null> | null,
+): Record<string, AccountState | null> {
+  const out: Record<string, AccountState | null> = {};
+  addresses.forEach((a, i) => {
+    if (accounts && i < accounts.length) out[a] = accounts[i] ?? null;
+  });
+  return out;
 }
 
 /**

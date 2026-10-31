@@ -19,6 +19,7 @@ import {
 } from "@solana/kit";
 import { beforeAll, describe, expect, it } from "vitest";
 import { ApiClientError } from "@/lib/api/errors";
+import type { AccountState } from "./check-accounts";
 import { failedInstructionIndex, type SendRpc, signAndSend } from "./send";
 
 let keyPair: CryptoKeyPair;
@@ -59,6 +60,8 @@ type FakeOptions = {
   };
   statuses?: Array<{ confirmationStatus: string; err: unknown } | null>;
   meta?: { err: unknown; logMessages: string[]; fee?: unknown };
+  /** Estado de las cuentas vigiladas: antes (getMultipleAccounts) y tras simular. */
+  accounts?: { before: Array<AccountState | null>; after: Array<AccountState | null> | null };
 };
 
 function fakeRpc({
@@ -66,9 +69,12 @@ function fakeRpc({
   simulationLogs = ["sim log"],
   statuses,
   meta,
+  accounts,
   throws = {},
 }: FakeOptions = {}) {
   const sent: Array<{ wire: string; config: unknown }> = [];
+  const simulated: unknown[] = [];
+  let reads = 0;
   const queue = statuses ?? [{ confirmationStatus: "confirmed", err: null }];
   const reply = <T>(value: T) => ({ send: async () => value });
   const fail = (error: unknown) => ({
@@ -78,10 +84,17 @@ function fakeRpc({
   });
   let statusFailures = 0;
   const rpc = {
-    simulateTransaction: () =>
-      throws.simulate
-        ? fail(throws.simulate)
-        : reply({ value: { err: simulationErr, logs: simulationLogs } }),
+    getMultipleAccounts: () => {
+      reads += 1;
+      return reply({ value: accounts?.before ?? [] });
+    },
+    simulateTransaction: (_wire: string, config: unknown) => {
+      simulated.push(config);
+      if (throws.simulate) return fail(throws.simulate);
+      return reply({
+        value: { err: simulationErr, logs: simulationLogs, accounts: accounts?.after ?? null },
+      });
+    },
     sendTransaction: (wire: string, config: unknown) => {
       if (throws.send) return fail(throws.send);
       sent.push({ wire, config });
@@ -97,7 +110,7 @@ function fakeRpc({
     },
     getTransaction: () => reply({ meta: meta ?? { err: null, logMessages: ["Program log: ok"] } }),
   } as unknown as SendRpc;
-  return { rpc, sent };
+  return { rpc, sent, simulated, reads: () => reads };
 }
 
 const base = () => ({
@@ -216,6 +229,85 @@ const httpError = (statusCode: number) =>
     message: "HTTP error",
     statusCode,
   });
+
+const AGENT = "AgentDemo1111111111111111111111111111111111";
+const USDC = "AgentUsdcAta1111111111111111111111111111111";
+const wallet = (lamports: bigint): AccountState => ({
+  lamports,
+  owner: "11111111111111111111111111111111",
+  data: ["", "base64"],
+});
+const usdc = (amount: string, extra: Record<string, unknown> = {}): AccountState => ({
+  lamports: 2_039_280n,
+  owner: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  data: { parsed: { type: "account", info: { owner: AGENT, tokenAmount: { amount }, ...extra } } },
+});
+const watch = { agent: AGENT, watched: USDC, addresses: [AGENT, USDC] };
+
+describe("signAndSend with the agent accounts watched", () => {
+  it("reads the accounts, simulates with them and sends when nothing is off", async () => {
+    const { rpc, sent, simulated, reads } = fakeRpc({
+      accounts: {
+        before: [wallet(40_000_000n), usdc("0")],
+        after: [wallet(39_995_000n), usdc("9950000")],
+      },
+    });
+    await signAndSend({ rpc, ...base(), watch });
+    expect(reads()).toBe(1);
+    expect(simulated[0]).toMatchObject({
+      accounts: { addresses: [AGENT, USDC], encoding: "jsonParsed" },
+    });
+    expect(sent).toHaveLength(1);
+  });
+
+  it("does not send when the simulation shows an account taken over", async () => {
+    const THIEF = "D1PzuAbRJB1io3awJX2GDoiL1ihwK9Kt9yfciLrgJFss";
+    const { rpc, sent } = fakeRpc({
+      accounts: {
+        before: [wallet(40_000_000n), usdc("0")],
+        after: [wallet(39_995_000n), usdc("9950000", { delegate: THIEF })],
+      },
+    });
+    const error = (await signAndSend({ rpc, ...base(), watch }).catch(
+      (e: unknown) => e,
+    )) as ApiClientError;
+    expect(error).toBeInstanceOf(ApiClientError);
+    expect(error.code).toBe("INTERNAL");
+    expect(error.message).toMatch(
+      /^The transaction would let another wallet spend from .*nothing was sent$/,
+    );
+    expect(sent).toHaveLength(0);
+  });
+
+  it("does not send when the simulation returns no accounts", async () => {
+    const { rpc, sent } = fakeRpc({
+      accounts: { before: [wallet(40_000_000n), usdc("0")], after: null },
+    });
+    await expect(signAndSend({ rpc, ...base(), watch })).rejects.toBeInstanceOf(ApiClientError);
+    expect(sent).toHaveLength(0);
+  });
+
+  // Una tx que falla en el guard revierte entera en la cadena: no hay estado final que comparar.
+  it("still sends a guard failure without comparing", async () => {
+    const guardErr = { InstructionError: [7, { Custom: 6004 }] };
+    const { rpc, sent } = fakeRpc({
+      simulationErr: guardErr,
+      simulationLogs: ["Program log: GUARD_FAIL received=1 min=2"],
+      statuses: [{ confirmationStatus: "confirmed", err: guardErr }],
+      meta: { err: guardErr, logMessages: [] },
+      accounts: { before: [wallet(40_000_000n), usdc("0")], after: null },
+    });
+    await signAndSend({ rpc, ...base(), watch });
+    expect(sent).toHaveLength(1);
+  });
+
+  it("reads nothing when there is nothing to watch", async () => {
+    const { rpc, simulated, reads } = fakeRpc();
+    await signAndSend({ rpc, ...base() });
+    expect(reads()).toBe(0);
+    expect(simulated[0]).not.toHaveProperty("accounts");
+  });
+});
 
 describe("signAndSend when the rpc fails", () => {
   it("keeps polling after a transient error and returns the confirmed result", async () => {
