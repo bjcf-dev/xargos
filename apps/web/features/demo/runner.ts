@@ -1,5 +1,5 @@
 import type { Dispatch } from "react";
-import type { ApiClient } from "@/lib/api/client";
+import type { ApiClient, FetchLike } from "@/lib/api/client";
 import { ApiClientError } from "@/lib/api/errors";
 import { pollUntil } from "@/lib/api/poll";
 import type { DemoSigner } from "./signer";
@@ -11,6 +11,8 @@ export type RunnerDeps = {
   recipeId: string;
   /** recipe.price.mint: el signer vigila la cuenta del agente con la que paga x402. */
   paymentMint?: string;
+  /** El fetch que paga x402 con la clave del agente (F8). Solo lo usa un build nuevo. */
+  payer?: FetchLike;
   /** Contrato: polling cada ~1,5 s. */
   pollIntervalMs?: number;
 };
@@ -86,7 +88,7 @@ export function runSetup(
 }
 
 export function runPay(
-  { api, recipeId }: RunnerDeps,
+  { api, recipeId, payer }: RunnerDeps,
   agent: string,
   position: string,
   rawDispatch: Dispatch<DemoEvent>,
@@ -95,7 +97,11 @@ export function runPay(
   const dispatch = unlessAborted(rawDispatch, signal);
   dispatch({ type: "PAY" });
   return step(dispatch, signal, async () => {
-    const { data, paymentResponse } = await api.build(recipeId, { agent, position }, { signal });
+    const { data, paymentResponse } = await api.build(
+      recipeId,
+      { agent, position },
+      { signal, ...(payer ? { pay: payer } : {}) },
+    );
     dispatch({ type: "BUILT", build: data, ...(paymentResponse ? { paymentResponse } : {}) });
   });
 }

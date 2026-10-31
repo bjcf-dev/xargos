@@ -195,6 +195,24 @@ describe("runner", () => {
     });
   });
 
+  // F8: el build nuevo paga con el fetch del agente; el rebuild gratis (D19) nunca lo usa.
+  it("pays a new build with the agent payer and never a rebuild", async () => {
+    const paid: string[] = [];
+    const payer = async (input: RequestInfo | URL, init?: RequestInit) => {
+      paid.push(String(init?.body));
+      return globalThis.fetch(input, init);
+    };
+    const withPayer = { ...deps, payer };
+    await runPay(withPayer, AGENT, POSITION, recorder().dispatch, live());
+    expect(paid).toHaveLength(1);
+    expect(JSON.parse(paid[0] ?? "")).not.toHaveProperty("buildId");
+
+    const run: Run = { agent: AGENT, position: POSITION, build: fixtureBuildResponse };
+    const now = Date.parse(fixtureBuildResponse.rebuildUntil) - 1_000;
+    await runRebuild(withPayer, run, recorder().dispatch, live(), now);
+    expect(paid).toHaveLength(1);
+  });
+
   it("rebuilds an expired run with its buildId and keeps the run", async () => {
     let body: unknown;
     server.use(
