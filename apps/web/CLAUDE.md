@@ -29,7 +29,7 @@ components/ui/              # shadcn
 - **Agente generado en el navegador:** `CryptoKey` Ed25519 no extraíble en IndexedDB (`AgentKeyStore`, `lib/solana`), 24 h y botón _New agent_. Si no se puede guardar, solo en memoria, nunca la semilla. Al backend solo va la pública (D13, D30).
 - **Ninguna cifra escrita a mano:** todo sale de `quote` y `guard`.
 - **Solo decir "guard" si falló el guard:** leer `meta.err` y el log `GUARD_FAIL` (D15).
-- **Antes de enviar, comparar las cuentas del agente** (`lib/solana/check-accounts.ts`): estado antes (`getMultipleAccounts`) y tras simular, de las que deriva el navegador más las `watchAccounts` del backend. Si la tx diera el control de una cuenta (Assign, Approve, SetAuthority) o sacara SOL más allá del margen, no se envía.
+- **Antes de enviar, comparar las cuentas del agente** (`lib/solana/check-accounts.ts`): estado antes (`getMultipleAccounts`) y tras simular, de las que deriva el navegador (también la de USDC con la que paga x402, por `recipe.price.mint`) más las `watchAccounts` del backend. Si la tx diera el control de una cuenta (Assign, Approve, SetAuthority), tocara la cuenta de pago, diera menos USDC demo que `minDelta` o sacara SOL más allá del margen, no se envía.
 - `/demo/setup` y `/demo/price-shock` son asíncronos: progreso por fases con polling, y mensajes claros para `RATE_LIMITED` y `ACCESS_DENIED`.
 - `NEXT_PUBLIC_API_MODE=mock | local | staging`; por defecto `mock`, que funciona sin backend ni secretos.
 

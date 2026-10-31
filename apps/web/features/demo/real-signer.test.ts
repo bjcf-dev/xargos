@@ -18,6 +18,8 @@ vi.mock("@/lib/solana/send", async (importActual) => ({
 import { createRealSigner } from "./real-signer";
 import type { Run } from "./types";
 
+/** USDC de Circle en devnet: un mint del programa Token clásico (comprobado en devnet). */
+const PAYMENT_MINT = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
 const run: Run = {
   agent: fixtureSetupReady.agent,
   position: fixtureSetupReady.position ?? "",
@@ -49,20 +51,32 @@ describe("createRealSigner", () => {
   });
 
   // No se fía solo de watchAccounts del backend: añade las cuentas del agente que deriva él.
-  it("watches the agent wallet, the guard account, its wSOL and its position account", async () => {
+  it("watches the agent wallet, the guard account, its wSOL, its position and its USDC", async () => {
     signAndSend.mockResolvedValue({ signature: "sig", err: null, logs: [] });
-    await signer({ ...run, build: { ...fixtureBuildResponse, watchAccounts: [] } }, signal);
+    const build = { ...fixtureBuildResponse, watchAccounts: [] };
+    await signer({ ...run, build }, signal, { paymentMint: PAYMENT_MINT });
     const watch = watchedIn();
+    const payment = await associatedTokenAddress(run.agent, PAYMENT_MINT, TOKEN_PROGRAM);
     expect(watch.agent).toBe(run.agent);
     expect(watch.watched).toBe(fixtureBuildResponse.guard.watchedAccount);
+    expect(watch.minDelta).toBe(BigInt(fixtureBuildResponse.guard.minDelta));
+    expect(watch.payment).toBe(payment);
     expect([...watch.addresses].sort()).toEqual(
       [
         run.agent,
         fixtureBuildResponse.guard.watchedAccount,
         await associatedTokenAddress(run.agent, WSOL_MINT, TOKEN_PROGRAM),
         await associatedTokenAddress(run.agent, run.position, TOKEN_2022_PROGRAM),
+        payment,
       ].sort(),
     );
+  });
+
+  it("watches no payment account when it does not know the mint", async () => {
+    signAndSend.mockResolvedValue({ signature: "sig", err: null, logs: [] });
+    await signer({ ...run, build: { ...fixtureBuildResponse, watchAccounts: [] } }, signal);
+    expect(watchedIn().payment).toBeUndefined();
+    expect(watchedIn().addresses).toHaveLength(4);
   });
 
   it("adds what the backend lists, once", async () => {
