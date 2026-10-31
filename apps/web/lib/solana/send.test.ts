@@ -242,7 +242,7 @@ const usdc = (amount: string, extra: Record<string, unknown> = {}): AccountState
   owner: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
   data: { parsed: { type: "account", info: { owner: AGENT, tokenAmount: { amount }, ...extra } } },
 });
-const watch = { agent: AGENT, watched: USDC, addresses: [AGENT, USDC] };
+const watch = { agent: AGENT, watched: USDC, minDelta: 9_900_000n, addresses: [AGENT, USDC] };
 
 describe("signAndSend with the agent accounts watched", () => {
   it("reads the accounts, simulates with them and sends when nothing is off", async () => {
@@ -276,6 +276,17 @@ describe("signAndSend with the agent accounts watched", () => {
     expect(error.message).toMatch(
       /^The transaction would let another wallet spend from .*nothing was sent$/,
     );
+    expect(sent).toHaveLength(0);
+  });
+
+  it("does not send when the agent would get less than the guard promises", async () => {
+    const { rpc, sent } = fakeRpc({
+      accounts: {
+        before: [wallet(40_000_000n), usdc("0")],
+        after: [wallet(39_995_000n), usdc("9899999")],
+      },
+    });
+    await expect(signAndSend({ rpc, ...base(), watch })).rejects.toThrow(/promises/);
     expect(sent).toHaveLength(0);
   });
 

@@ -37,6 +37,10 @@ export type WatchedAccounts = {
   agent: string;
   /** La cuenta de USDC demo que vigila el guard. */
   watched: string;
+  /** Lo que el guard promete que gana `watched` (build.guard.minDelta). */
+  minDelta: bigint;
+  /** La cuenta de USDC con la que el agente paga x402. */
+  payment?: string | undefined;
   addresses: readonly string[];
 };
 
@@ -183,6 +187,8 @@ async function signSimulateAndSend({
     const problem = checkAgentAccounts({
       agent: watch.agent,
       watched: watch.watched,
+      minDelta: watch.minDelta,
+      payment: watch.payment,
       before,
       after: byAddress(addresses, simulation.value.accounts),
     });

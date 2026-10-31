@@ -7,7 +7,8 @@ export const SYSTEM_PROGRAM = "11111111111111111111111111111111";
  * Cuánto SOL pueden perder entre todas las cuentas del agente: la comisión de red y el pequeño
  * desvío entre la cotización y la simulación (la receta paga el swap con el SOL que devuelve la
  * posición). Se suman todas porque el rent de una cuenta nueva o cerrada sigue siendo del agente.
- * Margen provisional: falta medirlo con la simulación de una demo A real en devnet.
+ * Billy lo midió en una demo A real en devnet (posición de 0,02 SOL): el agente gana SOL en
+ * total, porque la wallet recibe el SOL de la posición. El margen sobra; es una sola medida.
  */
 export const MAX_SOL_DROP_LAMPORTS = 2_000_000n;
 
@@ -33,6 +34,12 @@ function tokenInfo(state: AccountState): TokenInfo | null {
   };
 }
 
+/** Saldo de una cuenta de token; 0 si no existe o no se lee. */
+function amountOf(state: AccountState | null | undefined): bigint {
+  const amount = state ? tokenInfo(state)?.amount : undefined;
+  return amount === undefined ? 0n : BigInt(amount);
+}
+
 /**
  * Compara las cuentas del agente antes y después de simular la tx. El guard solo vigila el USDC
  * demo: esto para lo que el guard no ve, como dar el control de una cuenta (Assign, Approve,
@@ -42,12 +49,18 @@ function tokenInfo(state: AccountState): TokenInfo | null {
 export function checkAgentAccounts({
   agent,
   watched,
+  minDelta,
+  payment,
   before,
   after,
 }: {
   agent: string;
   /** La cuenta de USDC demo que vigila el guard (build.guard.watchedAccount). */
   watched: string;
+  /** Lo que el guard promete que gana `watched` (build.guard.minDelta). */
+  minDelta: bigint;
+  /** La cuenta de USDC con la que el agente paga x402: la receta no la toca. */
+  payment?: string | undefined;
   before: Readonly<Record<string, AccountState | null>>;
   after: Readonly<Record<string, AccountState | null>>;
 }): string | null {
@@ -64,6 +77,7 @@ export function checkAgentAccounts({
 
     if (!now) {
       if (address === watched) return "close the account the guard watches";
+      if (address === payment) return "close the account the agent pays with";
       continue; // la receta cierra la cuenta de wSOL y la de la posición
     }
     if (was && now.owner !== was.owner) return `move ${address} to another program`;
@@ -74,13 +88,14 @@ export function checkAgentAccounts({
     if (info.closeAuthority !== undefined && info.closeAuthority !== agent) {
       return `let another wallet close ${address}`;
     }
-    if (address === watched && was) {
-      const previous = tokenInfo(was)?.amount;
-      if (previous !== undefined && BigInt(info.amount ?? "0") < BigInt(previous)) {
-        return "take demo USDC from the agent";
-      }
+    if (address === payment && amountOf(now) < amountOf(was)) {
+      return "take USDC from the account the agent pays with";
     }
   }
+  // Que no baje no basta: una tx que se lleva la posición y cierra su cuenta no baja nada.
+  const gain = amountOf(after[watched]) - amountOf(before[watched]);
+  if (gain < 0n) return "take demo USDC from the agent";
+  if (gain < minDelta) return "give the agent less demo USDC than the guard promises";
   const total = (states: Readonly<Record<string, AccountState | null>>) =>
     Object.keys(before).reduce((sum, address) => sum + (states[address]?.lamports ?? 0n), 0n);
   if (total(before) - total(after) > MAX_SOL_DROP_LAMPORTS) return "take SOL from the agent";
