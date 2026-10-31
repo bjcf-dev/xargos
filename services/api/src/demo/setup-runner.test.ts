@@ -125,4 +125,14 @@ describe("runSetup", () => {
     );
     expect(jobs.get(AGENT)?.phase).toBe("failed");
   });
+
+  it("ends failed when a step hangs, so the client can try again", async () => {
+    const jobs = new SetupJobs();
+    jobs.create(AGENT);
+    const log = { error: vi.fn() };
+    const never = () => new Promise<void>(() => {});
+    await runSetup(jobs, fakeSteps({ fundSol: never }), AGENT, log, 10);
+    expect(jobs.get(AGENT)?.phase).toBe("failed");
+    expect(log.error).toHaveBeenCalledOnce();
+  });
 });

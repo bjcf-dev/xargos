@@ -1,4 +1,5 @@
 import type { PriceShockStatus } from "@xargos/shared";
+import { withTimeout } from "../http/timeout";
 import type { Logger } from "./setup-runner";
 
 /** What the shock does on-chain. Injected so the flow can be tested without a network. */
@@ -55,23 +56,6 @@ export class ShockGate {
 const RESTORE_TIMEOUT_MS = 45_000;
 const RESTORE_ATTEMPTS = 3;
 const RESTORE_RETRY_MS = 5_000;
-
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`timed out after ${ms} ms`)), ms);
-    timer.unref?.();
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (error: unknown) => {
-        clearTimeout(timer);
-        reject(error);
-      },
-    );
-  });
-}
 
 /** Never throws: a failure ends the job as `failed`; a landed shock schedules the restore. */
 export async function runShock(
