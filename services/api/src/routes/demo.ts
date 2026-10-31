@@ -45,6 +45,8 @@ export function sameCode(given: string | undefined, expected: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+const NO_FUNDS_RETRY_SECONDS = 60 * 60;
+
 export function createDemoRoutes({
   jobs,
   steps,
@@ -61,8 +63,11 @@ export function createDemoRoutes({
     if (!body.success) return errorResponse(c, "VALIDATION_ERROR", "Invalid setup request");
     const codeIsValid = accessCode !== undefined && sameCode(body.data.accessCode, accessCode);
     // The limit goes first, so guessing the access code also uses up the quota.
-    if (!limiter.allow(clientKey(c, codeIsValid))) {
-      return errorResponse(c, "RATE_LIMITED", "Too many setups, try later");
+    const client = clientKey(c, codeIsValid);
+    if (!limiter.allow(client)) {
+      return errorResponse(c, "RATE_LIMITED", "Too many setups, try later", {
+        retryAfterSeconds: limiter.retryAfterSeconds(client),
+      });
     }
     if (accessCode && !codeIsValid) return errorResponse(c, "ACCESS_DENIED", "Invalid access code");
 
@@ -72,10 +77,15 @@ export function createDemoRoutes({
     const isNew = !jobs.get(agent);
     if (isNew || jobs.get(agent)?.phase === "failed") {
       if (globalLimiter && !globalLimiter.allow("all")) {
-        return errorResponse(c, "RATE_LIMITED", "The demo is busy, try later");
+        return errorResponse(c, "RATE_LIMITED", "The demo is busy, try later", {
+          retryAfterSeconds: globalLimiter.retryAfterSeconds("all"),
+        });
       }
+      // Not SETUP_FAILED: "try again in a moment" would not help until someone tops the payer up.
       if (hasFunds && !(await hasFunds())) {
-        return errorResponse(c, "SETUP_FAILED", "The demo is out of funds for now");
+        return errorResponse(c, "RATE_LIMITED", "The demo is out of funds for now", {
+          retryAfterSeconds: NO_FUNDS_RETRY_SECONDS,
+        });
       }
     }
     if (isNew) {

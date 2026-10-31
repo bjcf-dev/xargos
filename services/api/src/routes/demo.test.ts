@@ -129,6 +129,8 @@ describe("limits of POST /demo/setup (P0-1, P1-6)", () => {
     }
     expect(codes.slice(0, 5).every((status) => status === 403)).toBe(true);
     expect(codes.slice(5).every((status) => status === 429)).toBe(true);
+    const blocked = await post({ agent: AGENT, accessCode: "guess" });
+    expect(Number(blocked.headers.get("Retry-After"))).toBeGreaterThan(0);
   });
 
   it("caps setups across every client, on top of the limit per IP", async () => {
@@ -149,8 +151,9 @@ describe("limits of POST /demo/setup (P0-1, P1-6)", () => {
   it("refuses a new setup with a clear error when the payer is short of funds", async () => {
     const { post, jobs } = setup({ hasFunds: async () => false });
     const res = await post({ agent: AGENT });
-    expect(res.status).toBe(500);
-    expect((await errorBody(res)).error.code).toBe("SETUP_FAILED");
+    expect(res.status).toBe(429);
+    expect((await errorBody(res)).error.code).toBe("RATE_LIMITED");
+    expect(res.headers.get("Retry-After")).toBe("3600");
     expect(jobs.get(AGENT)).toBeUndefined();
   });
 });

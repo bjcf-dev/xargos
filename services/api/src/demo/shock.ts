@@ -37,13 +37,29 @@ export class ShockJobs {
  * One shock at a time, and not again until the pool has been RESTORED. A second shock on a pool
  * that is still low would not be a shock, and a shock that overlaps the restore cancels itself.
  */
+/** While a shock is running its end is unknown; a short wait is enough to ask again. */
+const RUNNING_RETRY_SECONDS = 15;
+
 export class ShockGate {
   private locked = false;
+  private expectedFreeAt = 0;
+
+  constructor(private readonly now: () => number = Date.now) {}
 
   tryStart(): boolean {
     if (this.locked) return false;
     this.locked = true;
+    this.expectedFreeAt = 0;
     return true;
+  }
+
+  /** When the restore should be over, for the Retry-After of whoever finds the gate locked. */
+  expectFreeIn(ms: number): void {
+    this.expectedFreeAt = this.now() + ms;
+  }
+
+  retryAfterSeconds(): number {
+    return Math.max(RUNNING_RETRY_SECONDS, Math.ceil((this.expectedFreeAt - this.now()) / 1000));
   }
 
   /** Opens the gate: the shock failed (nothing moved) or the pool is back at its baseline. */
@@ -54,6 +70,8 @@ export class ShockGate {
 
 /** A restore that never answers (a lost confirmation) must not keep the demo locked forever. */
 const RESTORE_TIMEOUT_MS = 45_000;
+/** Rough time a restore takes once it starts: only used to say how long to wait. */
+const RESTORE_MARGIN_MS = 10_000;
 const RESTORE_ATTEMPTS = 3;
 const RESTORE_RETRY_MS = 5_000;
 
@@ -90,6 +108,7 @@ export async function runShock(
         },
       );
     };
+    gate.expectFreeIn(options.cooldownMs + RESTORE_MARGIN_MS);
     schedule(() => restore(1), options.cooldownMs);
   } catch (error) {
     options.log?.error({ shockId, error: String(error) }, "price shock failed");

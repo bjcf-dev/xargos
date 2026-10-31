@@ -38,8 +38,12 @@ export function createShockRoutes(deps: ShockRoutesDeps) {
     const codeIsValid = deps.accessCode !== undefined && sameCode(code, deps.accessCode);
     if (deps.accessCode && !codeIsValid) {
       // Wrong codes do use up the quota: otherwise this is a free way to guess the code.
-      const allowed = deps.limiter.allow(clientKey(c, false));
-      if (!allowed) return errorResponse(c, "RATE_LIMITED", "Too many price shocks, try later");
+      const stranger = clientKey(c, false);
+      if (!deps.limiter.allow(stranger)) {
+        return errorResponse(c, "RATE_LIMITED", "Too many price shocks, try later", {
+          retryAfterSeconds: deps.limiter.retryAfterSeconds(stranger),
+        });
+      }
       return errorResponse(c, "ACCESS_DENIED", "Invalid access code");
     }
 
@@ -54,11 +58,16 @@ export function createShockRoutes(deps: ShockRoutesDeps) {
     // The gate comes BEFORE the rate limit: a client that is only waiting for the pool to recover
     // must not use up its quota with every poll. Only a shock that really starts is counted.
     if (!deps.gate.tryStart()) {
-      return errorResponse(c, "RATE_LIMITED", "The pool is busy or recovering, try again soon");
+      return errorResponse(c, "RATE_LIMITED", "The pool is busy or recovering, try again soon", {
+        retryAfterSeconds: deps.gate.retryAfterSeconds(),
+      });
     }
-    if (!deps.limiter.allow(clientKey(c, codeIsValid))) {
+    const client = clientKey(c, codeIsValid);
+    if (!deps.limiter.allow(client)) {
       deps.gate.release();
-      return errorResponse(c, "RATE_LIMITED", "Too many price shocks, try later");
+      return errorResponse(c, "RATE_LIMITED", "Too many price shocks, try later", {
+        retryAfterSeconds: deps.limiter.retryAfterSeconds(client),
+      });
     }
 
     const shockId = `shk_${randomUUID()}`;

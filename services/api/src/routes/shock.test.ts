@@ -121,6 +121,7 @@ describe("POST /demo/price-shock", () => {
     expect((await post()).status).toBe(202);
     const second = await post();
     expect(second.status).toBe(429);
+    expect(Number(second.headers.get("Retry-After"))).toBeGreaterThan(0);
     expect(ErrorResponse.parse(await second.json()).error.code).toBe("RATE_LIMITED");
   });
 
