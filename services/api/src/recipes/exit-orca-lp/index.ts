@@ -23,9 +23,9 @@ import type { BuildContext, BuiltRecipe, Recipe, RecipeStep } from "../types";
 import { withCollectFees } from "./collect-fees";
 import { tagStep } from "./steps";
 
-/** Same id as the contract fixture (packages/shared), which the front looks up. */
 const TOKEN_2022_PROGRAM = address("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
 
+/** Same id as the contract fixture (packages/shared), which the front looks up. */
 export const EXIT_ORCA_LP_ID = "exit-orca-lp-to-usdc";
 
 export type ExitOrcaLpDeps = {
