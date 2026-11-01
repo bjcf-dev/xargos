@@ -89,6 +89,6 @@ export async function buildResponse({
       programId: s.instruction.programAddress,
       kind: s.kind,
     })),
-    watchAccounts: [built.guard.watchedAccount],
+    watchAccounts: built.watchAccounts ?? [built.guard.watchedAccount],
   });
 }

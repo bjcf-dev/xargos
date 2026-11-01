@@ -1,146 +1,8 @@
-import { address, type Instruction, type Rpc, type SolanaRpcApi } from "@solana/kit";
-import type { FacilitatorClient } from "@x402/core/server";
-import { SOLANA_DEVNET_CAIP2 } from "@x402/svm";
 import { getAssertMinDeltaInstruction, getSnapshotInstruction } from "@xargos/guard-client";
 import { BuildResponse, ErrorResponse } from "@xargos/shared";
 import { describe, expect, it, vi } from "vitest";
 import type { Recipe } from "../recipes/types";
-import { BuildStore } from "../store/build-store";
-import { createRecipeRoutes } from "./recipes";
-
-const PAYER = "A3zwodWASq2rCTSwjiRvzrRMNKLEP7bMwC3azd4X5nDj";
-const PAY_TO = "3NxLt5rLgsT46ngFjUj2VQhsfhu1miEmARUTS8gN1MYw";
-const FEE_PAYER = "3qybJ9ApEBWun7xvbnrVJ6NfDpvRGTBbppfxaFENe6SC";
-const AGENT = "Vote111111111111111111111111111111111111111";
-const MINT = address("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU");
-const WATCHED = address("SysvarC1ock11111111111111111111111111111111");
-const SNAPSHOT = address("SysvarRent111111111111111111111111111111111");
-const GUARD = address("97YMLtF9e6tW3e2ynHASe4qCB2e8uGnyGh5AmJNkJmCm");
-const config = { programAddress: GUARD };
-
-function fakeFacilitator() {
-  const calls = { verify: 0, settle: 0 };
-  const facilitator: FacilitatorClient = {
-    verify: async () => {
-      calls.verify++;
-      return { isValid: true, payer: PAYER };
-    },
-    settle: async () => {
-      calls.settle++;
-      return {
-        success: true,
-        transaction: "fake-signature",
-        network: SOLANA_DEVNET_CAIP2,
-        payer: PAYER,
-      };
-    },
-    getSupported: async () => ({
-      kinds: [
-        {
-          x402Version: 2,
-          scheme: "exact",
-          network: SOLANA_DEVNET_CAIP2,
-          extra: { feePayer: FEE_PAYER },
-        },
-      ],
-      extensions: [],
-      signers: {},
-    }),
-  };
-  return { facilitator, calls };
-}
-
-const step = (instruction: Instruction, label: string) => ({
-  instruction,
-  label,
-  protocol: "xARGOS guard",
-  kind: "guard" as const,
-});
-
-const recipe = (build?: Recipe["build"]): Recipe => ({
-  info: {
-    id: "exit-orca-lp-to-usdc",
-    name: "Exit",
-    description: "x",
-    price: { amount: "10000", mint: MINT },
-  },
-  build:
-    build ??
-    (async () => ({
-      steps: [
-        step(
-          getSnapshotInstruction({ agentTokenAccount: WATCHED, snapshot: SNAPSHOT }, config),
-          "Record",
-        ),
-        step(
-          getAssertMinDeltaInstruction(
-            { agentTokenAccount: WATCHED, snapshot: SNAPSHOT, minDelta: 9_900_000n },
-            config,
-          ),
-          "Check",
-        ),
-      ],
-      quote: { tokenOut: MINT, expectedOut: "10000000", slippageBps: 100 },
-      guard: { programId: GUARD, mint: MINT, watchedAccount: WATCHED, minDelta: "9900000" },
-    })),
-});
-
-const fakeRpc = (simulationErr: unknown = null) =>
-  ({
-    getLatestBlockhash: () => ({
-      send: async () => ({
-        value: { blockhash: "11111111111111111111111111111111", lastValidBlockHeight: 1n },
-      }),
-    }),
-    simulateTransaction: () => ({
-      send: async () => ({ value: { err: simulationErr, logs: [] } }),
-    }),
-  }) as unknown as Rpc<SolanaRpcApi>;
-
-function setup(
-  options: {
-    build?: Recipe["build"];
-    simulationErr?: unknown;
-    now?: () => number;
-    publicUrl?: string;
-  } = {},
-) {
-  const { facilitator, calls } = fakeFacilitator();
-  const store = new BuildStore(options.now);
-  const app = createRecipeRoutes({
-    recipes: [recipe(options.build)],
-    rpc: fakeRpc(options.simulationErr),
-    store,
-    facilitator,
-    payTo: PAY_TO,
-    price: "$0.01",
-    publicUrl: options.publicUrl,
-  });
-  const url = "/recipes/exit-orca-lp-to-usdc/build";
-  const body = JSON.stringify({ agent: AGENT, position: MINT });
-  const post = (headers: Record<string, string> = {}) =>
-    app.request(url, {
-      method: "POST",
-      headers: { "content-type": "application/json", ...headers },
-      body,
-    });
-  /** First ask (402), then repeat with a payment, like an x402 client does. */
-  async function postPaid() {
-    const first = await post();
-    expect(first.status).toBe(402);
-    const required = JSON.parse(
-      Buffer.from(first.headers.get("PAYMENT-REQUIRED") ?? "", "base64").toString(),
-    );
-    const payload = {
-      x402Version: 2,
-      resource: required.resource,
-      accepted: required.accepts[0],
-      payload: {},
-    };
-    return post({ "PAYMENT-SIGNATURE": Buffer.from(JSON.stringify(payload)).toString("base64") });
-  }
-  return { app, calls, store, post, postPaid };
-}
+import { AGENT, config, GUARD, MINT, SNAPSHOT, setup, step, WATCHED } from "./recipe-test-kit";
 
 describe("POST /recipes/:id/build with x402", () => {
   it("asks for payment first and does not build anything", async () => {
@@ -328,6 +190,21 @@ describe("free rebuild with a buildId (D19)", () => {
     expect(calls.verify + calls.settle).toBe(0);
   });
 
+  it("caps the free rebuilds of one build", async () => {
+    const { app, postPaid } = setup();
+    const first = BuildResponse.parse(await (await postPaid()).json());
+    const rebuild = () =>
+      app.request("/recipes/exit-orca-lp-to-usdc/build", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: rebuildBody(first.buildId),
+      });
+    for (let i = 0; i < 5; i++) expect((await rebuild()).status).toBe(200);
+    const blocked = await rebuild();
+    expect(blocked.status).toBe(410);
+    expect(ErrorResponse.parse(await blocked.json()).error.code).toBe("REBUILD_WINDOW_CLOSED");
+  });
+
   it("closes the window after rebuildUntil", async () => {
     let clock = Date.now();
     const { app, postPaid } = setup({ now: () => clock });
@@ -350,5 +227,33 @@ describe("free rebuild with a buildId (D19)", () => {
       body: rebuildBody(first.buildId, "SysvarC1ock11111111111111111111111111111111"),
     });
     expect(res.status).toBe(410);
+  });
+});
+
+describe("a build only counts once its payment settled (P1-4)", () => {
+  it("keeps the x402 receipt with a settled build", async () => {
+    const { postPaid, store } = setup();
+    const response = BuildResponse.parse(await (await postPaid()).json());
+    expect(store.get(response.buildId)?.paymentResponse).toBeTruthy();
+  });
+
+  it("forgets the build when the settlement fails: no rebuild and no shock from it", async () => {
+    const { postPaid, store } = setup({ settleFailures: ["insufficient_funds"] });
+    const res = await postPaid();
+    expect(res.ok).toBe(false);
+    expect(store.size).toBe(0);
+    expect(store.latestLiveBuildFor(AGENT)).toBeUndefined();
+  });
+
+  it("does not sell a second recipe for a payment sent twice", async () => {
+    // The real facilitator answers duplicate_settlement (@x402/svm's SettlementCache).
+    const { postPaid, calls, store } = setup({ settleFailures: ["", "duplicate_settlement"] });
+    const first = await postPaid();
+    expect(first.status).toBe(200);
+    const second = await postPaid();
+    expect(second.ok).toBe(false);
+    expect(await second.text()).not.toContain('transaction":"');
+    expect(calls.settle).toBe(2);
+    expect(store.size).toBe(1);
   });
 });

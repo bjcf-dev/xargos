@@ -27,4 +27,12 @@ describe("safeLog", () => {
     expect(spy.mock.calls[0]?.[1]).toMatchObject({ attempt: 2 });
     spy.mockRestore();
   });
+
+  it("also redacts Errors and nested objects logged by mistake", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const url = "https://rpc.example/?api-key=SECRET";
+    safeLog.error({ error: new Error(`down ${url}`), nested: { list: [url] } }, "failed");
+    expect(JSON.stringify(spy.mock.calls)).not.toContain("SECRET");
+    spy.mockRestore();
+  });
 });
