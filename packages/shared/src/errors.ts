@@ -13,6 +13,7 @@ export const ErrorCode = z.enum([
   "RATE_LIMITED",
   "ACCESS_DENIED",
   "VALIDATION_ERROR",
+  "NOT_FOUND",
   "SETUP_FAILED",
   "SHOCK_FAILED",
   "INTERNAL",
@@ -45,6 +46,7 @@ export const ERROR_HTTP: Record<ErrorCode, { status: number; retryable: boolean 
   RATE_LIMITED: { status: 429, retryable: true },
   ACCESS_DENIED: { status: 403, retryable: false },
   VALIDATION_ERROR: { status: 400, retryable: false },
+  NOT_FOUND: { status: 404, retryable: false },
   SETUP_FAILED: { status: 500, retryable: true }, // normalmente viaja dentro del estado del job
   SHOCK_FAILED: { status: 500, retryable: true }, // ídem
   INTERNAL: { status: 500, retryable: true },
