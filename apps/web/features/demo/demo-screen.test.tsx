@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { encodePaymentRequiredHeader } from "@x402/core/http";
 import {
   fixtureBuildResponse,
   fixtureRecipe,
@@ -11,6 +12,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { createApiClient } from "@/lib/api/client";
 import { createAgentKeyStore, createMemoryBackend } from "@/lib/solana/agent-key-store";
 import type { SendRpc } from "@/lib/solana/send";
+import { DEVNET_NETWORK } from "@/lib/x402/payer";
 import { createHandlers } from "@/mocks/handlers";
 import { AgentCard } from "./agent-card";
 import { mockPaymentNote } from "./copy";
@@ -673,6 +675,43 @@ describe("DemoScreen (devnet modes)", () => {
     const message = await screen.findByText(/agent's key could not be created/i);
     expect(message.closest('[data-slot="alert"]')?.textContent).toMatch(/QuotaExceededError/);
     expect(screen.getByRole("button", { name: /reload/i })).toBeDefined();
+  });
+
+  // F8: el 402 lo escribe el backend; el agente no paga más que el precio de la receta.
+  it("refuses a payment above the recipe price and says nothing was charged", async () => {
+    const tooMuch = encodePaymentRequiredHeader({
+      x402Version: 2,
+      resource: {
+        url: "http://localhost/api/xargos/recipes/r/build",
+        description: "",
+        mimeType: "",
+      },
+      accepts: [
+        {
+          scheme: "exact",
+          network: DEVNET_NETWORK,
+          asset: fixtureRecipe.price.mint,
+          amount: (BigInt(fixtureRecipe.price.amount) + 1n).toString(),
+          payTo: fixtureSetupReady.agent,
+          maxTimeoutSeconds: 60,
+          extra: { feePayer: fixtureSetupReady.agent },
+        },
+      ],
+    });
+    server.use(
+      http.post(
+        "*/api/xargos/recipes/:id/build",
+        () => new HttpResponse("{}", { status: 402, headers: { "PAYMENT-REQUIRED": tooMuch } }),
+      ),
+    );
+    render(<DemoScreen api={api} mode="local" agentOptions={agentOptions()} pollIntervalMs={1} />);
+
+    await click(/happy path/i);
+    await click(/pay & build/i);
+
+    expect((await screen.findAllByText(/agent refused to pay/i)).length).toBeGreaterThan(0);
+    expect(screen.getByText(/nothing was charged/i)).toBeDefined();
+    expect(screen.queryByRole("button", { name: /try again/i })).not.toBeNull();
   });
 
   it("mock mode has no New agent button", async () => {

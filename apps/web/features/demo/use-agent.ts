@@ -1,11 +1,13 @@
 import { getAddressFromPublicKey } from "@solana/kit";
 import { fixtureSetupReady } from "@xargos/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { FetchLike } from "@/lib/api/client";
 import { type ApiMode, apiMode } from "@/lib/api/mode";
 import { type AgentKeyStore, openAgentKeyStore } from "@/lib/solana/agent-key-store";
 import { isEd25519Supported } from "@/lib/solana/ed25519";
-import { browserRpc } from "@/lib/solana/rpc";
+import { browserRpc, browserRpcUrl } from "@/lib/solana/rpc";
 import type { SendRpc } from "@/lib/solana/send";
+import { createPayingFetch, type PaymentLimit } from "@/lib/x402/payer";
 import { createRealSigner } from "./real-signer";
 import type { DemoSigner } from "./signer";
 
@@ -19,6 +21,8 @@ export type AgentState =
       address: string;
       /** undefined: el signer de mock (en useDemo, null sería "ninguno"). */
       signer: DemoSigner | undefined;
+      /** El fetch que paga x402 con esta clave, hasta `limit` (F8). undefined en mock: no se paga. */
+      payer: ((limit: PaymentLimit) => FetchLike) | undefined;
       /** false: el agente vive solo en memoria y se pierde al recargar. */
       persistent: boolean;
       newAgent(): Promise<void>;
@@ -29,6 +33,8 @@ export type UseAgentOptions = {
   openStore?: () => Promise<AgentKeyStore>;
   ed25519?: () => Promise<boolean>;
   rpc?: () => SendRpc;
+  /** URL del RPC con el que el pago x402 lee su mint: la ruta del front (la CSP bloquea otras). */
+  rpcUrl?: () => string;
 };
 
 /** Un fallo al crear o leer la clave: sin esto la demo se quedaría cargando para siempre. */
@@ -41,6 +47,7 @@ const MOCK_AGENT: AgentState = {
   status: "ready",
   address: fixtureSetupReady.agent,
   signer: undefined,
+  payer: undefined,
   persistent: true,
   newAgent: async () => {},
 };
@@ -54,13 +61,14 @@ export function useAgent({
   openStore = openAgentKeyStore,
   ed25519 = isEd25519Supported,
   rpc = browserRpc,
+  rpcUrl = browserRpcUrl,
 }: UseAgentOptions = {}): AgentState {
   const [agent, setAgent] = useState<AgentState>(
     mode === "mock" ? MOCK_AGENT : { status: "loading" },
   );
   const store = useRef<AgentKeyStore | null>(null);
   // Las dependencias se leen al montar: cambiarlas no debe crear otro agente.
-  const deps = useRef({ openStore, ed25519, rpc });
+  const deps = useRef({ openStore, ed25519, rpc, rpcUrl });
 
   const load = useCallback(async (fresh: boolean) => {
     const current = store.current;
@@ -71,6 +79,7 @@ export function useAgent({
       status: "ready",
       address: await getAddressFromPublicKey(keyPair.publicKey),
       signer: createRealSigner({ rpc: deps.current.rpc(), keyPair }),
+      payer: (limit) => createPayingFetch({ keyPair, rpcUrl: deps.current.rpcUrl(), limit }),
       persistent: current.persistent,
       newAgent: () => load(true).catch((error: unknown) => setAgent(failed(error))),
     });

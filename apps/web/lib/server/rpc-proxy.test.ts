@@ -59,6 +59,16 @@ describe("createRpcProxy", () => {
     expect(calls.at(-1)?.body).toContain("getMultipleAccounts");
   });
 
+  // El cliente x402 (F8) lee el mint del pago (decimales y programa) antes de firmar.
+  it("forwards getAccountInfo", async () => {
+    const { fetch, calls } = fakeFetch();
+    const response = await createRpcProxy({ upstreamUrl: UPSTREAM, fetch })(
+      rpcRequest(call("getAccountInfo")),
+    );
+    expect(response.status).toBe(200);
+    expect(calls.at(-1)?.body).toContain("getAccountInfo");
+  });
+
   it("rejects a method outside the list", async () => {
     const { fetch, calls } = fakeFetch();
     const response = await createRpcProxy({ upstreamUrl: UPSTREAM, fetch })(

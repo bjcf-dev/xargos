@@ -5,6 +5,8 @@ export const RPC_METHODS = [
   "getLatestBlockhash",
   // Estado de las cuentas del agente antes de simular, para comparar (lib/solana/check-accounts).
   "getMultipleAccounts",
+  // El cliente x402 (F8) lee el mint del pago: decimales y programa de token.
+  "getAccountInfo",
   "simulateTransaction",
   "sendTransaction",
   "getSignatureStatuses",

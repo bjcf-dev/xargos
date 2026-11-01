@@ -289,6 +289,34 @@ describe("createApiClient", () => {
     }
   });
 
+  it("builds through the paying fetch when one is given (F8)", async () => {
+    const plain = fakeFetch(() => json({}, 500));
+    const paying = fakeFetch(() => json(fixtureBuildResponse));
+    const api = createApiClient({ baseUrl: BASE, fetch: plain.fetch });
+
+    await api.build(fixtureRecipe.id, { agent: AGENT, position: "P" }, { pay: paying.fetch });
+
+    expect(paying.calls).toHaveLength(1);
+    expect(paying.calls[0]?.url).toBe(`${BASE}/recipes/${fixtureRecipe.id}/build`);
+    expect(plain.calls).toHaveLength(0);
+  });
+
+  it("keeps the error of a payment the agent refused, instead of a network error", async () => {
+    const refused = new ApiClientError("PAYMENT_INVALID", "The agent did not pay: too much", {
+      rejected: true,
+    });
+    const api = createApiClient({ baseUrl: BASE });
+    const pay = async () => {
+      throw refused;
+    };
+
+    const error = await catchError(
+      api.build(fixtureRecipe.id, { agent: AGENT, position: "P" }, { pay }),
+    );
+
+    expect(error).toBe(refused);
+  });
+
   it("uses /api/xargos as the default base URL", async () => {
     const { fetch, calls } = fakeFetch(() => json([fixtureRecipe]));
     const api = createApiClient({ fetch });

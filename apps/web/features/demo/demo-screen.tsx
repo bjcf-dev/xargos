@@ -1,7 +1,7 @@
 "use client";
 
 import type { DemoSetupStatus } from "@xargos/shared";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -82,6 +82,11 @@ export function DemoScreen({
   const chosenSigner =
     signer !== undefined ? signer : agent.status === "ready" ? agent.signer : undefined;
   const recipe = load.status === "ready" ? load.recipe : null;
+  // F8: el agente paga el build con su clave, como mucho el precio de la receta y en su mint.
+  const payer = useMemo(() => {
+    if (agent.status !== "ready" || !agent.payer || !recipe) return undefined;
+    return agent.payer({ mint: recipe.price.mint, maxAmount: recipe.price.amount });
+  }, [agent, recipe]);
   const [lastSetup, setLastSetup] = useState<DemoSetupStatus | null>(null);
   const [path, setPath] = useState<DemoPath | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -90,6 +95,7 @@ export function DemoScreen({
   const demo = useDemo({
     recipeId: recipe?.id ?? "",
     paymentMint: recipe?.price.mint,
+    payer,
     agent: address,
     api,
     ...(chosenSigner !== undefined ? { signer: chosenSigner } : {}),

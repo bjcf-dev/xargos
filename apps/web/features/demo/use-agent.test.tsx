@@ -25,7 +25,19 @@ describe("useAgent", () => {
       status: "ready",
       address: fixtureSetupReady.agent,
       signer: undefined,
+      payer: undefined,
     });
+  });
+
+  // F8: el agente paga x402 con su clave, hasta el límite que le dé la pantalla (recipe.price).
+  it("a ready agent can make the fetch that pays with its key", async () => {
+    const { result } = renderHook(() =>
+      useAgent(options({ rpcUrl: () => "http://web.local/rpc" })),
+    );
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    const agent = result.current;
+    if (agent.status !== "ready" || !agent.payer) throw new Error("expected a payer");
+    expect(agent.payer({ mint: "M", maxAmount: "10000" })).toBeTypeOf("function");
   });
 
   it("unsupported when Ed25519 is missing", async () => {
