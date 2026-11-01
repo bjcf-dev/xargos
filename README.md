@@ -2,7 +2,7 @@
 
 **Multi-step DeFi recipes for AI agents, paid per request with x402 on Solana. Kept as promised, or not executed at all.**
 
-> Encode Solana Hackathon 2026 · Challenge: _Best Use of x402 on Solana_ · 🚧 Work in progress
+> Encode Solana Hackathon 2026 · Challenge: _Best Use of x402 on Solana_ · 🚧 Checkpoint 1: work in progress
 
 ## The problem
 
@@ -16,11 +16,48 @@ AI agents that manage funds on Solana often need multi-step operations: exit an 
 
 No custody, no escrow: the guarantee is enforced by the chain.
 
+## Status (checkpoint 1)
+
+All on **devnet**. Evidence is a transaction signature or a test, never a claim.
+
+| Piece | State | Evidence |
+| ----- | ----- | -------- |
+| Guard program (`snapshot`, `assert_min_delta`) | Deployed | `97YMLtF9e6tW3e2ynHASe4qCB2e8uGnyGh5AmJNkJmCm`; LiteSVM tests in `programs/guard/tests` |
+| Own Orca pool (wSOL / demo USDC) | Live | Pool `3qTZVVZbPmCGE3h3GpGxNw6B3F6Z2NdYJeWiv4Kw38pS`; creation, position and swap transactions in [ADR 0003](docs/adr/0003-own-demo-usdc-pool.md) |
+| x402 payment verified and settled | Done in the spike | [`3q2HbKhx…cSQRq`](https://explorer.solana.com/tx/3q2HbKhxgbRDW86HkNo3F1wPFUfSwcNHzmxaNY4SAZxFApWzz9Nh2K2nrfrL7uDKWkHMW4qRC1aU2tvZQFcfSQRq?cluster=devnet), see [ADR 0001](docs/adr/0001-x402-self-facilitation.md) |
+| Paid `POST /recipes/:id/build` (verify → build → simulate → settle) | Implemented; real x402 payment settled on devnet | `pnpm --filter @xargos/api demo:full`; `services/api/src/routes/recipes.test.ts` |
+| Price shock (demo B) and free rebuild | Implemented, tested | `services/api/src/routes/shock.test.ts` |
+| Demo A end to end through the paid route | Demonstrated by script against a local API | [`4Vn4sfLQ…xi67xcw`](https://explorer.solana.com/tx/4Vn4sfLQosq1RNw8McGbRM2vdhknrCnAn9f7wQ56agb3nSNKw9EoUyq22j7Xjo1o4nAQ1NtsVaoCZMucxxi67xcw?cluster=devnet) |
+| Demo B revert on devnet | Five runs in a row, all reverted by the guard with `GUARD_FAIL` | [1](https://explorer.solana.com/tx/iEjy2ksysir2sYv14cBRqakA3bwgLCUd52nbQkScEYeUYqKMckujw3Fokj8JcyVnq8bTjudXB49jk9DwVoKk1Zm?cluster=devnet), [2](https://explorer.solana.com/tx/TZyfcaBsV56aB4Jjfy3no8vih5EKCTR7cdojC7pqW4aNmVMRJWN8Gf2PGcphgrusjnuRFMeMg4S6YRSd1NjwPk5?cluster=devnet), [3](https://explorer.solana.com/tx/5PQRDmr1wACX3idxL7EjqB7av9LpDESJRKdM2QNwSrXgDsFvTyMZpH4NtYBxwENMRNr6RHajXKgk5mLDQYQY1eYy?cluster=devnet), [4](https://explorer.solana.com/tx/4mJW4FpEgGRnwAw6oy5U1XDnL6Nb4LC2gcUFSWktcW4T5QBZTsRR8j65bZbupkL7D7koxyydmew3jPwmVwMAsUkP?cluster=devnet), [5](https://explorer.solana.com/tx/5a5EBtWzDmYeXNwtaktgAj1Bi1DwoDFXp52PbqSzFuUumMm1SCxY166i1EsdLrr3viYNz7Z5t2gAduyQBYy9CJMc?cluster=devnet) |
+
 ## How Solana makes it possible
 
 - **Atomic transactions:** every step succeeds together or none does.
 - **x402 on Solana:** fast, cheap USDC payments over HTTP, verified and settled on-chain.
 - **On-chain guard:** a tiny Anchor program that measures what the agent actually received inside the same transaction.
+
+## Guard program
+
+`programs/guard` (Anchor) has no custody and only reads token balances:
+
+- `snapshot` stores the agent's USDC balance and the slot in a PDA.
+- `assert_min_delta(min_delta)` requires the same slot, computes `received = balance − snapshot` and, below `min_delta`, logs `GUARD_FAIL received=… min=…` and fails with `MinDeltaNotMet`.
+- Both check the owner, the mint and that the account is the agent's associated token account.
+
+Why it is built this way: [docs/decisions.md](docs/decisions.md) (D5–D8).
+
+## API
+
+Full contract and error table: [docs/api-contract.md](docs/api-contract.md).
+
+| Method | Route | x402 | Answer |
+| ------ | ----- | ---- | ------ |
+| GET | `/recipes` | no | Recipe list with price |
+| POST | `/recipes/:id/build` | **yes** | `BuildResponse`: the v0 transaction ready to sign, with `buildId` and `rebuildUntil` |
+| POST | `/recipes/:id/build` with `{ buildId }` | no, until `rebuildUntil` | Rebuilt with the same promised minimum, no new payment |
+| POST / GET | `/demo/setup`, `/demo/setup/:agent` | no (access code) | Funds a demo agent and opens its position, by phases |
+| POST / GET | `/demo/price-shock`, `/demo/price-shock/:shockId` | no (access code) | Moves the demo pool price, then restores it after a cooldown |
+| GET | `/health` | no | `{ ok: true }` |
 
 ## Failed payments
 
@@ -30,6 +67,8 @@ No custody, no escrow: the guarantee is enforced by the chain.
 | We can't build or simulate the recipe  | The payment is **not settled**: the agent pays nothing                                         |
 | The transaction expires before sending | Free rebuild for 120 s with the same `buildId`                                                 |
 | The outcome misses the minimum         | The whole transaction reverts on-chain; the agent only pays the recipe fee and the network fee |
+
+The first three rows are covered by tests in `services/api/src/routes/recipes.test.ts`. The last one is enforced by the guard and is not yet shown on devnet.
 
 ## Repository
 
@@ -52,6 +91,15 @@ bash scripts/prepare-env.sh
 cp .env.example .env    # not needed for the frontend mock mode
 pnpm check
 ```
+
+### Run the backend locally
+
+```bash
+pnpm --filter @xargos/api test     # unit tests, no network
+pnpm --filter @xargos/api start    # needs RPC_URL, a payer key and the addresses in .env.example
+```
+
+The payer key comes from `PAYER_KEYPAIR_PATH`, a file outside the repo. Never commit it.
 
 All on **Solana devnet**. Contribution flow: [CONTRIBUTING.md](CONTRIBUTING.md).
 
