@@ -113,7 +113,8 @@ jobs:
       - name: The committed IDL must match the program
         run: |
           diff <(jq 'del(.address)' target/idl/guard.json) <(jq 'del(.address)' packages/guard-client/idl/guard.json)
-          grep -qF "declare_id!(\"$(jq -r .address packages/guard-client/idl/guard.json)\")" programs/guard/src/lib.rs
+          # The build rewrites declare_id! in lib.rs, so read the committed file.
+          git show HEAD:programs/guard/src/lib.rs | grep -qF "declare_id!(\"$(jq -r .address packages/guard-client/idl/guard.json)\")"
       - run: cargo test -p guard # tests LiteSVM sobre target/deploy/guard.so
 
   ci-ok:
