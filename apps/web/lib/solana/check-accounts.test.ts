@@ -64,6 +64,16 @@ describe("checkAgentAccounts", () => {
     expect(check(done)).toBeNull();
   });
 
+  it("accepts an account the recipe closes that the simulation returns with 0 lamports", () => {
+    // simulateTransaction no da null por una cuenta cerrada: la da vacía, sin lamports.
+    expect(check({ ...done, [WSOL]: wallet(0n) })).toBeNull();
+  });
+
+  it("refuses closing the watched or the payment account, also with 0 lamports", () => {
+    expect(check({ ...done, [USDC]: wallet(0n) })).toMatch(/guard/);
+    expect(check({ ...done, [PAY]: wallet(0n) })).toMatch(/pays with/);
+  });
+
   it("accepts exactly the demo USDC the guard promises", () => {
     expect(check({ ...done, [USDC]: token(MIN_DELTA.toString()) })).toBeNull();
   });
