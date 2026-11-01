@@ -115,6 +115,7 @@ El status de cada código vive en `ERROR_HTTP` (`packages/shared/src/errors.ts`)
 | --------------------------------------- | ---- | ----------------------------------------------------------- | ------------------ |
 | `PAYMENT_REQUIRED` / `PAYMENT_INVALID`  | 402  | Sin pago / pago inválido o insuficiente                     | No                 |
 | `VALIDATION_ERROR`                      | 400  | Petición mal formada                                        | No                 |
+| `NOT_FOUND`                             | 404  | Ruta o recurso desconocido (agente sin setup, shock sin id) | No                 |
 | `ACCESS_DENIED`                         | 403  | Código de acceso de la demo incorrecto                      | No                 |
 | `REBUILD_WINDOW_CLOSED`                 | 410  | Ya pasó `rebuildUntil`: hay que pedir un build nuevo (pago) | No                 |
 | `RATE_LIMITED`                          | 429  | Demasiadas peticiones; cabecera `Retry-After`               | Sí, tras esperar   |
