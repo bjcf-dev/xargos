@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { headers } from "next/headers";
 import "./globals.css";
-import { ModeBadge } from "@/components/mode-badge";
 import { Providers } from "@/components/providers";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { SiteHeader } from "@/components/site-header";
 import { cn } from "@/lib/utils";
 
 const geist = Geist({
@@ -22,11 +22,13 @@ export const metadata: Metadata = {
     "Multi-step DeFi recipes for AI agents, paid per request with x402 on Solana: kept as promised or not executed at all.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // El nonce de la CSP (proxy.ts): el script inline de next-themes lo necesita para correr.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html
       lang="en"
@@ -34,15 +36,9 @@ export default function RootLayout({
       className={cn("font-sans", geist.variable, geistMono.variable)}
     >
       <body className="antialiased">
-        <Providers>
+        <Providers nonce={nonce}>
           <div className="min-h-screen bg-background text-foreground">
-            <header className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-              <span className="font-mono text-sm font-bold">xARGOS</span>
-              <div className="flex items-center gap-3">
-                <ModeBadge />
-                <ThemeToggle />
-              </div>
-            </header>
+            <SiteHeader />
             {children}
           </div>
         </Providers>

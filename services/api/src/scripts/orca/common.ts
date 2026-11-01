@@ -3,12 +3,14 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import {
   setDefaultFunder,
+  setNativeMintWrappingStrategy,
   setPayerFromBytes,
   setPriorityFeeSetting,
   setRpc,
   WhirlpoolDeployment,
 } from "@orca-so/whirlpools";
 import { type Address, address, createSolanaRpc } from "@solana/kit";
+import { assertDevnet as assertDevnetRpc } from "../../solana/assert-devnet";
 
 // Devnet only (rule 1). Public RPC unless RPC_URL is set; never print the URL (it may carry a key).
 export const RPC_URL = process.env.RPC_URL || "https://api.devnet.solana.com";
@@ -29,18 +31,11 @@ export const rpc = createSolanaRpc(RPC_URL);
 export const explorerTx = (signature: string) =>
   `https://explorer.solana.com/tx/${signature}?cluster=devnet`;
 
-/** Genesis hash of Solana devnet. The RPC must answer with it before any key is loaded (rule 1). */
-export const DEVNET_GENESIS_HASH = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG";
+export { DEVNET_GENESIS_HASH } from "../../solana/assert-devnet";
 
-type GenesisClient = { getGenesisHash(): { send(): Promise<string> } };
-
-/** Stops the script when RPC_URL does not point to devnet, so a wrong URL can never reach mainnet. */
-export async function assertDevnet(client: GenesisClient = rpc): Promise<void> {
-  const genesis = await client.getGenesisHash().send();
-  if (genesis !== DEVNET_GENESIS_HASH) {
-    throw new Error("RPC_URL does not point to devnet (genesis hash differs): stopping");
-  }
-}
+/** The scripts check their own RPC before loading a key. */
+export const assertDevnet = (client: Parameters<typeof assertDevnetRpc>[0] = rpc) =>
+  assertDevnetRpc(client);
 
 /** Reads ~/.config/xargos/<name>-keypair.json. The bytes never leave this process or get printed. */
 export function loadKeyBytes(name: string): Uint8Array<ArrayBuffer> {
@@ -52,6 +47,7 @@ export function loadKeyBytes(name: string): Uint8Array<ArrayBuffer> {
 export async function useFacilitator() {
   await assertDevnet();
   await setRpc(RPC_URL);
+  setNativeMintWrappingStrategy("ata");
   setPriorityFeeSetting({ type: "none" });
   const payer = await setPayerFromBytes(loadKeyBytes("facilitator"));
   setDefaultFunder(payer);

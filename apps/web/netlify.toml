@@ -1,16 +1,40 @@
-# Netlify — frontend de xARGOS (monorepo pnpm, package directory = apps/web)
-# Verificad en la UI de Netlify que detecta el monorepo y Next.js; el runtime de
-# Next.js en Netlify se aplica solo, no hace falta plugin manual.
+# Netlify — frontend de xARGOS (monorepo pnpm). En la UI: base directory vacío (la raíz)
+# y package directory = apps/web; este archivo se lee desde ahí. El install, el build y el
+# ignore corren en la raíz, así que las rutas van desde la raíz, no desde apps/web.
+# El runtime de Next.js en Netlify se aplica solo, no hace falta plugin manual.
 
 [build]
+  # Solo @xargos/web tiene script de build: `pnpm -r build` construye solo la web.
   command = "pnpm build"
-  publish = ".next"
+  publish = "apps/web/.next"
   # Salta el build si el commit no toca el front, el contrato ni el lockfile.
   # Exit 0 = no construir. Ahorra créditos (cada deploy de producción gasta 15).
-  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- ../../apps/web ../../packages/shared ../../pnpm-lock.yaml"
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- apps/web packages/shared pnpm-lock.yaml"
 
 [build.environment]
   NODE_VERSION = "22"
 
 # Los secretos (URL del backend, DEMO_ACCESS_CODE) se ponen en el panel de Netlify,
 # separados para producción y para develop/previews. Nunca aquí.
+
+# Límite de la plataforma para la ruta RPC del navegador (D30). Una ruta de Next no puede
+# exportar el `config.rateLimit` de Netlify, así que va como redirect a sí misma: Netlify solo
+# documenta `rate_limit` en funciones propias y en redirects. Mismo cupo que el límite en
+# memoria por cliente (120/min).
+# Sin comprobar hasta desplegar (F7, #21). Netlify ignora sin avisar una regla que no valida, y
+# su doc de rewrites dice que descarta las que apuntan a sí mismas (aunque su ejemplo de límite
+# para todo el sitio, /* → /:splat, también lo hace). Un 429 no basta para dar la regla por buena:
+#   1. el log del deploy (post-processing) debe listar la regla de rate limit;
+#   2. el 429 de la ruta lleva JSON-RPC con code -32005 y retry-after; el de Netlify, no.
+# En una deploy preview se puede bajar window_limit a 5 para verlo. Si Netlify la descarta,
+# hará falta una edge function propia delante de la ruta.
+[[redirects]]
+  from = "/api/xargos/rpc"
+  to = "/api/xargos/rpc"
+  status = 200
+  force = true
+
+  [redirects.rate_limit]
+    window_limit = 120
+    window_size = 60
+    aggregate_by = ["ip", "domain"]

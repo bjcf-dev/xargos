@@ -17,6 +17,7 @@ import { createSetupSteps } from "../demo/steps";
 import { createExitOrcaLpRecipe } from "../recipes/exit-orca-lp";
 import { buildResponse } from "../solana/build-transaction";
 import { createSender } from "../solana/send";
+import { createSerial } from "../solana/serial";
 import { SetupJobs } from "../store/setup-jobs";
 import { DEMO_USDC_MINT, explorerTx, RPC_URL, USDC_MINT, useFacilitator } from "./orca/common";
 
@@ -43,6 +44,7 @@ const steps = createSetupSteps({
   fundSolLamports: 20_000_000n,
   fundUsdcBase: BigInt(process.env.FUND_USDC_BASE ?? 0),
   positionSolLamports: 50_000_000n,
+  serial: createSerial(),
 });
 
 const agent = await generateKeyPairSigner();

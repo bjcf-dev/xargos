@@ -2,6 +2,7 @@
 import {
   fixtureBuildResponse,
   fixtureRecipe,
+  fixtureSetupFailed,
   fixtureSetupReady,
   fixtureShockConfirmed,
 } from "@xargos/shared";
@@ -11,7 +12,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { type ApiClient, createApiClient } from "@/lib/api/client";
 import { createHandlers } from "@/mocks/handlers";
 import { createMockSigner } from "./mock-signer";
-import { type RunnerDeps, runPay, runSetup, runShock, runSign } from "./runner";
+import { type RunnerDeps, runPay, runRebuild, runSetup, runShock, runSign } from "./runner";
 import type { DemoSigner } from "./signer";
 import type { DemoEvent, Run } from "./types";
 
@@ -26,7 +27,10 @@ const deps: RunnerDeps = {
 };
 
 beforeAll(() => server.listen({ onUnhandledFrame: "error" }));
-beforeEach(() => server.resetHandlers(...createHandlers()));
+beforeEach(() => {
+  server.events.removeAllListeners();
+  server.resetHandlers(...createHandlers());
+});
 afterAll(() => server.close());
 
 /** Guarda los eventos despachados para comprobar su secuencia. */
@@ -36,6 +40,15 @@ function recorder() {
 }
 const live = () => new AbortController().signal;
 
+/** Cuenta los POST /demo/setup que llegan al mock a partir de ahora. */
+function countSetupPosts() {
+  let count = 0;
+  server.events.on("request:start", ({ request }) => {
+    if (request.method === "POST" && request.url.endsWith("/demo/setup")) count += 1;
+  });
+  return () => count;
+}
+
 describe("runner", () => {
   it("starts the setup and reports every phase until ready", async () => {
     const { events, dispatch } = recorder();
@@ -44,6 +57,39 @@ describe("runner", () => {
     expect(events[0]).toEqual({ type: "SETUP_STARTED", agent: AGENT });
     const phases = events.slice(1).map((e) => e.type === "SETUP_PROGRESS" && e.setup.phase);
     expect(phases).toEqual(["queued", "funding_sol", "funding_usdc", "opening_position", "ready"]);
+  });
+
+  it("resumes a known agent without POST", async () => {
+    const posts = countSetupPosts();
+    server.use(
+      http.get("http://localhost/api/xargos/demo/setup/:agent", () =>
+        HttpResponse.json(fixtureSetupReady),
+      ),
+    );
+    const { events, dispatch } = recorder();
+    await runSetup(deps, AGENT, dispatch, live());
+    expect(posts()).toBe(0);
+    expect(events.at(-1)).toEqual({ type: "SETUP_PROGRESS", setup: fixtureSetupReady });
+  });
+
+  it("posts again when the agent is unknown", async () => {
+    const posts = countSetupPosts();
+    await runSetup(deps, AGENT, recorder().dispatch, live());
+    expect(posts()).toBe(1);
+  });
+
+  it("posts again when the job failed", async () => {
+    const posts = countSetupPosts();
+    let first = true;
+    server.use(
+      http.get("http://localhost/api/xargos/demo/setup/:agent", () => {
+        if (!first) return HttpResponse.json(fixtureSetupReady);
+        first = false;
+        return HttpResponse.json(fixtureSetupFailed);
+      }),
+    );
+    await runSetup(deps, AGENT, recorder().dispatch, live());
+    expect(posts()).toBe(1);
   });
 
   it("pays and builds", async () => {
@@ -88,7 +134,10 @@ describe("runner", () => {
 
     expect(events).toEqual([
       { type: "PAY" },
-      { type: "FAILED", error: { code: "RATE_LIMITED", message: "Too many builds" } },
+      {
+        type: "FAILED",
+        error: { code: "RATE_LIMITED", message: "Too many builds", rejected: true },
+      },
     ]);
   });
 
@@ -102,6 +151,73 @@ describe("runner", () => {
     await runSetup(deps, AGENT, dispatch, controller.signal);
 
     expect(events.map((e) => e.type)).toEqual(["SETUP_STARTED", "SETUP_PROGRESS"]);
+  });
+
+  it("passes the Retry-After wait of a rate-limited build to the error", async () => {
+    server.use(
+      http.post("*/api/xargos/recipes/:id/build", () =>
+        HttpResponse.json(
+          { error: { code: "RATE_LIMITED", message: "Slow down" } },
+          { status: 429, headers: { "retry-after": "20" } },
+        ),
+      ),
+    );
+    const { events, dispatch } = recorder();
+    await runPay(deps, AGENT, POSITION, dispatch, live());
+
+    expect(events.at(-1)).toEqual({
+      type: "FAILED",
+      error: { code: "RATE_LIMITED", message: "Slow down", retryAfterSeconds: 20, rejected: true },
+    });
+  });
+
+  it("flags an unreachable backend in the error", async () => {
+    server.use(http.post("*/api/xargos/recipes/:id/build", () => HttpResponse.error()));
+    const { events, dispatch } = recorder();
+    await runPay(deps, AGENT, POSITION, dispatch, live());
+
+    expect(events.at(-1)).toEqual({
+      type: "FAILED",
+      error: { code: "INTERNAL", message: "Network error", unreachable: true },
+    });
+  });
+
+  it("rebuilds an expired run with its buildId and keeps the run", async () => {
+    let body: unknown;
+    server.use(
+      http.post("*/api/xargos/recipes/:id/build", async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(fixtureBuildResponse);
+      }),
+    );
+    const run: Run = { agent: AGENT, position: POSITION, build: fixtureBuildResponse };
+    const now = Date.parse(fixtureBuildResponse.rebuildUntil) - 1_000;
+    const { events, dispatch } = recorder();
+    await runRebuild(deps, run, dispatch, live(), now);
+
+    expect(body).toEqual({ agent: AGENT, position: POSITION, buildId: run.build.buildId });
+    expect(events).toEqual([
+      { type: "REBUILD", now },
+      { type: "BUILT", build: fixtureBuildResponse },
+    ]);
+  });
+
+  it("does not call the API once the free rebuild window has closed", async () => {
+    let calls = 0;
+    server.use(
+      http.post("*/api/xargos/recipes/:id/build", () => {
+        calls += 1;
+        return HttpResponse.json(fixtureBuildResponse);
+      }),
+    );
+    const run: Run = { agent: AGENT, position: POSITION, build: fixtureBuildResponse };
+    const now = Date.parse(fixtureBuildResponse.rebuildUntil);
+    const { events, dispatch } = recorder();
+    await runRebuild(deps, run, dispatch, live(), now);
+
+    // El reducer convierte este REBUILD en REBUILD_WINDOW_CLOSED.
+    expect(events).toEqual([{ type: "REBUILD", now }]);
+    expect(calls).toBe(0);
   });
 });
 

@@ -38,6 +38,8 @@ const apiError = (code: ErrorCode, message: string) =>
 export function createHandlers({ latencyMs = 0 }: { latencyMs?: number } = {}) {
   const setupPolls = new Map<string, number>();
   const shockPolls = new Map<string, number>();
+  /** buildId → rebuildUntil (ms): la ventana del rebuild gratis de cada build (D19). */
+  const rebuildWindows = new Map<string, number>();
   let builds = 0;
   let shocks = 0;
 
@@ -56,12 +58,31 @@ export function createHandlers({ latencyMs = 0 }: { latencyMs?: number } = {}) {
         if (params.recipeId !== fixtureRecipe.id) {
           return apiError("VALIDATION_ERROR", `Unknown recipe "${params.recipeId}"`);
         }
-        const { agent } = await request.json();
+        const { agent, buildId } = await request.json();
         const now = Date.now();
+        // Rebuild gratis: mismo buildId y blockhash nuevo, sin mover rebuildUntil (D19).
+        if (buildId !== undefined) {
+          const rebuildUntil = rebuildWindows.get(buildId);
+          if (rebuildUntil === undefined) {
+            return apiError("VALIDATION_ERROR", `Unknown build "${buildId}"`);
+          }
+          if (now >= rebuildUntil) {
+            return apiError("REBUILD_WINDOW_CLOSED", "The free rebuild window has closed");
+          }
+          return HttpResponse.json({
+            ...fixtureBuildResponse,
+            buildId,
+            expiresAt: new Date(now + EXPIRES_IN_MS).toISOString(),
+            rebuildUntil: new Date(rebuildUntil).toISOString(),
+            watchAccounts: [agent],
+          });
+        }
         builds++;
+        const id = `bld_mock_${builds}`;
+        rebuildWindows.set(id, now + REBUILD_WINDOW_MS);
         return HttpResponse.json({
           ...fixtureBuildResponse,
-          buildId: `bld_mock_${builds}`,
+          buildId: id,
           expiresAt: new Date(now + EXPIRES_IN_MS).toISOString(),
           rebuildUntil: new Date(now + REBUILD_WINDOW_MS).toISOString(),
           watchAccounts: [agent],

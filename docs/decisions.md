@@ -32,6 +32,7 @@ Registro de lo decidido en las sesiones de diseño (oct 2026). Si una decisión 
 | D14 | `/demo/setup` abre la posición LP y **transfiere el NFT al agente**. Con rate limit, tope por llamada y `DEMO_ACCESS_CODE`.                                     | En Orca, quien tiene el NFT controla la posición; sin límites nos vacían el faucet. |
 | D15 | La UI **lee qué instrucción falló** (`InstructionError [índice, …]`) y solo dice "guard" si de verdad fue el guard.                                             | No afirmar nada que la cadena no diga.                                              |
 | D16 | El texto del revert incluye **la comisión de red**.                                                                                                             | Es exacto y más creíble para un jurado técnico.                                     |
+| D30 | **El agente es una `CryptoKey` Ed25519 no extraíble guardada en IndexedDB**, detrás de `AgentKeyStore`. Caduca a las 24 h y hay botón *New agent*. Si el navegador no la puede guardar, el agente vive en memoria; nunca se guarda la semilla. Varias pestañas comparten el agente. El navegador habla con Solana solo por `/api/xargos/rpc` (genesis de devnet, lista de métodos y límite de peticiones). | El secreto no sale del navegador y ni JS ni un XSS pueden copiarlo (D13). Una recarga no paga otro setup. La URL del RPC, que puede llevar una api-key, no llega al cliente. Acordado con Billy el 29 oct. |
 
 ## Pagos (criterio del jurado: pagos fallidos)
 
