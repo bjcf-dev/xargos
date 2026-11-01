@@ -75,7 +75,8 @@ export function checkAgentAccounts({
       continue;
     }
 
-    if (!now) {
+    // Cerrada: simulateTransaction la devuelve con 0 lamports, no como null.
+    if (!now || now.lamports === 0n) {
       if (address === watched) return "close the account the guard watches";
       if (address === payment) return "close the account the agent pays with";
       continue; // la receta cierra la cuenta de wSOL y la de la posición

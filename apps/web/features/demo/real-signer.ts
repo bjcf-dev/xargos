@@ -1,4 +1,5 @@
-import { parseGuardFail } from "@xargos/shared";
+import { parseGuardFail, verifyRecipeTransaction } from "@xargos/shared";
+import { ApiClientError } from "@/lib/api/errors";
 import {
   associatedTokenAddress,
   TOKEN_2022_PROGRAM,
@@ -41,15 +42,29 @@ async function watchedAccounts(run: Run, { paymentMint }: SignContext): Promise<
   };
 }
 
-/** El signer de devnet: la clave del agente, en este navegador, firma la tx del build (D13). */
+/**
+ * El signer de devnet: la clave del agente, en este navegador, firma la tx del build (D13).
+ * Antes de firmar comprueba la tx sin fiarse del backend (`verifyRecipeTransaction`): el agente
+ * firma solo, programas conocidos, el guard donde dice el build y su mínimo. Lo que no se ve en
+ * la tx (los saldos) lo compara `signAndSend` en la simulación.
+ */
 export function createRealSigner({
   rpc,
   keyPair,
+  verify = verifyRecipeTransaction,
 }: {
   rpc: SendRpc;
   keyPair: CryptoKeyPair;
+  verify?: typeof verifyRecipeTransaction;
 }): DemoSigner {
   return async (run, signal, context = {}) => {
+    const check = verify(run.build.transaction, run.build, run.agent);
+    if (!check.ok) {
+      throw new ApiClientError(
+        "INTERNAL",
+        `The transaction is not what the recipe promised (${check.reason}); nothing was sent`,
+      );
+    }
     const { assertIndex } = run.build.guard;
     const { signature, err, logs, fee } = await signAndSend({
       rpc,

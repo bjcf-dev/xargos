@@ -18,4 +18,10 @@ export class RateLimiter {
     entry.count += 1;
     return true;
   }
+
+  /** Seconds until this key gets a fresh window: what a 429 tells the client to wait. */
+  retryAfterSeconds(key: string, now: number = Date.now()): number {
+    const entry = this.hits.get(key);
+    return entry ? Math.max(1, Math.ceil((entry.resetAt - now) / 1000)) : 1;
+  }
 }

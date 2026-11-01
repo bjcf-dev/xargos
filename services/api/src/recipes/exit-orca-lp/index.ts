@@ -2,11 +2,10 @@ import {
   closePositionInstructions,
   fetchConcentratedLiquidityPool,
   orderMints,
-  setNativeMintWrappingStrategy,
   swapInstructions,
   WhirlpoolDeployment,
 } from "@orca-so/whirlpools";
-import { type Address, createNoopSigner, type Rpc, type SolanaRpcApi } from "@solana/kit";
+import { type Address, address, createNoopSigner, type Rpc, type SolanaRpcApi } from "@solana/kit";
 import { findAssociatedTokenPda, TOKEN_PROGRAM_ADDRESS } from "@solana-program/token";
 import {
   findSnapshotStatePda,
@@ -23,6 +22,8 @@ import { POOL_TICK_SPACING, WSOL_MINT } from "../../solana/constants";
 import type { BuildContext, BuiltRecipe, Recipe, RecipeStep } from "../types";
 import { withCollectFees } from "./collect-fees";
 import { tagStep } from "./steps";
+
+const TOKEN_2022_PROGRAM = address("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
 
 /** Same id as the contract fixture (packages/shared), which the front looks up. */
 export const EXIT_ORCA_LP_ID = "exit-orca-lp-to-usdc";
@@ -55,8 +56,6 @@ export function createExitOrcaLpRecipe(deps: ExitOrcaLpDeps): Recipe {
       // Note: the swap spends `solOut` SOL from the agent's wallet after the wSOL account is closed. If
       // a shock makes the position return less SOL than estimated, the agent covers the difference
       // from its own SOL, which the guard (it only watches the demo USDC) does not see.
-      // The default wraps SOL in throwaway keypairs the agent would have to co-sign; use its wSOL ATA.
-      setNativeMintWrappingStrategy("ata");
       const authority = createNoopSigner(agent); // the agent signs in its own wallet, never here
       const config = {
         authority,
@@ -102,6 +101,21 @@ export function createExitOrcaLpRecipe(deps: ExitOrcaLpDeps): Recipe {
         mint: deps.usdcMint,
         tokenProgram: TOKEN_PROGRAM_ADDRESS,
       });
+      const [wsolAccount] = await findAssociatedTokenPda({
+        owner: agent,
+        mint: WSOL_MINT,
+        tokenProgram: TOKEN_PROGRAM_ADDRESS,
+      });
+      const [positionAccount] = await findAssociatedTokenPda({
+        owner: agent,
+        mint: position,
+        tokenProgram: TOKEN_2022_PROGRAM,
+      });
+      const [paymentAccount] = await findAssociatedTokenPda({
+        owner: agent,
+        mint: deps.priceMint,
+        tokenProgram: TOKEN_PROGRAM_ADDRESS,
+      });
       const [snapshot] = await findSnapshotStatePda(
         { agent, mint: deps.usdcMint },
         { programAddress: deps.guardProgram },
@@ -137,6 +151,9 @@ export function createExitOrcaLpRecipe(deps: ExitOrcaLpDeps): Recipe {
 
       return {
         quoteSqrtPrice: pool.sqrtPrice,
+        // Everything the agent has at stake: demo USDC, SOL (the wallet), wSOL, the position NFT and
+        // the Circle USDC it pays x402 with, which this tx has no reason to touch.
+        watchAccounts: [watchedAccount, agent, wsolAccount, positionAccount, paymentAccount],
         steps,
         quote: {
           tokenOut: deps.usdcMint,

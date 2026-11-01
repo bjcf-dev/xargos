@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
 import { serve } from "@hono/node-server";
+import { setNativeMintWrappingStrategy } from "@orca-so/whirlpools";
 import {
   address,
   createKeyPairSignerFromBytes,
@@ -11,29 +11,27 @@ import { SOLANA_DEVNET_CAIP2, toFacilitatorSvmSigner } from "@x402/svm";
 import { registerExactSvmScheme as registerFacilitator } from "@x402/svm/exact/facilitator";
 import { createApp } from "./app";
 import { parseConfig } from "./config";
+import { createPayerFunds } from "./demo/funds";
 import { ShockGate, ShockJobs } from "./demo/shock";
 import { createShockSteps } from "./demo/shock-steps";
 import { createSetupSteps } from "./demo/steps";
+import { safeLog } from "./http/log";
 import { RateLimiter } from "./http/rate-limit";
 import { asFacilitatorClient } from "./payment/local-facilitator";
 import { createExitOrcaLpRecipe } from "./recipes/exit-orca-lp";
 import { createRecipeRoutes } from "./routes/recipes";
 import { createShockRoutes } from "./routes/shock";
 import { assertDevnet } from "./solana/assert-devnet";
+import { readPayerBytes } from "./solana/payer";
 import { createSender } from "./solana/send";
+import { createSerial } from "./solana/serial";
 import { BuildStore } from "./store/build-store";
 
 const config = parseConfig(process.env);
-if (!config.DEMO_ACCESS_CODE) {
-  // Without the code anyone can start setups that cost the payer SOL: fine locally, not in Railway.
-  console.warn("DEMO_ACCESS_CODE is not set: /demo/setup is open to anyone");
-}
 const rpc = createSolanaRpc(config.RPC_URL);
 // SOLANA_CLUSTER is only an env var: ask the RPC itself before any key is read or any SOL moves.
 await assertDevnet(rpc);
-const payer = await createKeyPairSignerFromBytes(
-  Uint8Array.from(JSON.parse(readFileSync(config.PAYER_KEYPAIR_PATH, "utf8"))),
-);
+const payer = await createKeyPairSignerFromBytes(readPayerBytes(config));
 const rpcSubscriptions = createSolanaRpcSubscriptions(config.RPC_URL.replace(/^http/, "ws"));
 
 // x402: the backend settles its own payments with the payer key (ADR 0001, D18).
@@ -53,7 +51,9 @@ const recipe = createExitOrcaLpRecipe({
 const dollars = (Number(config.RECIPE_PRICE_BASE_UNITS) / 1_000_000).toFixed(6);
 
 const buildStore = new BuildStore();
-const log = { error: (data: object, message: string) => console.error(message, data) };
+// The SDK setting is global. With the ATA the agent signs alone and the tx stays small; set once.
+setNativeMintWrappingStrategy("ata");
+const payerSerial = createSerial();
 
 const app = createApp({
   shockRoutes: createShockRoutes({
@@ -66,12 +66,13 @@ const app = createApp({
       whirlpool: address(config.WHIRLPOOL_ADDRESS),
       demoUsdc: address(config.DEMO_USDC_MINT),
       dropBps: config.SHOCK_DROP_BPS,
+      serial: payerSerial,
     }),
     store: buildStore,
     limiter: new RateLimiter(config.SHOCK_RATE_LIMIT_PER_HOUR, 60 * 60 * 1000),
     cooldownMs: config.SHOCK_COOLDOWN_MS,
     accessCode: config.DEMO_ACCESS_CODE,
-    log,
+    log: safeLog,
   }),
   recipeRoutes: createRecipeRoutes({
     recipes: [recipe],
@@ -80,7 +81,8 @@ const app = createApp({
     facilitator: asFacilitatorClient(facilitator),
     payTo: config.PAY_TO_ADDRESS,
     price: `$${dollars}`,
-    log: { error: (data, message) => console.error(message, data) },
+    publicUrl: config.PUBLIC_RESOURCE_URL,
+    log: safeLog,
   }),
   steps: createSetupSteps({
     rpc,
@@ -93,12 +95,19 @@ const app = createApp({
     fundSolLamports: config.FUND_SOL_LAMPORTS,
     fundUsdcBase: config.FUND_USDC_BASE,
     positionSolLamports: config.POSITION_SOL_LAMPORTS,
+    serial: payerSerial,
   }),
   accessCode: config.DEMO_ACCESS_CODE,
   setupRateLimitPerHour: config.SETUP_RATE_LIMIT_PER_HOUR,
+  setupGlobalLimitPerHour: config.SETUP_GLOBAL_LIMIT_PER_HOUR,
+  funds: createPayerFunds({
+    rpc,
+    payer: payer.address,
+    circleUsdc: address(config.USDC_MINT),
+    minLamports: config.MIN_PAYER_LAMPORTS,
+  }),
   setupMaxJobs: config.SETUP_MAX_JOBS,
-  // Never log keys, RPC URLs with a token or the access code: only what setup reports.
-  log: { error: (data, message) => console.error(message, data) },
+  log: safeLog,
 });
 
 serve({ fetch: app.fetch, port: config.PORT });

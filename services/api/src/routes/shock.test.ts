@@ -121,6 +121,7 @@ describe("POST /demo/price-shock", () => {
     expect((await post()).status).toBe(202);
     const second = await post();
     expect(second.status).toBe(429);
+    expect(Number(second.headers.get("Retry-After"))).toBeGreaterThan(0);
     expect(ErrorResponse.parse(await second.json()).error.code).toBe("RATE_LIMITED");
   });
 
@@ -184,7 +185,7 @@ describe("POST /demo/price-shock", () => {
   it("rejects a malformed body and an unknown shock", async () => {
     const { app, post } = setup();
     expect((await post({}, "nope")).status).toBe(400);
-    expect((await app.request("/demo/price-shock/shk_unknown")).status).toBe(400);
+    expect((await app.request("/demo/price-shock/shk_unknown")).status).toBe(404);
   });
 
   it("does not stay locked when a restore never answers: it times out and retries", async () => {
@@ -223,5 +224,13 @@ describe("POST /demo/price-shock", () => {
     const { shockId } = (await (await post()).json()) as { shockId: string };
     await vi.waitFor(async () => expect((await status(shockId)).status).toBe("confirmed"));
     expect((await status(shockId)).signature).toBeUndefined();
+  });
+
+  it("counts wrong access codes, so they cannot be guessed for free", async () => {
+    const { post } = setup({ accessCode: "secret-code", limit: 3 });
+    for (let i = 0; i < 3; i++) {
+      expect((await post({ "x-xargos-access-code": "wrong" })).status).toBe(403);
+    }
+    expect((await post({ "x-xargos-access-code": "wrong" })).status).toBe(429);
   });
 });

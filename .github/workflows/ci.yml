@@ -74,8 +74,13 @@ jobs:
       - uses: pnpm/action-setup@v4 # lee "packageManager" de package.json
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # .nvmrc says "22" on purpose: the latest 22.x keeps the security patches coming. The
+          # floor lives in scripts/check-node.sh (and engines); a runner image that lags fails here.
+          node-version-file: .nvmrc
+          check-latest: true # a stale 22.x cached in the runner image would fail the floor check
           cache: pnpm
+      - name: Node meets the security floor (rule 12)
+        run: bash scripts/check-node.sh
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck

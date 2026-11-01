@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import {
   setDefaultFunder,
+  setNativeMintWrappingStrategy,
   setPayerFromBytes,
   setPriorityFeeSetting,
   setRpc,
@@ -46,6 +47,7 @@ export function loadKeyBytes(name: string): Uint8Array<ArrayBuffer> {
 export async function useFacilitator() {
   await assertDevnet();
   await setRpc(RPC_URL);
+  setNativeMintWrappingStrategy("ata");
   setPriorityFeeSetting({ type: "none" });
   const payer = await setPayerFromBytes(loadKeyBytes("facilitator"));
   setDefaultFunder(payer);

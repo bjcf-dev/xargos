@@ -7,6 +7,7 @@ import {
   type SolanaRpcApi,
 } from "@solana/kit";
 import { describe, expect, it, vi } from "vitest";
+import { createSerial } from "../solana/serial";
 
 const positions = vi.hoisted(() => ({ held: [] as unknown[] }));
 vi.mock("@orca-so/whirlpools", async (importActual) => ({
@@ -54,6 +55,7 @@ function steps(state: Parameters<typeof fakeRpc>[0], overrides: Partial<SetupSte
     fundSolLamports: 20_000_000n,
     fundUsdcBase: 50_000n,
     positionSolLamports: 50_000_000n,
+    serial: createSerial(),
     ...overrides,
   });
   return { built, sent, send };
