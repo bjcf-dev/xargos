@@ -350,9 +350,8 @@ describe("free rebuild with a buildId (D19)", () => {
       });
     for (let i = 0; i < 5; i++) expect((await rebuild()).status).toBe(200);
     const blocked = await rebuild();
-    expect(blocked.status).toBe(429);
-    expect(ErrorResponse.parse(await blocked.json()).error.code).toBe("RATE_LIMITED");
-    expect(Number(blocked.headers.get("Retry-After"))).toBeGreaterThan(0);
+    expect(blocked.status).toBe(410);
+    expect(ErrorResponse.parse(await blocked.json()).error.code).toBe("REBUILD_WINDOW_CLOSED");
   });
 
   it("closes the window after rebuildUntil", async () => {

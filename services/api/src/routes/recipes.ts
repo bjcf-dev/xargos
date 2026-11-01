@@ -31,14 +31,14 @@ export type RecipeRoutesDeps = {
   log?: Logger;
 };
 
+/** Enough for any honest retry; each rebuild costs a quote, a blockhash and a simulation. */
+const MAX_FREE_REBUILDS = 5;
+
 /**
  * POST /recipes/:id/build: x402 verifies the payment first (D17), the handler builds and simulates,
  * and the middleware settles only if the handler answers below 400. So a failed build or a failed
  * simulation never charges the agent.
  */
-/** Enough for any honest retry; each rebuild costs a quote, a blockhash and a simulation. */
-const MAX_FREE_REBUILDS = 5;
-
 export function createRecipeRoutes({
   recipes,
   rpc,
@@ -142,10 +142,13 @@ export function createRecipeRoutes({
     if (!stored || !sameBuild) {
       return errorResponse(c, "REBUILD_WINDOW_CLOSED", "The free rebuild window is closed");
     }
+    // Used up, the window stays closed for this build: a wait would not help, only a new build.
     if ((stored.rebuilds ?? 0) >= MAX_FREE_REBUILDS) {
-      return errorResponse(c, "RATE_LIMITED", "Too many rebuilds of this transaction", {
-        retryAfterSeconds: (Date.parse(stored.response.rebuildUntil) - Date.now()) / 1000,
-      });
+      return errorResponse(
+        c,
+        "REBUILD_WINDOW_CLOSED",
+        "The free rebuilds of this build are used up",
+      );
     }
     return build(c, recipe, request.data, stored);
   });

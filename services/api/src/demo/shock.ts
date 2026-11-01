@@ -33,13 +33,13 @@ export class ShockJobs {
   }
 }
 
+/** While a shock is running its end is unknown; a short wait is enough to ask again. */
+const RUNNING_RETRY_SECONDS = 15;
+
 /**
  * One shock at a time, and not again until the pool has been RESTORED. A second shock on a pool
  * that is still low would not be a shock, and a shock that overlaps the restore cancels itself.
  */
-/** While a shock is running its end is unknown; a short wait is enough to ask again. */
-const RUNNING_RETRY_SECONDS = 15;
-
 export class ShockGate {
   private locked = false;
   private expectedFreeAt = 0;
