@@ -7,7 +7,7 @@ import {
 import type { Instruction, TransactionSigner } from "@solana/kit";
 
 type Whirlpool = Parameters<typeof identifyWhirlpoolInstruction>[0];
-const kindOf = (instruction: Instruction) => {
+export const kindOf = (instruction: Instruction) => {
   try {
     return identifyWhirlpoolInstruction(instruction as Whirlpool);
   } catch {
