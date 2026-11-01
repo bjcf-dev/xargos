@@ -98,7 +98,12 @@ const fakeRpc = (simulationErr: unknown = null) =>
   }) as unknown as Rpc<SolanaRpcApi>;
 
 function setup(
-  options: { build?: Recipe["build"]; simulationErr?: unknown; now?: () => number } = {},
+  options: {
+    build?: Recipe["build"];
+    simulationErr?: unknown;
+    now?: () => number;
+    publicUrl?: string;
+  } = {},
 ) {
   const { facilitator, calls } = fakeFacilitator();
   const store = new BuildStore(options.now);
@@ -109,6 +114,7 @@ function setup(
     facilitator,
     payTo: PAY_TO,
     price: "$0.01",
+    publicUrl: options.publicUrl,
   });
   const url = "/recipes/exit-orca-lp-to-usdc/build";
   const body = JSON.stringify({ agent: AGENT, position: MINT });
@@ -143,6 +149,26 @@ describe("POST /recipes/:id/build with x402", () => {
     expect((await post()).status).toBe(402);
     expect(build).not.toHaveBeenCalled();
     expect(calls.settle).toBe(0);
+  });
+
+  it("names the public proxy URL as the paid resource (D20)", async () => {
+    const { post } = setup({ publicUrl: "https://app.example/api/xargos/" });
+    const res = await post();
+    expect(res.status).toBe(402);
+    const required = JSON.parse(
+      Buffer.from(res.headers.get("PAYMENT-REQUIRED") ?? "", "base64").toString(),
+    );
+    expect(required.resource.url).toBe(
+      "https://app.example/api/xargos/recipes/exit-orca-lp-to-usdc/build",
+    );
+  });
+
+  it("falls back to the request URL when no public URL is set", async () => {
+    const { post } = setup();
+    const required = JSON.parse(
+      Buffer.from((await post()).headers.get("PAYMENT-REQUIRED") ?? "", "base64").toString(),
+    );
+    expect(required.resource.url).toBe("http://localhost/recipes/exit-orca-lp-to-usdc/build");
   });
 
   it("verifies, builds, simulates, stores and settles once", async () => {

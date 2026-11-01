@@ -2,7 +2,6 @@ import {
   closePositionInstructions,
   fetchConcentratedLiquidityPool,
   orderMints,
-  setNativeMintWrappingStrategy,
   swapInstructions,
   WhirlpoolDeployment,
 } from "@orca-so/whirlpools";
@@ -55,8 +54,6 @@ export function createExitOrcaLpRecipe(deps: ExitOrcaLpDeps): Recipe {
       // Note: the swap spends `solOut` SOL from the agent's wallet after the wSOL account is closed. If
       // a shock makes the position return less SOL than estimated, the agent covers the difference
       // from its own SOL, which the guard (it only watches the demo USDC) does not see.
-      // The default wraps SOL in throwaway keypairs the agent would have to co-sign; use its wSOL ATA.
-      setNativeMintWrappingStrategy("ata");
       const authority = createNoopSigner(agent); // the agent signs in its own wallet, never here
       const config = {
         authority,

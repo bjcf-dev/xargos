@@ -6,8 +6,16 @@ const BaseUnitsNumber = z.string().regex(/^\d+$/).transform(BigInt);
 /** Environment of the API. Anything missing or malformed stops the boot (lesson 8). */
 export const ConfigSchema = z.object({
   SOLANA_CLUSTER: z.literal("devnet"),
+  /**
+   * Defaults to production on purpose: forgetting it must not open the paid endpoints. Only
+   * APP_ENV=local may run without DEMO_ACCESS_CODE.
+   */
+  APP_ENV: z.enum(["local", "staging", "production"]).default("production"),
   RPC_URL: z.url(),
-  PAYER_KEYPAIR_PATH: z.string().min(1),
+  /** Local runs: path to the payer keypair file. Railway has no files: use PAYER_KEYPAIR there. */
+  PAYER_KEYPAIR_PATH: z.string().min(1).optional(),
+  /** The payer keypair as a JSON array of bytes, set only in the host's variables panel. */
+  PAYER_KEYPAIR: z.string().min(1).optional(),
   USDC_MINT: Address,
   DEMO_USDC_MINT: Address,
   GUARD_PROGRAM_ID: Address,
@@ -16,6 +24,8 @@ export const ConfigSchema = z.object({
   PAY_TO_ADDRESS: Address,
   /** Recipe price in base units of Circle's USDC (10000 = 0.01 USDC). */
   RECIPE_PRICE_BASE_UNITS: BaseUnitsNumber.default(10_000n),
+  /** Public base URL the agent calls (the Netlify proxy), e.g. https://app.netlify.app/api/xargos (D20). */
+  PUBLIC_RESOURCE_URL: z.url().optional(),
   DEMO_ACCESS_CODE: z.string().min(1).optional(),
   PORT: z.coerce.number().int().min(1).max(65_535).default(8787),
   SETUP_RATE_LIMIT_PER_HOUR: z.coerce.number().int().min(1).default(10),
@@ -32,11 +42,20 @@ export const ConfigSchema = z.object({
 export type Config = z.infer<typeof ConfigSchema>;
 
 export function parseConfig(env: Record<string, string | undefined>): Config {
-  const result = ConfigSchema.safeParse(env);
+  // `NAME=` in a .env file reaches us as "", which means "not set", not an invalid value.
+  const present = Object.fromEntries(Object.entries(env).filter(([, value]) => value !== ""));
+  const result = ConfigSchema.safeParse(present);
   if (!result.success) {
     // Names of the bad variables only: never the values (they may hold keys or API tokens).
     const names = [...new Set(result.error.issues.map((i) => i.path.join(".")))];
     throw new Error(`Invalid configuration: ${names.join(", ")}`);
+  }
+  const { PAYER_KEYPAIR, PAYER_KEYPAIR_PATH, APP_ENV, DEMO_ACCESS_CODE } = result.data;
+  if (Boolean(PAYER_KEYPAIR) === Boolean(PAYER_KEYPAIR_PATH)) {
+    throw new Error("Invalid configuration: set exactly one of PAYER_KEYPAIR_PATH, PAYER_KEYPAIR");
+  }
+  if (APP_ENV !== "local" && !DEMO_ACCESS_CODE) {
+    throw new Error(`Invalid configuration: DEMO_ACCESS_CODE is required when APP_ENV=${APP_ENV}`);
   }
   return result.data;
 }
