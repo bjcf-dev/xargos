@@ -35,3 +35,8 @@ src/
 - Facilitador: CDP primero, autofacilitar como plan B (D18).
 - Confirmar si el middleware oficial liquida solo con respuesta 2xx.
 - Que la URL del recurso coincida con la pública del proxy (D20).
+
+## Operación
+
+- **Devolver el pool a su precio.** El candado y el precio base del shock viven en memoria: tras un reinicio con el pool bajo, nadie lo restaura. `RESTORE_TO=134 pnpm --filter @xargos/api demo:shock` lo sube a ese precio, sin hacer shock. Solo sube: si el pool está por encima, no hace nada.
+- **Saldo del `payer`.** `/health` lo enseña. Por debajo de `MIN_PAYER_LAMPORTS` los setups nuevos responden `RATE_LIMITED`.

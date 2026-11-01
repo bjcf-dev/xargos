@@ -22,6 +22,8 @@ export type BuildContext = {
 };
 
 export type BuiltRecipe = {
+  /** Every agent account the tx touches: what a client compares in its simulation (P0-5). */
+  watchAccounts?: string[];
   /** Pool sqrtPrice used for the quote; the shock aims below it. */
   quoteSqrtPrice?: bigint;
   steps: RecipeStep[];
