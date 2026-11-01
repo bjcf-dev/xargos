@@ -89,6 +89,7 @@ export function DemoScreen({
   const firstStatus = useRef(true);
   const demo = useDemo({
     recipeId: recipe?.id ?? "",
+    paymentMint: recipe?.price.mint,
     agent: address,
     api,
     ...(chosenSigner !== undefined ? { signer: chosenSigner } : {}),

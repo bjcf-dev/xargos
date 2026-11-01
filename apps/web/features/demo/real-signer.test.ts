@@ -1,7 +1,14 @@
 // @vitest-environment node
 import { fixtureBuildResponse, fixtureGuardFailLogs, fixtureSetupReady } from "@xargos/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SendRpc } from "@/lib/solana/send";
+import { ApiClientError } from "@/lib/api/errors";
+import {
+  associatedTokenAddress,
+  TOKEN_2022_PROGRAM,
+  TOKEN_PROGRAM,
+  WSOL_MINT,
+} from "@/lib/solana/ata";
+import type { SendRpc, WatchedAccounts } from "@/lib/solana/send";
 
 const signAndSend = vi.fn();
 vi.mock("@/lib/solana/send", async (importActual) => ({
@@ -12,16 +19,29 @@ vi.mock("@/lib/solana/send", async (importActual) => ({
 import { createRealSigner } from "./real-signer";
 import type { Run } from "./types";
 
+/** USDC de Circle en devnet: un mint del programa Token clásico (comprobado en devnet). */
+const PAYMENT_MINT = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
 const run: Run = {
   agent: fixtureSetupReady.agent,
   position: fixtureSetupReady.position ?? "",
   build: fixtureBuildResponse,
 };
 const assertIndex = fixtureBuildResponse.guard.assertIndex;
-const signer = createRealSigner({ rpc: {} as SendRpc, keyPair: {} as CryptoKeyPair });
+/** La tx de las fixtures es de relleno: verifyRecipeTransaction no la decodifica. */
+const verify = vi.fn();
+const signer = createRealSigner({ rpc: {} as SendRpc, keyPair: {} as CryptoKeyPair, verify });
 const signal = new AbortController().signal;
 
-beforeEach(() => signAndSend.mockReset());
+beforeEach(() => {
+  signAndSend.mockReset();
+  verify.mockReset().mockReturnValue({ ok: true });
+});
+
+function watchedIn(): WatchedAccounts {
+  const args = signAndSend.mock.lastCall?.[0] as { watch: WatchedAccounts } | undefined;
+  if (!args) throw new Error("signAndSend was not called");
+  return args.watch;
+}
 
 describe("createRealSigner", () => {
   it("signs the build transaction with its guard index", async () => {
@@ -34,6 +54,63 @@ describe("createRealSigner", () => {
         signal,
       }),
     );
+  });
+
+  it("checks the transaction against the build before signing, for this agent", async () => {
+    signAndSend.mockResolvedValue({ signature: "sig", err: null, logs: [] });
+    await signer(run, signal);
+    expect(verify).toHaveBeenCalledWith(fixtureBuildResponse.transaction, run.build, run.agent);
+  });
+
+  it("refuses to sign a transaction that is not what the recipe promised", async () => {
+    verify.mockReturnValue({ ok: false, reason: "Forbidden instruction: Approve" });
+    const error = await signer(run, signal).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ApiClientError);
+    expect((error as Error).message).toBe(
+      "The transaction is not what the recipe promised (Forbidden instruction: Approve); nothing was sent",
+    );
+    expect(signAndSend).not.toHaveBeenCalled();
+  });
+
+  // No se fía solo de watchAccounts del backend: añade las cuentas del agente que deriva él.
+  it("watches the agent wallet, the guard account, its wSOL, its position and its USDC", async () => {
+    signAndSend.mockResolvedValue({ signature: "sig", err: null, logs: [] });
+    const build = { ...fixtureBuildResponse, watchAccounts: [] };
+    await signer({ ...run, build }, signal, { paymentMint: PAYMENT_MINT });
+    const watch = watchedIn();
+    const payment = await associatedTokenAddress(run.agent, PAYMENT_MINT, TOKEN_PROGRAM);
+    expect(watch.agent).toBe(run.agent);
+    expect(watch.watched).toBe(fixtureBuildResponse.guard.watchedAccount);
+    expect(watch.minDelta).toBe(BigInt(fixtureBuildResponse.guard.minDelta));
+    expect(watch.payment).toBe(payment);
+    expect([...watch.addresses].sort()).toEqual(
+      [
+        run.agent,
+        fixtureBuildResponse.guard.watchedAccount,
+        await associatedTokenAddress(run.agent, WSOL_MINT, TOKEN_PROGRAM),
+        await associatedTokenAddress(run.agent, run.position, TOKEN_2022_PROGRAM),
+        payment,
+      ].sort(),
+    );
+  });
+
+  it("watches no payment account when it does not know the mint", async () => {
+    signAndSend.mockResolvedValue({ signature: "sig", err: null, logs: [] });
+    await signer({ ...run, build: { ...fixtureBuildResponse, watchAccounts: [] } }, signal);
+    expect(watchedIn().payment).toBeUndefined();
+    expect(watchedIn().addresses).toHaveLength(4);
+  });
+
+  it("adds what the backend lists, once", async () => {
+    signAndSend.mockResolvedValue({ signature: "sig", err: null, logs: [] });
+    const extra = "D1PzuAbRJB1io3awJX2GDoiL1ihwK9Kt9yfciLrgJFss";
+    await signer(
+      { ...run, build: { ...fixtureBuildResponse, watchAccounts: [run.agent, extra] } },
+      signal,
+    );
+    const watch = watchedIn();
+    expect(watch.addresses).toContain(extra);
+    expect(new Set(watch.addresses).size).toBe(watch.addresses.length);
   });
 
   it("reports guard only when the assert failed and GUARD_FAIL parses", async () => {

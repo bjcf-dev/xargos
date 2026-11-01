@@ -9,6 +9,8 @@ export type RunnerDeps = {
   api: ApiClient;
   signer: DemoSigner;
   recipeId: string;
+  /** recipe.price.mint: el signer vigila la cuenta del agente con la que paga x402. */
+  paymentMint?: string;
   /** Contrato: polling cada ~1,5 s. */
   pollIntervalMs?: number;
 };
@@ -122,7 +124,7 @@ export function runShock(
 }
 
 export function runSign(
-  { signer }: RunnerDeps,
+  { signer, paymentMint }: RunnerDeps,
   run: Run,
   rawDispatch: Dispatch<DemoEvent>,
   signal: AbortSignal,
@@ -130,7 +132,7 @@ export function runSign(
   const dispatch = unlessAborted(rawDispatch, signal);
   dispatch({ type: "SIGN" });
   return step(dispatch, signal, async () => {
-    const result = await signer(run, signal);
+    const result = await signer(run, signal, paymentMint ? { paymentMint } : {});
     dispatch(
       result.outcome === "confirmed"
         ? { type: "CONFIRMED", signature: result.signature }
