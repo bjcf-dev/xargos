@@ -6,12 +6,7 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 echo "==> Node"
-node_major="$(node -p 'process.versions.node.split(".")[0]')"
-if [ "$node_major" -lt 22 ]; then
-  echo "Se necesita Node 22 o superior (tienes $(node --version))." >&2
-  exit 1
-fi
-node --version
+bash scripts/check-node.sh || exit 1
 
 echo "==> pnpm (vía corepack)"
 corepack enable >/dev/null 2>&1 || true

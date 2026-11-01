@@ -74,8 +74,13 @@ jobs:
       - uses: pnpm/action-setup@v4 # lee "packageManager" de package.json
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # .nvmrc says "22" on purpose: the latest 22.x keeps the security patches coming. The
+          # floor lives in scripts/check-node.sh (and engines); a runner image that lags fails here.
+          node-version-file: .nvmrc
+          check-latest: true # a stale 22.x cached in the runner image would fail the floor check
           cache: pnpm
+      - name: Node meets the security floor (rule 12)
+        run: bash scripts/check-node.sh
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
@@ -88,7 +93,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # Poner la versión EXACTA que uséis en local (anchor --version)
-      ANCHOR_VERSION: "1.0.0"
+      ANCHOR_VERSION: "1.0.1"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -102,7 +107,14 @@ jobs:
           cargo install --git https://github.com/solana-foundation/anchor avm --locked
           avm install "$ANCHOR_VERSION"
           avm use "$ANCHOR_VERSION"
-      - run: anchor build
+      # The program keypair lives outside git (target/ is ignored), so CI cannot match declare_id!.
+      - run: anchor build --ignore-keys
+      # Without the keypair the build gets a random address, so that field is checked apart.
+      - name: The committed IDL must match the program
+        run: |
+          diff <(jq 'del(.address)' target/idl/guard.json) <(jq 'del(.address)' packages/guard-client/idl/guard.json)
+          # The build rewrites declare_id! in lib.rs, so read the committed file.
+          git show HEAD:programs/guard/src/lib.rs | grep -qF "declare_id!(\"$(jq -r .address packages/guard-client/idl/guard.json)\")"
       - run: cargo test -p guard # tests LiteSVM sobre target/deploy/guard.so
 
   ci-ok:

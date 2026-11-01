@@ -1,0 +1,36 @@
+[package]
+name = "guard"
+version = "0.1.0"
+description = "xARGOS guard: snapshot and assert_min_delta"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "guard"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+anchor-debug = []
+custom-heap = []
+custom-panic = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = "1.0.1"
+anchor-spl = { version = "1.0.1", default-features = false, features = ["token", "token_2022", "associated_token", "solana-v3"] }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }
+
+[dev-dependencies]
+litesvm = "0.17"
+litesvm-token = "0.17"
+solana-clock = "4.0.0"
+solana-keypair = "3.1.2"
+solana-message = "4.6"
+solana-signer = "3.0.1"
+solana-transaction = "4.3"

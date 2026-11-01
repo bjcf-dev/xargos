@@ -1,0 +1,172 @@
+import type { Dispatch } from "react";
+import type { ApiClient, FetchLike } from "@/lib/api/client";
+import { ApiClientError } from "@/lib/api/errors";
+import { pollUntil } from "@/lib/api/poll";
+import type { DemoSigner } from "./signer";
+import type { DemoError, DemoEvent, Run } from "./types";
+
+export type RunnerDeps = {
+  api: ApiClient;
+  signer: DemoSigner;
+  recipeId: string;
+  /** recipe.price.mint: el signer vigila la cuenta del agente con la que paga x402. */
+  paymentMint?: string;
+  /** El fetch que paga x402 con la clave del agente (F8). Solo lo usa un build nuevo. */
+  payer?: FetchLike;
+  /** Contrato: polling cada ~1,5 s. */
+  pollIntervalMs?: number;
+};
+
+function toDemoError(error: unknown): DemoError {
+  if (error instanceof ApiClientError) {
+    return {
+      code: error.code,
+      message: error.message,
+      ...(error.retryAfterSeconds !== undefined
+        ? { retryAfterSeconds: error.retryAfterSeconds }
+        : {}),
+      ...(error.unreachable ? { unreachable: true as const } : {}),
+      ...(error.rejected ? { rejected: true as const } : {}),
+    };
+  }
+  return { code: "INTERNAL", message: error instanceof Error ? error.message : "Unexpected error" };
+}
+
+/** Despacha solo mientras la acción sigue viva: lo que resuelva tras un abort no toca el estado. */
+function unlessAborted(dispatch: Dispatch<DemoEvent>, signal: AbortSignal): Dispatch<DemoEvent> {
+  return (event) => {
+    if (!signal.aborted) dispatch(event);
+  };
+}
+
+/** Ejecuta un paso: un error de API pasa a FAILED; si se abortó, no se despacha nada. */
+async function step(
+  dispatch: Dispatch<DemoEvent>,
+  signal: AbortSignal,
+  work: () => Promise<void>,
+): Promise<void> {
+  try {
+    await work();
+  } catch (error) {
+    if (signal.aborted) return;
+    dispatch({ type: "FAILED", error: toDemoError(error) });
+  }
+}
+
+export function runSetup(
+  { api, pollIntervalMs = 1_500 }: RunnerDeps,
+  agent: string,
+  rawDispatch: Dispatch<DemoEvent>,
+  signal: AbortSignal,
+): Promise<void> {
+  const dispatch = unlessAborted(rawDispatch, signal);
+  dispatch({ type: "SETUP_STARTED", agent });
+  return step(dispatch, signal, async () => {
+    // Primero se pregunta: un agente que sobrevivió a la recarga no gasta otro setup ni el
+    // límite por IP. Desconocido (servidor reiniciado, job caducado) o fallido: POST con el
+    // mismo agente; el backend se salta lo que ya está hecho (#52).
+    const known = await api.getSetupStatus(agent, { signal }).catch((error: unknown) => {
+      if (
+        error instanceof ApiClientError &&
+        // VALIDATION_ERROR: backends anteriores a NOT_FOUND (#78).
+        (error.code === "NOT_FOUND" || error.code === "VALIDATION_ERROR")
+      )
+        return null;
+      throw error;
+    });
+    if (!known || known.phase === "failed") await api.startSetup({ agent }, { signal });
+    await pollUntil(
+      async () => {
+        const setup = await api.getSetupStatus(agent, { signal });
+        dispatch({ type: "SETUP_PROGRESS", setup });
+        return setup;
+      },
+      (setup) => setup.phase === "ready" || setup.phase === "failed",
+      { intervalMs: pollIntervalMs, signal },
+    );
+  });
+}
+
+export function runPay(
+  { api, recipeId, payer }: RunnerDeps,
+  agent: string,
+  position: string,
+  rawDispatch: Dispatch<DemoEvent>,
+  signal: AbortSignal,
+): Promise<void> {
+  const dispatch = unlessAborted(rawDispatch, signal);
+  dispatch({ type: "PAY" });
+  return step(dispatch, signal, async () => {
+    const { data, paymentResponse } = await api.build(
+      recipeId,
+      { agent, position },
+      { signal, ...(payer ? { pay: payer } : {}) },
+    );
+    dispatch({ type: "BUILT", build: data, ...(paymentResponse ? { paymentResponse } : {}) });
+  });
+}
+
+export function runShock(
+  { api, pollIntervalMs = 1_500 }: RunnerDeps,
+  agent: string,
+  rawDispatch: Dispatch<DemoEvent>,
+  signal: AbortSignal,
+): Promise<void> {
+  const dispatch = unlessAborted(rawDispatch, signal);
+  dispatch({ type: "SHOCK_REQUESTED" });
+  return step(dispatch, signal, async () => {
+    const { shockId } = await api.startPriceShock({ agent }, { signal });
+    dispatch({ type: "SHOCK_ACCEPTED", shockId });
+    await pollUntil(
+      async () => {
+        const shock = await api.getPriceShockStatus(shockId, { signal });
+        dispatch({ type: "SHOCK_SETTLED", shock });
+        return shock;
+      },
+      (shock) => shock.status !== "pending",
+      { intervalMs: pollIntervalMs, signal },
+    );
+  });
+}
+
+export function runSign(
+  { signer, paymentMint }: RunnerDeps,
+  run: Run,
+  rawDispatch: Dispatch<DemoEvent>,
+  signal: AbortSignal,
+): Promise<void> {
+  const dispatch = unlessAborted(rawDispatch, signal);
+  dispatch({ type: "SIGN" });
+  return step(dispatch, signal, async () => {
+    const result = await signer(run, signal, paymentMint ? { paymentMint } : {});
+    dispatch(
+      result.outcome === "confirmed"
+        ? { type: "CONFIRMED", signature: result.signature }
+        : { type: "REVERTED", signature: result.signature, failure: result.failure },
+    );
+  });
+}
+
+/**
+ * Rebuild gratis (D19): mismo buildId, tx nueva, sin pagar. Con la ventana ya cerrada solo se
+ * despacha REBUILD (el reducer lo convierte en REBUILD_WINDOW_CLOSED) y no se llama a la API.
+ */
+export function runRebuild(
+  { api, recipeId }: RunnerDeps,
+  run: Run,
+  rawDispatch: Dispatch<DemoEvent>,
+  signal: AbortSignal,
+  now = Date.now(),
+): Promise<void> {
+  const dispatch = unlessAborted(rawDispatch, signal);
+  dispatch({ type: "REBUILD", now });
+  if (now >= Date.parse(run.build.rebuildUntil)) return Promise.resolve();
+  return step(dispatch, signal, async () => {
+    const { data } = await api.build(
+      recipeId,
+      { agent: run.agent, position: run.position, buildId: run.build.buildId },
+      { signal },
+    );
+    dispatch({ type: "BUILT", build: data });
+  });
+}

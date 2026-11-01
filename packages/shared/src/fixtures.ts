@@ -1,0 +1,139 @@
+import type { BuildResponse, DemoSetupStatus, PriceShockStatus, Recipe } from "./contract";
+import type { ErrorResponse } from "./errors";
+
+/**
+ * Datos de ejemplo VÁLIDOS según el contrato, para los mocks MSW del front y los tests.
+ * Las direcciones del agente, USDC y guard son ficticias (formato base58 válido, sin cuentas reales).
+ * Las fechas (`expiresAt`, `rebuildUntil`) son absolutas: los mocks y tests deben reescribirlas con now + Δ.
+ */
+const AGENT = "AgentDemo1111111111111111111111111111111111";
+const AGENT_USDC_ATA = "AgentUsdcAta1111111111111111111111111111111";
+const USDC = "UsdcDemo11111111111111111111111111111111111";
+const GUARD = "GuardDemo1111111111111111111111111111111111";
+const ORCA = "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc";
+// Programas reales de Solana, para que los enlaces al explorer no engañen.
+const COMPUTE_BUDGET = "ComputeBudget111111111111111111111111111111";
+const ASSOCIATED_TOKEN = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
+const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+
+export const fixtureRecipe: Recipe = {
+  id: "exit-orca-lp-to-usdc",
+  name: "Exit Orca LP → USDC",
+  description: "Withdraw liquidity, collect fees and swap everything to USDC, guarded on-chain.",
+  price: { amount: "10000", mint: USDC },
+};
+
+export const fixtureBuildResponse: BuildResponse = {
+  buildId: "bld_demo_0001",
+  recipeId: fixtureRecipe.id,
+  transaction: "AQIDBA==",
+  expiresAt: "2026-11-01T12:01:00.000Z",
+  rebuildUntil: "2026-11-01T12:02:00.000Z",
+  quote: { tokenOut: USDC, expectedOut: "10000000", slippageBps: 50 },
+  guard: {
+    programId: GUARD,
+    mint: USDC,
+    watchedAccount: AGENT_USDC_ATA,
+    minDelta: "9950000",
+    snapshotIndex: 2,
+    assertIndex: 7,
+  },
+  steps: [
+    {
+      index: 0,
+      label: "Compute budget",
+      protocol: "ComputeBudget",
+      programId: COMPUTE_BUDGET,
+      kind: "setup",
+    },
+    {
+      index: 1,
+      label: "Create token accounts",
+      protocol: "AssociatedToken",
+      programId: ASSOCIATED_TOKEN,
+      kind: "setup",
+    },
+    { index: 2, label: "Snapshot", protocol: "Guard", programId: GUARD, kind: "guard" },
+    { index: 3, label: "Collect fees", protocol: "Orca", programId: ORCA, kind: "action" },
+    { index: 4, label: "Withdraw liquidity", protocol: "Orca", programId: ORCA, kind: "action" },
+    { index: 5, label: "Swap SOL → USDC", protocol: "Orca", programId: ORCA, kind: "action" },
+    { index: 6, label: "Close wSOL", protocol: "Token", programId: TOKEN_PROGRAM, kind: "setup" },
+    {
+      index: 7,
+      label: "Assert received ≥ min",
+      protocol: "Guard",
+      programId: GUARD,
+      kind: "guard",
+    },
+  ],
+  watchAccounts: [AGENT],
+};
+
+export const fixtureSetupReady: DemoSetupStatus = {
+  agent: AGENT,
+  phase: "ready",
+  position: "PositionDemo1111111111111111111111111111111",
+  balances: { sol: "50000000", usdc: "0" },
+};
+
+export const fixtureShockConfirmed: PriceShockStatus = {
+  shockId: "shk_demo_0001",
+  status: "confirmed",
+  signature: "5demoSignature",
+  priceBefore: "150.00",
+  priceAfter: "141.00",
+};
+
+export const fixtureGuardFailLogs: string[] = [
+  "Program log: Instruction: AssertMinDelta",
+  "Program log: GUARD_FAIL received=9100000 min=9950000",
+];
+
+// Estados intermedios del setup (polling cada ~1,5 s): la UI pinta una pantalla por fase.
+export const fixtureSetupQueued: DemoSetupStatus = { agent: AGENT, phase: "queued" };
+
+export const fixtureSetupFundingSol: DemoSetupStatus = { agent: AGENT, phase: "funding_sol" };
+
+export const fixtureSetupFundingUsdc: DemoSetupStatus = {
+  agent: AGENT,
+  phase: "funding_usdc",
+  balances: { sol: "50000000", usdc: "0" },
+};
+
+export const fixtureSetupFailed: DemoSetupStatus = {
+  agent: AGENT,
+  phase: "failed",
+  error: { code: "SETUP_FAILED", message: "Could not fund the agent. Try again." },
+};
+
+// Price shock: pending mientras se confirma; failed si no llega a confirmarse.
+export const fixtureShockPending: PriceShockStatus = {
+  shockId: "shk_demo_0001",
+  status: "pending",
+};
+
+export const fixtureShockFailed: PriceShockStatus = {
+  shockId: "shk_demo_0001",
+  status: "failed",
+  error: { code: "SHOCK_FAILED", message: "The price shock did not confirm." },
+};
+
+// Respuestas de error del contrato (ErrorResponse) para los mocks de errores.
+export const fixtureErrorRateLimited: ErrorResponse = {
+  error: { code: "RATE_LIMITED", message: "Too many requests. Wait a moment and try again." },
+};
+
+export const fixtureErrorAccessDenied: ErrorResponse = {
+  error: { code: "ACCESS_DENIED", message: "Invalid demo access code." },
+};
+
+export const fixtureErrorBuildExpired: ErrorResponse = {
+  error: { code: "BUILD_EXPIRED", message: "The transaction expired before it was sent." },
+};
+
+export const fixtureErrorRebuildWindowClosed: ErrorResponse = {
+  error: {
+    code: "REBUILD_WINDOW_CLOSED",
+    message: "The free rebuild window has closed. Request a new build.",
+  },
+};
