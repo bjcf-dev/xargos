@@ -109,8 +109,11 @@ jobs:
           avm use "$ANCHOR_VERSION"
       # The program keypair lives outside git (target/ is ignored), so CI cannot match declare_id!.
       - run: anchor build --ignore-keys
+      # Without the keypair the build gets a random address, so that field is checked apart.
       - name: The committed IDL must match the program
-        run: diff target/idl/guard.json packages/guard-client/idl/guard.json
+        run: |
+          diff <(jq 'del(.address)' target/idl/guard.json) <(jq 'del(.address)' packages/guard-client/idl/guard.json)
+          grep -qF "declare_id!(\"$(jq -r .address packages/guard-client/idl/guard.json)\")" programs/guard/src/lib.rs
       - run: cargo test -p guard # tests LiteSVM sobre target/deploy/guard.so
 
   ci-ok:
