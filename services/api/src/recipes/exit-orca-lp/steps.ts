@@ -1,7 +1,9 @@
 import { WhirlpoolDeployment } from "@orca-so/whirlpools";
+import { WhirlpoolInstruction } from "@orca-so/whirlpools-client";
 import type { Instruction } from "@solana/kit";
 import { TOKEN_PROGRAM_ADDRESS } from "@solana-program/token";
 import type { RecipeStep } from "../types";
+import { kindOf } from "./collect-fees";
 
 const WHIRLPOOL_PROGRAM = WhirlpoolDeployment.devnet.programId;
 const SYSTEM_PROGRAM = "11111111111111111111111111111111";
@@ -11,6 +13,18 @@ const TOKEN_CLOSE_ACCOUNT = 9;
 const TOKEN_SYNC_NATIVE = 17;
 
 type Action = { label: string; protocol: string };
+
+/** Closing a position is three Orca instructions: each one is named for what it does. */
+export function closeStepLabel(instruction: Instruction): string {
+  switch (kindOf(instruction)) {
+    case WhirlpoolInstruction.DecreaseLiquidityV2:
+      return "Withdraw the liquidity";
+    case WhirlpoolInstruction.CollectFeesV2:
+      return "Collect the fees";
+    default:
+      return "Close the LP position";
+  }
+}
 
 /**
  * Tags one SDK instruction. Orca's own instructions are the action; the plumbing around them gets

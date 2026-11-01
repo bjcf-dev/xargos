@@ -1,8 +1,13 @@
 import { WhirlpoolDeployment } from "@orca-so/whirlpools";
-import { type Address, address, type Instruction } from "@solana/kit";
+import {
+  getClosePositionWithTokenExtensionsDiscriminatorBytes,
+  getCollectFeesV2DiscriminatorBytes,
+  getDecreaseLiquidityV2DiscriminatorBytes,
+} from "@orca-so/whirlpools-client";
+import { type Address, address, type Instruction, type ReadonlyUint8Array } from "@solana/kit";
 import { TOKEN_PROGRAM_ADDRESS } from "@solana-program/token";
 import { describe, expect, it } from "vitest";
-import { tagStep } from "./steps";
+import { closeStepLabel, tagStep } from "./steps";
 
 const action = { label: "Close the LP position", protocol: "Orca Whirlpools" };
 const ix = (programAddress: Address, first?: number): Instruction => ({
@@ -41,5 +46,22 @@ describe("tagStep", () => {
       kind: "setup",
       label: "Prepare token accounts",
     });
+  });
+});
+
+describe("closeStepLabel", () => {
+  const orca = (data: ReadonlyUint8Array) => ({
+    programAddress: WhirlpoolDeployment.devnet.programId,
+    data,
+  });
+
+  it("names each of the three instructions that close a position", () => {
+    expect(closeStepLabel(orca(getDecreaseLiquidityV2DiscriminatorBytes()))).toBe(
+      "Withdraw the liquidity",
+    );
+    expect(closeStepLabel(orca(getCollectFeesV2DiscriminatorBytes()))).toBe("Collect the fees");
+    expect(closeStepLabel(orca(getClosePositionWithTokenExtensionsDiscriminatorBytes()))).toBe(
+      "Close the LP position",
+    );
   });
 });
