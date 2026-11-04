@@ -82,6 +82,8 @@ const quoteAnswer = (extra: Partial<AuroraQuoteResponse["quote"]> = {}): AuroraQ
     amountOutFormatted: "1.99",
     amountOutUsd: "1.99",
     minAmountOut: "1970100",
+    withdrawFee: "248701",
+    refundFee: "2400",
     ...extra,
   },
 });
@@ -196,6 +198,8 @@ describe("POST /fund/quote", () => {
     const quote = FundQuote.parse(await res.json());
     expect(quote.depositAddress).toBe("0x00000000000000000000000000000000000de905");
     expect(quote.deadline).toBe("2026-11-05T10:30:00.000Z");
+    // Aurora's fees reach the screen, which shows them before asking for the deposit.
+    expect(quote).toMatchObject({ withdrawFee: "248701", refundFee: "2400" });
     expect(quotes[0]).toMatchObject({
       swapType: "EXACT_INPUT",
       depositType: "ORIGIN_CHAIN",
