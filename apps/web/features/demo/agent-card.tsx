@@ -1,13 +1,12 @@
 import type { DemoSetupPhase, DemoSetupStatus } from "@xargos/shared";
-import { CheckCircle2Icon, CircleIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Spinner } from "@/components/ui/spinner";
 import type { ApiMode } from "@/lib/api/mode";
 import { formatUnits, SOL_DECIMALS, USDC_DECIMALS } from "@/lib/format";
 import { ellipsify } from "@/lib/solana/explorer";
 import { cn } from "@/lib/utils";
+import { DoneIcon, StepIcon } from "./step-icon";
 import type { DemoState } from "./types";
 
 const PHASES: { phase: DemoSetupPhase; label: string }[] = [
@@ -60,8 +59,9 @@ export function AgentCard({
   const complete = done === PHASES.length && state.status !== "setup";
 
   return (
-    // self-start: sin él la tarjeta se estira hasta el alto de la columna del panel.
-    <Card className="self-start">
+    // Mientras se elige camino, tan alta como la tarjeta de al lado. Después, self-start: el panel
+    // crece mucho (pago, resultado, anatomía) y la tarjeta no debe estirarse con él.
+    <Card className={state.status === "idle" ? "self-stretch" : "self-start"}>
       <CardHeader>
         <CardTitle>{mode === "mock" ? "Simulated agent" : "Agent"}</CardTitle>
         <CardDescription className="font-mono">
@@ -76,7 +76,7 @@ export function AgentCard({
       <CardContent className="flex flex-col gap-4">
         {complete ? (
           <p className="flex items-center gap-2 text-sm md:hidden">
-            <CheckCircle2Icon aria-hidden className="size-4 text-primary" />
+            <DoneIcon />
             Agent ready
           </p>
         ) : null}
@@ -93,13 +93,7 @@ export function AgentCard({
                     : "flex items-center gap-2 text-muted-foreground"
                 }
               >
-                {isDone ? (
-                  <CheckCircle2Icon aria-hidden className="size-4 text-primary" />
-                ) : isCurrent ? (
-                  <Spinner aria-hidden />
-                ) : (
-                  <CircleIcon aria-hidden className="size-4" />
-                )}
+                <StepIcon state={isDone ? "done" : isCurrent ? "active" : "pending"} />
                 <span>{label}</span>
                 <span className="sr-only">
                   {isDone ? "(done)" : isCurrent ? "(in progress)" : "(pending)"}

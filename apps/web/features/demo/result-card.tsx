@@ -1,5 +1,5 @@
 import type { Recipe } from "@xargos/shared";
-import { AlertTriangleIcon, CheckCircle2Icon, ShieldCheckIcon, XCircleIcon } from "lucide-react";
+import { AlertTriangleIcon, ShieldCheckIcon, XCircleIcon } from "lucide-react";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { ApiMode } from "@/lib/api/mode";
@@ -15,6 +15,8 @@ import {
   mockPaymentNote,
   POOL_TOKEN,
 } from "./copy";
+import { GuaranteeBar } from "./guarantee-bar";
+import { DoneIcon } from "./step-icon";
 import type { DemoState } from "./types";
 
 type ResultState = Extract<DemoState, { status: "confirmed" | "reverted" | "error" }>;
@@ -52,9 +54,10 @@ export function ResultCard({ state, mode, price }: ResultCardProps) {
   if (state.status === "confirmed") {
     const minimum = formatUnits(state.run.build.guard.minDelta, USDC_DECIMALS);
     return (
-      <Alert role="presentation">
-        <CheckCircle2Icon />
-        <AlertTitle data-step-title tabIndex={-1}>
+      <Alert role="presentation" className="border-success/50">
+        {/* "!": el Alert pinta los iconos con el color del texto. */}
+        <DoneIcon className="text-success!" />
+        <AlertTitle data-step-title tabIndex={-1} className="text-success">
           Executed as promised
         </AlertTitle>
         <AlertDescription>
@@ -75,14 +78,34 @@ export function ResultCard({ state, mode, price }: ResultCardProps) {
     const revert = describeRevert(state.run, state.failure);
     const spent = describeSpent(price, state.failure.networkFeeLamports ?? null);
     return (
-      // Un revert del guard es la garantía funcionando: no va en rojo (el rojo queda en el paso).
-      <Alert variant={revert.byGuard ? "default" : "destructive"} role="presentation">
-        {revert.byGuard ? <ShieldCheckIcon /> : <XCircleIcon />}
-        <AlertTitle data-step-title tabIndex={-1}>
+      // Un revert del guard es la garantía funcionando: va en el color de protección, no en rojo
+      // (guía §2.2). Si falló otro paso, es un fallo de verdad y sí va en rojo.
+      <Alert
+        variant={revert.byGuard ? "default" : "destructive"}
+        role="presentation"
+        className={revert.byGuard ? "border-protect/50 bg-protect-soft" : undefined}
+      >
+        {revert.byGuard ? <ShieldCheckIcon className="text-protect!" /> : <XCircleIcon />}
+        <AlertTitle
+          data-step-title
+          tabIndex={-1}
+          className={revert.byGuard ? "text-protect" : undefined}
+        >
           {revert.title}
         </AlertTitle>
-        <AlertDescription>
+        {/* Sobre el fondo de protección, el gris no llega a 4,5:1: texto principal. */}
+        <AlertDescription className={revert.byGuard ? "text-foreground" : undefined}>
           <p>{revert.detail}</p>
+          {state.failure.guard && revert.figures ? (
+            <GuaranteeBar
+              value={state.failure.guard.received}
+              minimum={state.failure.guard.min}
+              expected={BigInt(state.run.build.quote.expectedOut)}
+              valueText={revert.figures.received}
+              minimumText={revert.figures.minimum}
+              token={POOL_TOKEN}
+            />
+          ) : null}
           {revert.figures ? (
             <dl className="my-1 grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5">
               <dt>Would have received</dt>

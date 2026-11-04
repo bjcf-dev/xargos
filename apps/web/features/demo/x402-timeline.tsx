@@ -1,9 +1,8 @@
 import type { Recipe } from "@xargos/shared";
-import { CheckCircle2Icon, CircleDashedIcon, CircleIcon } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Spinner } from "@/components/ui/spinner";
 import type { ApiMode } from "@/lib/api/mode";
 import { formatFee, mockPaymentNote, type X402StepState, x402Timeline } from "./copy";
+import { StepIcon } from "./step-icon";
 import type { DemoState } from "./types";
 
 const STATE_TEXT: Record<X402StepState, string> = {
@@ -12,13 +11,6 @@ const STATE_TEXT: Record<X402StepState, string> = {
   pending: "pending",
   simulated: "simulated",
 };
-
-function StepIcon({ state }: { state: X402StepState }) {
-  if (state === "done") return <CheckCircle2Icon aria-hidden className="size-4 text-primary" />;
-  if (state === "active") return <Spinner aria-hidden />;
-  if (state === "simulated") return <CircleDashedIcon aria-hidden className="size-4" />;
-  return <CircleIcon aria-hidden className="size-4" />;
-}
 
 /** El intercambio x402, visible: es lo que viene a ver el jurado de "Best Use of x402". */
 export function X402Timeline({
