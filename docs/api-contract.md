@@ -168,7 +168,9 @@ Sin código de acceso: el jurado lo prueba con sus fondos. Con límite por IP.
 - Los enlaces (`FundTx.explorerUrl`) solo pueden ser `https`.
 - `FUND_UNAVAILABLE` (503) siempre lleva el cuerpo del contrato. El cliente lee primero el cuerpo y solo trata como "backend caído" un 502/503/504 **sin** cuerpo. Por eso el front con este contrato se despliega antes que el backend que lo emite.
 
-Las fixtures `fixtureFund*` son **provisionales** hasta tener la salida real del paso 0.
+**Comisiones** (paso 0, 4 nov): de 2 USDC enviados desde Base llegan ~1,75 USDC a Solana. `withdrawFee` (~0,25 USDC, en unidades del token de destino) ya está descontado de `amountOut`; `refundFee` es lo que se descontaría de un reembolso. La pantalla enseña las dos antes de pedir el depósito.
+
+Fixtures: los assets y la cotización salen del paso 0 (respuestas reales, `dry: true`). Los estados salen de la referencia de la API hasta el swap real (B18).
 
 ## Revert parseable
 

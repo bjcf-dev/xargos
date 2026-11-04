@@ -213,6 +213,13 @@ export const FundQuote = z
     amountOutUsd: z.string().min(1),
     /** Lo mínimo que llega con el slippage aceptado. */
     minAmountOut: BaseUnits,
+    /**
+     * Lo que cobra Aurora por entregar en Solana, en unidades del token de destino. Ya está
+     * descontado de `amountOut`: con 2 USDC son ~0,25, así que la pantalla debe enseñarlo (paso 0).
+     */
+    withdrawFee: BaseUnits.optional(),
+    /** Lo que se descontaría de un reembolso, en unidades del token de origen. */
+    refundFee: BaseUnits.optional(),
     timeEstimateSeconds: z.number().nonnegative(),
     /** Solo con dry: false. Adonde el usuario envía los fondos, en la cadena de origen. */
     depositAddress: z.string().min(1).optional(),
