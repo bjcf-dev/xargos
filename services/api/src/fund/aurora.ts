@@ -27,6 +27,15 @@ export const AuroraToken = z.object({
 });
 export type AuroraToken = z.infer<typeof AuroraToken>;
 
+/**
+ * The live API wraps the list as `{ tokens, asset_stats }` (seen in step 0, 4 Nov), while the
+ * reference shows a bare array. Both are accepted.
+ */
+export const AuroraTokenList = z.union([
+  z.array(AuroraToken),
+  z.object({ tokens: z.array(AuroraToken) }).transform((body) => body.tokens),
+]);
+
 export const AuroraQuoteRequest = z.object({
   dry: z.boolean(),
   swapType: z.literal("EXACT_INPUT"),
@@ -55,6 +64,9 @@ const AuroraQuote = z.object({
   amountOutFormatted: z.string(),
   amountOutUsd: z.string(),
   minAmountOut: z.string(),
+  /** In destination units, already taken from amountOut (~0.25 USDC on Solana, step 0). */
+  withdrawFee: z.string().nullish(),
+  refundFee: z.string().nullish(),
   deadline: z.string().optional(),
   timeWhenInactive: z.string().optional(),
   depositAddress: z.string().optional(),
@@ -182,7 +194,7 @@ export function createAuroraClient({
   return {
     async tokens() {
       if (cached && now() - cached.at < TOKENS_CACHE_MS) return cached.tokens;
-      const tokens = await call("tokens", url("tokens"), { method: "GET" }, z.array(AuroraToken));
+      const tokens = await call("tokens", url("tokens"), { method: "GET" }, AuroraTokenList);
       cached = { at: now(), tokens };
       return tokens;
     },
