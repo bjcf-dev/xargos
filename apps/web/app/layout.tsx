@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { Antonio, Geist, Geist_Mono } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
+import { AppShell } from "@/components/app-shell";
 import { Providers } from "@/components/providers";
-import { SiteHeader } from "@/components/site-header";
 import { cn } from "@/lib/utils";
 
 const geist = Geist({
@@ -45,8 +45,7 @@ export default async function RootLayout({
       <body className="antialiased">
         <Providers nonce={nonce}>
           <div className="min-h-screen bg-background text-foreground">
-            <SiteHeader />
-            {children}
+            <AppShell>{children}</AppShell>
           </div>
         </Providers>
       </body>
