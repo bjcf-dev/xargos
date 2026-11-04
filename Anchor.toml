@@ -9,7 +9,7 @@ guard = "97YMLtF9e6tW3e2ynHASe4qCB2e8uGnyGh5AmJNkJmCm"
 
 [provider]
 cluster = "devnet"
-wallet = "~/.config/xargos/facilitator-keypair.json"
+wallet = "~/.config/xargos/deployer-keypair.json"
 
 [scripts]
 test = "cargo test"
