@@ -14,7 +14,7 @@ import { ErrorResponse } from "./errors";
 import * as fixtures from "./fixtures";
 
 const request = {
-  originAsset: "provisional:base-usdc",
+  originAsset: "nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near",
   amount: "2000000",
   recipient: "FundRecipientDemo111111111111111111111111111",
   refundTo: "0x00000000000000000000000000000000000f00d1",
@@ -114,6 +114,12 @@ describe("FundQuote", () => {
   it("keeps the deposited amount apart from the quoted one in INCOMPLETE_DEPOSIT", () => {
     const status = FundStatusResponse.parse(fixtures.fixtureFundIncompleteDeposit);
     expect(BigInt(status.depositedAmount ?? "0")).toBeLessThan(BigInt(status.amountIn ?? "0"));
+  });
+
+  it("carries Aurora's fees, already taken from amountOut (step 0)", () => {
+    const quote = FundQuote.parse(fixtures.fixtureFundQuote);
+    expect(quote.withdrawFee).toBe("248701");
+    expect(BigInt(quote.amountOut)).toBeLessThan(BigInt(quote.amountIn));
   });
 
   it("accepts a real quote without timeWhenInactive or deadline", () => {

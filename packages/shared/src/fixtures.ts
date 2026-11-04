@@ -148,9 +148,9 @@ export const fixtureErrorRebuildWindowClosed: ErrorResponse = {
 };
 
 // ---------- Fund (Aurora Intents) ----------
-// PROVISIONAL: sacadas de la referencia de la Swap API de Aurora (campos y estados), no de una
-// respuesta real. Se sustituyen por la salida del paso 0 (local/aurora-step0-output.md, sin la key).
-// Los assetId, hashes y direcciones son ficticios; ninguno es un token, mint o cuenta real.
+// Assets y cotización: respuestas reales del paso 0 (4 nov, `dry: true`, 2 USDC de Base a Solana).
+// Los estados siguen saliendo de la referencia de la API (aún no hay swap real, B18); por eso la
+// dirección de depósito, los plazos, los hashes y el destinatario son ficticios.
 
 const FUND_RECIPIENT = "FundRecipientDemo111111111111111111111111111";
 const FUND_REFUND_TO = "0x00000000000000000000000000000000000f00d1";
@@ -167,64 +167,66 @@ const DESTINATION_TX = {
 
 export const fixtureFundAssets: FundAssetsResponse = {
   destination: {
-    assetId: "provisional:sol-usdc",
+    assetId: "nep141:sol-5ce3bf3a31af18be40ba30f721101b4341690186.omft.near",
     symbol: "USDC",
     blockchain: "sol",
     decimals: 6,
-    priceUsd: 1,
+    priceUsd: 0.999489,
   },
   origins: [
     {
-      assetId: "provisional:base-usdc",
+      assetId: "nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near",
       symbol: "USDC",
       blockchain: "base",
       decimals: 6,
-      priceUsd: 1,
+      priceUsd: 0.999489,
     },
     {
-      assetId: "provisional:base-eth",
+      assetId: "nep141:base.omft.near",
       symbol: "ETH",
       blockchain: "base",
       decimals: 18,
-      priceUsd: 3000,
+      priceUsd: 2329.69,
     },
     {
-      assetId: "provisional:arb-usdc",
+      assetId: "nep141:arb-0xaf88d065e77c8cc2239327c5edb3a432268e5831.omft.near",
       symbol: "USDC",
       blockchain: "arb",
       decimals: 6,
-      priceUsd: 1,
+      priceUsd: 0.999489,
     },
     {
-      assetId: "provisional:arb-eth",
+      assetId: "nep141:arb.omft.near",
       symbol: "ETH",
       blockchain: "arb",
       decimals: 18,
-      priceUsd: 3000,
+      priceUsd: 2329.69,
     },
     {
-      assetId: "provisional:eth-usdc",
+      assetId: "nep141:eth-0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48.omft.near",
       symbol: "USDC",
       blockchain: "eth",
       decimals: 6,
-      priceUsd: 1,
+      priceUsd: 0.999489,
     },
   ],
 };
 
 const QUOTE_BASE = {
-  originAsset: "provisional:base-usdc",
-  destinationAsset: "provisional:sol-usdc",
+  originAsset: "nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near",
+  destinationAsset: "nep141:sol-5ce3bf3a31af18be40ba30f721101b4341690186.omft.near",
   recipient: FUND_RECIPIENT,
   refundTo: FUND_REFUND_TO,
   amountIn: "2000000",
   amountInFormatted: "2.0",
-  amountInUsd: "2.00",
-  amountOut: "1990000",
-  amountOutFormatted: "1.99",
-  amountOutUsd: "1.99",
-  minAmountOut: "1970100",
-  timeEstimateSeconds: 30,
+  amountInUsd: "1.998978000000",
+  amountOut: "1750908",
+  amountOutFormatted: "1.750908",
+  amountOutUsd: "1.750013286012",
+  minAmountOut: "1733398",
+  withdrawFee: "248701",
+  refundFee: "2400",
+  timeEstimateSeconds: 32,
 };
 
 /** Solo el precio (dry: true): sin dirección de depósito ni plazos. */
@@ -237,7 +239,7 @@ export const fixtureFundQuote: FundQuote = {
   depositAddress: FUND_DEPOSIT_ADDRESS,
   deadline: "2026-11-06T12:25:00.000Z",
   timeWhenInactive: "2026-11-06T12:30:00.000Z",
-  correlationId: "provisional-correlation-0001",
+  correlationId: "afb003bb-a5a2-4c02-9d13-0e6510796e8d",
 };
 
 function fundStatus(
@@ -278,8 +280,8 @@ export const fixtureFundSuccess = fundStatus("SUCCESS", {
   destinationTxs: [DESTINATION_TX],
   amountIn: "2000000",
   amountInFormatted: "2.0",
-  amountOut: "1990000",
-  amountOutFormatted: "1.99",
+  amountOut: "1750908",
+  amountOutFormatted: "1.750908",
 });
 export const fixtureFundRefunded = fundStatus("REFUNDED", {
   originTxs: [ORIGIN_TX],
@@ -289,8 +291,7 @@ export const fixtureFundRefunded = fundStatus("REFUNDED", {
   depositedAmountFormatted: "1.5",
   refundedAmount: "1500000",
   refundedAmountFormatted: "1.5",
-  refundReason:
-    "PROVISIONAL: deposit below the quoted amount and not topped up before the deadline",
+  refundReason: "Deposit below the quoted amount and not topped up before the deadline",
 });
 export const fixtureFundFailed = fundStatus("FAILED", { originTxs: [ORIGIN_TX] });
 
