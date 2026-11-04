@@ -92,10 +92,16 @@ async function failure(promise: Promise<unknown>): Promise<AuroraError> {
 }
 
 describe("createAuroraClient", () => {
-  it("puts the key in the path and reads the token list", async () => {
-    const s = setup([{ body: [token] }]);
+  it("puts the key in the path and reads the token list as the live API sends it", async () => {
+    // Step 0 (4 Nov): the list comes inside `tokens`, next to `asset_stats`.
+    const s = setup([{ body: { asset_stats: [{ token_id: "x" }], tokens: [token] } }]);
     expect(await s.client.tokens()).toEqual([token]);
     expect(s.requests[0]?.url).toBe(`https://intents-api.aurora.dev/api/tokens/${KEY}`);
+  });
+
+  it("also reads a bare array, as the reference documents it", async () => {
+    const s = setup([{ body: [token] }]);
+    expect(await s.client.tokens()).toEqual([token]);
   });
 
   it("caches the token list for 5 minutes", async () => {
