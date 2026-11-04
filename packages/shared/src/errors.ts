@@ -16,6 +16,8 @@ export const ErrorCode = z.enum([
   "NOT_FOUND",
   "SETUP_FAILED",
   "SHOCK_FAILED",
+  "FUND_QUOTE_FAILED",
+  "FUND_UNAVAILABLE",
   "INTERNAL",
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;
@@ -49,5 +51,10 @@ export const ERROR_HTTP: Record<ErrorCode, { status: number; retryable: boolean 
   NOT_FOUND: { status: 404, retryable: false },
   SETUP_FAILED: { status: 500, retryable: true }, // normalmente viaja dentro del estado del job
   SHOCK_FAILED: { status: 500, retryable: true }, // ídem
+  // Aurora rechazó la cotización (importe, par o dirección): repetirla igual no sirve.
+  FUND_QUOTE_FAILED: { status: 400, retryable: false },
+  // Aurora no responde, falla o limita, o falta su key. Siempre con cuerpo del contrato: el front
+  // solo trata como "backend caído" un 502/503/504 sin cuerpo (D31).
+  FUND_UNAVAILABLE: { status: 503, retryable: true },
   INTERNAL: { status: 500, retryable: true },
 };
