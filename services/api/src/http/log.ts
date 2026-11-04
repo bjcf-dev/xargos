@@ -2,6 +2,9 @@ import type { Logger } from "../demo/setup-runner";
 
 const MAX_DEPTH = 5;
 
+/** Aurora puts its API key in the path (`/api/quote/<key>`), where the query rule cannot see it. */
+const AURORA_KEY_IN_PATH = /(\/api\/(?:tokens|quote|status|deposit\/submit)\/)[^\s/?#"'<>]+/gi;
+
 /**
  * Errors from the RPC client can carry the full URL, and with it the Helius api-key (lesson 20).
  * Every log line goes through here, so a new `String(error)` cannot leak it.
@@ -9,7 +12,8 @@ const MAX_DEPTH = 5;
 export function redact(text: string): string {
   return text
     .replace(/(https?|wss?):\/\/[^\s"'<>]+/gi, (url) => url.split(/[?#]/)[0] ?? "")
-    .replace(/(api[-_]?key|token|secret)=[^\s&"']+/gi, "$1=***");
+    .replace(/(api[-_]?key|token|secret)=[^\s&"']+/gi, "$1=***")
+    .replace(AURORA_KEY_IN_PATH, "$1***");
 }
 
 /** Goes down objects, arrays and Errors, so logging one by mistake cannot leak a key either. */
