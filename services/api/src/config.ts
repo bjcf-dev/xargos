@@ -43,6 +43,30 @@ export const ConfigSchema = z.object({
   MIN_PAYER_LAMPORTS: BaseUnitsNumber.default(500_000_000n),
   /** Setups per hour across every client, on top of the limit per IP. */
   SETUP_GLOBAL_LIMIT_PER_HOUR: z.coerce.number().int().min(1).default(60),
+
+  // ----- Aurora Intents (module fund, D31). All optional: without a key the module stays off. -----
+  // Only HTTP to Aurora's API, which runs on mainnet: no RPC, mint or key of mainnet here, and
+  // SOLANA_CLUSTER and assertDevnet do not change (D31).
+  /** Only Aurora's own host, over https (D31). */
+  AURORA_API_URL: z
+    .url({ protocol: /^https$/, hostname: /^intents-api\.aurora\.dev$/ })
+    .default("https://intents-api.aurora.dev"),
+  /** Goes in the request path: never logged (redact() hides it). */
+  AURORA_API_KEY: z.string().min(1).optional(),
+  /** Chains a deposit may come from, as Aurora names them. */
+  AURORA_ORIGIN_CHAINS: z
+    .string()
+    .default("base,arb,eth")
+    .transform((value) =>
+      value
+        .split(",")
+        .map((chain) => chain.trim())
+        .filter(Boolean),
+    ),
+  /** A quote must be worth between 1 $ and this, checked before calling Aurora. */
+  AURORA_MAX_USD: z.coerce.number().min(1).max(1000).default(25),
+  /** Aurora's slippage tolerance, in basis points (100 = 1 %). */
+  AURORA_SLIPPAGE_BPS: z.coerce.number().int().min(1).max(1000).default(100),
 });
 export type Config = z.infer<typeof ConfigSchema>;
 
