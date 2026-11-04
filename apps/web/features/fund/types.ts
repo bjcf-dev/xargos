@@ -1,0 +1,67 @@
+import type { ErrorCode } from "@xargos/shared";
+import type { FundQuote, FundQuoteRequest, FundStatus, FundStatusResponse } from "./contract";
+
+/** Los dos errores de fund llegan con #97; hasta entonces se suman aquí (PROVISIONAL). */
+export type FundErrorCode = ErrorCode | "FUND_QUOTE_FAILED" | "FUND_UNAVAILABLE";
+
+export type FundError = {
+  code: FundErrorCode;
+  message: string;
+  retryAfterSeconds?: number;
+  /** El backend no contestó. */
+  unreachable?: true;
+};
+
+/**
+ * La dirección a la que el usuario envía y sus plazos. Es lo que se guarda para seguir tras
+ * recargar: sin ella no se sabría dónde está el dinero.
+ */
+export type Deposit = {
+  depositAddress: string;
+  depositMemo?: string;
+  /** Hasta aquí se envía (Aurora, 4 nov). */
+  deadline?: string;
+  /** Respaldo si falta `deadline`. */
+  timeWhenInactive?: string;
+  /** Lo que se enseñó al pedir la dirección (importes y comisiones). */
+  quote: FundQuote;
+};
+
+export type FundState =
+  | { status: "idle" }
+  /** Cotización `dry` en vuelo: solo el precio. */
+  | { status: "previewing"; request: FundQuoteRequest }
+  | { status: "previewed"; request: FundQuoteRequest; preview: FundQuote }
+  /** Cotización real en vuelo: pide la dirección de depósito. */
+  | { status: "requesting"; request: FundQuoteRequest; preview?: FundQuote }
+  | {
+      status: "tracking";
+      deposit: Deposit;
+      /** undefined hasta la primera respuesta (p. ej. justo tras recargar). */
+      aurora?: FundStatus;
+      latest?: FundStatusResponse;
+      /** Venció el plazo en PENDING_DEPOSIT: la siguiente respuesta decide si es `expired`. */
+      lastCheck?: true;
+      /** La última consulta falló: se reintenta sin perder el depósito. */
+      lastError?: FundError;
+    }
+  /** Pasó el plazo y la última consulta seguía en PENDING_DEPOSIT: no enviar nada. */
+  | { status: "expired"; deposit: Deposit; latest?: FundStatusResponse }
+  /** Falló una cotización: todavía no hay dinero en juego. */
+  | { status: "error"; error: FundError; request: FundQuoteRequest };
+
+export type FundEvent =
+  | { type: "PREVIEW_REQUESTED"; request: FundQuoteRequest }
+  | { type: "PREVIEW_RECEIVED"; preview: FundQuote }
+  | { type: "DEPOSIT_REQUESTED"; request: FundQuoteRequest }
+  | { type: "DEPOSIT_RECEIVED"; quote: FundQuote }
+  | { type: "QUOTE_FAILED"; error: FundError }
+  | { type: "STATUS_RECEIVED"; status: FundStatusResponse }
+  | { type: "STATUS_FAILED"; error: FundError }
+  /** Llega con el plazo vencido (la hora la decide quien despacha). */
+  | { type: "DEADLINE_PASSED" }
+  /** Recuperar un depósito guardado al recargar. */
+  | { type: "RESTORED"; deposit: Deposit }
+  | { type: "RESET" };
+
+export const initialFundState: FundState = { status: "idle" };
