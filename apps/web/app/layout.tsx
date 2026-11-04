@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Antonio, Geist, Geist_Mono } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
 import { Providers } from "@/components/providers";
@@ -14,6 +14,13 @@ const geist = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+// Letra de los titulares grandes de la portada (condensada, alta y fina). Solo el peso 300.
+const antonio = Antonio({
+  variable: "--font-antonio",
+  subsets: ["latin"],
+  weight: "300",
 });
 
 export const metadata: Metadata = {
@@ -33,7 +40,7 @@ export default async function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("font-sans", geist.variable, geistMono.variable)}
+      className={cn("font-sans", geist.variable, geistMono.variable, antonio.variable)}
     >
       <body className="antialiased">
         <Providers nonce={nonce}>

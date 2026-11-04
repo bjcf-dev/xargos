@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
   agentRules: false,
   // @xargos/shared se publica como TypeScript sin compilar (exports → src/index.ts).
   transpilePackages: ["@xargos/shared"],
+  // 90 solo para la escultura de la portada: a 75, el WebP deja bloques tenues en su transparencia.
+  images: { qualities: [75, 90] },
   turbopack: {
     resolveAlias: {
       // msw/browser no exporta nada para Node ("node": null). El SSR compila el

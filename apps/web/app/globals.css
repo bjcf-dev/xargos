@@ -4,73 +4,101 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * Paleta de la guía de identidad (nov 2026). En claro, el turquesa, el verde, el ámbar, el gris y
+ * el oro van algo más oscuros que en la guía para llegar a 4,5:1 (theme-contrast.test.ts).
+ * El turquesa es el acento funcional; magenta y oro, solo firma de marca (nunca estado).
+ */
 :root {
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --ring: oklch(0.708 0 0);
+  --background: #f5f7f8;
+  --foreground: #182433;
+  --card: #ffffff;
+  --card-foreground: #182433;
+  --popover: #ffffff;
+  --popover-foreground: #182433;
+  --panel-raised: #eef2f4;
+  --primary: #0e7871;
+  --primary-foreground: #ffffff;
+  --primary-soft: #ddf4f0;
+  --secondary: #eef2f4;
+  --secondary-foreground: #182433;
+  --muted: #eef2f4;
+  --muted-foreground: #637182;
+  --accent: #eef2f4;
+  --accent-foreground: #182433;
+  --border: #dce3e8;
+  --input: #dce3e8;
+  --ring: #0e7871;
+  --brand-magenta: #8c315f;
+  --brand-gold: #966425;
+  --success: #14795a;
+  --success-soft: #e3f3ec;
+  --warning: #936219;
+  --warning-soft: #fbf0dc;
+  --destructive: #b53d46;
+  --destructive-soft: #f9e5e6;
+  /* El guard intervino: es la garantía funcionando, no un fallo. */
+  --protect: #24738c;
+  --protect-soft: #e1f0f5;
   --radius: 0.625rem;
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --chart-1: #0e7871;
+  --chart-2: #8c315f;
+  --chart-3: #966425;
+  --chart-4: #24738c;
+  --chart-5: #637182;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #182433;
+  --sidebar-primary: #0e7871;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #ddf4f0;
+  --sidebar-accent-foreground: #0e7871;
+  --sidebar-border: #dce3e8;
+  --sidebar-ring: #0e7871;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --ring: oklch(0.556 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #10141c;
+  --foreground: #e8eef3;
+  --card: #171f2b;
+  --card-foreground: #e8eef3;
+  --popover: #171f2b;
+  --popover-foreground: #e8eef3;
+  --panel-raised: #202d3c;
+  --primary: #32d7c5;
+  --primary-foreground: #10141c;
+  --primary-soft: #123a3d;
+  --secondary: #202d3c;
+  --secondary-foreground: #e8eef3;
+  --muted: #202d3c;
+  --muted-foreground: #a7b3bf;
+  --accent: #202d3c;
+  --accent-foreground: #e8eef3;
+  --border: #2b3948;
+  --input: #2b3948;
+  --ring: #32d7c5;
+  --brand-magenta: #c05a8a;
+  --brand-gold: #e7a64b;
+  --success: #36d6a3;
+  --success-soft: #12342b;
+  --warning: #f2b84b;
+  --warning-soft: #3a2f17;
+  --destructive: #f0787e;
+  --destructive-soft: #3b1e22;
+  --protect: #54c8e5;
+  --protect-soft: #12303a;
+  --chart-1: #32d7c5;
+  --chart-2: #c05a8a;
+  --chart-3: #e7a64b;
+  --chart-4: #54c8e5;
+  --chart-5: #a7b3bf;
+  --sidebar: #121b27;
+  --sidebar-foreground: #e8eef3;
+  --sidebar-primary: #32d7c5;
+  --sidebar-primary-foreground: #10141c;
+  --sidebar-accent: #123a3d;
+  --sidebar-accent-foreground: #32d7c5;
+  --sidebar-border: #2b3948;
+  --sidebar-ring: #32d7c5;
 }
 
 @theme inline {
@@ -78,17 +106,28 @@
   --color-foreground: var(--foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
+  --color-panel-raised: var(--panel-raised);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-protect: var(--protect);
+  --color-protect-soft: var(--protect-soft);
+  --color-brand-magenta: var(--brand-magenta);
+  --color-brand-gold: var(--brand-gold);
   --color-ring: var(--ring);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -98,6 +137,7 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --font-heading: var(--font-sans);
+  --font-display: var(--font-antonio);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -117,6 +157,70 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Movimiento de la guía: el check se dibuja al completarse un paso (solo con un cambio real). */
+@theme {
+  --animate-draw-check: draw-check 0.5s ease-out both;
+  --animate-grow-x: grow-x 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  /* Misma duración que TICKER_INTERVAL_MS (guarantee-ticker.tsx). */
+  --animate-ticker: ticker 3.5s linear forwards;
+  /* El busto de la portada "respira": crece y vuelve, muy despacio. */
+  --animate-breathe: breathe 8s ease-in-out infinite;
+
+  @keyframes ticker {
+    from {
+      width: 0;
+    }
+    to {
+      width: 100%;
+    }
+  }
+
+  @keyframes breathe {
+    50% {
+      transform: scale(1.03);
+    }
+  }
+
+  @keyframes grow-x {
+    from {
+      transform: scaleX(0);
+    }
+  }
+
+  @keyframes draw-check {
+    from {
+      stroke-dashoffset: 14;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+}
+
+/* Retícula diagonal sacada del cuadrante turquesa del emblema; se desvanece hacia la izquierda. */
+@utility bg-reticle {
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      color-mix(in srgb, var(--primary) 12%, transparent) 0 1px,
+      transparent 1px 22px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, var(--primary) 12%, transparent) 0 1px,
+      transparent 1px 22px
+    );
+  mask-image: linear-gradient(90deg, transparent, #000 70%);
+}
+
+/* El busto de la portada se difumina hacia el texto (izquierda) y hacia abajo. */
+@utility mask-hero-bust {
+  mask-image:
+    linear-gradient(to right, transparent, #000 42%),
+    linear-gradient(to bottom, #000 62%, transparent);
+  mask-composite: intersect;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -127,5 +231,23 @@
   }
   html {
     @apply font-sans;
+  }
+
+  /* Sin movimiento para quien lo pide: todo queda en su estado final. Los spinners se paran,
+     pero cada espera ya lleva su texto ("Signing and sending…"). */
+  @media (prefers-reduced-motion: reduce) {
+    /* !important: tiene que ganar a utilidades como animate-spin, que son más específicas. */
+    *,
+    ::before,
+    ::after {
+      /* biome-ignore lint/complexity/noImportantStyles: ver arriba */
+      animation-duration: 0.01ms !important;
+      /* biome-ignore lint/complexity/noImportantStyles: ver arriba */
+      animation-iteration-count: 1 !important;
+      /* biome-ignore lint/complexity/noImportantStyles: ver arriba */
+      transition-duration: 0.01ms !important;
+      /* biome-ignore lint/complexity/noImportantStyles: ver arriba */
+      scroll-behavior: auto !important;
+    }
   }
 }
