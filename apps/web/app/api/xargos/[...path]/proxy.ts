@@ -7,6 +7,8 @@ import { ERROR_HTTP, type ErrorCode, type ErrorResponse } from "@xargos/shared";
 export type ProxyConfig = {
   backendUrl: string | undefined;
   accessCode?: string | undefined;
+  /** PROXY_SHARED_SECRET: solo con él se fía el backend de la IP que mandamos en /fund/* (D31). */
+  proxySecret?: string | undefined;
   fetch?: typeof fetch;
   timeoutMs?: number;
 };
@@ -18,11 +20,16 @@ export const UPSTREAM_TIMEOUT_MS = 9_000;
 export const ACCESS_CODE_HEADER = "x-xargos-access-code";
 /** Cabecera con la IP del navegador para el límite del backend; solo la pone el proxy. */
 export const CLIENT_IP_HEADER = "x-xargos-client-ip";
+/**
+ * Cabecera con el secreto compartido en /fund/*, que no lleva código de acceso: sin ella, el
+ * backend cuenta a todos con la IP de Netlify. Mismo nombre que PROXY_SECRET_HEADER del backend.
+ */
+export const PROXY_SECRET_HEADER = "x-xargos-proxy-secret";
 /** Netlify pone aquí la IP de la conexión. */
 const NETLIFY_CLIENT_IP = "x-nf-client-connection-ip";
 
 /** Primer segmento de las rutas del contrato; lo demás no sale hacia el backend. */
-const ALLOWED_ROOTS = new Set(["recipes", "demo", "executions"]);
+const ALLOWED_ROOTS = new Set(["recipes", "demo", "executions", "fund"]);
 
 /**
  * Cabeceras por lista blanca. Las de x402 pasan intactas; ni cookies ni `authorization`
@@ -69,12 +76,14 @@ function upstreamHeaders(
   request: Request,
   path: string[],
   accessCode: string | undefined,
+  proxySecret: string | undefined,
 ): Headers {
   const headers = pickHeaders(request.headers, FORWARDED_REQUEST_HEADERS);
   const ip = request.headers.get(NETLIFY_CLIENT_IP);
   if (ip) headers.set(CLIENT_IP_HEADER, ip);
   const isShock = request.method === "POST" && path.join("/") === "demo/price-shock";
   if (isShock && accessCode) headers.set(ACCESS_CODE_HEADER, accessCode);
+  if (path[0] === "fund" && proxySecret) headers.set(PROXY_SECRET_HEADER, proxySecret);
   return headers;
 }
 
@@ -105,6 +114,7 @@ export function createXargosProxy(config: ProxyConfig) {
   const {
     backendUrl,
     accessCode,
+    proxySecret,
     fetch: doFetch = globalThis.fetch,
     timeoutMs = UPSTREAM_TIMEOUT_MS,
   } = config;
@@ -123,7 +133,7 @@ export function createXargosProxy(config: ProxyConfig) {
     try {
       upstream = await doFetch(upstreamUrl(backendUrl, path, new URL(request.url).search), {
         method,
-        headers: upstreamHeaders(request, path, accessCode),
+        headers: upstreamHeaders(request, path, accessCode, proxySecret),
         signal: AbortSignal.timeout(timeoutMs),
         ...(hasBody ? { body: await requestBody(request, path, accessCode) } : {}),
       });
