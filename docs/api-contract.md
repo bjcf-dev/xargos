@@ -122,6 +122,8 @@ El status de cada código vive en `ERROR_HTTP` (`packages/shared/src/errors.ts`)
 | `BUILD_FAILED` / `INTERNAL`             | 500  | Falla el build o error interno; **no se liquida**           | Sí, con espera     |
 | `SETUP_FAILED` / `SHOCK_FAILED`         | 500  | Normalmente viajan dentro del estado del job (`failed`)     | Sí                 |
 | `BUILD_EXPIRED`                         | 410  | **Reservado**: el backend no lo emite (ver `rebuildUntil`)  | No                 |
+| `FUND_QUOTE_FAILED`                     | 400  | Aurora rechazó la cotización (importe, par o dirección)     | No                 |
+| `FUND_UNAVAILABLE`                      | 503  | Aurora no responde, falla o limita, o falta su key. **Siempre con cuerpo** | Sí, con espera     |
 
 Reglas:
 
@@ -132,6 +134,33 @@ Reglas:
 - La pantalla de "caducada" la dibuja el front desde `expiresAt`; el backend solo responde `REBUILD_WINDOW_CLOSED` cuando se acaba la ventana gratuita.
 
 Evolución prevista (RFC 9457, versionado, catálogo): ver [ADR 0002](adr/0002-error-contract.md).
+
+## Fund (Aurora Intents, mainnet) — D31
+
+Fondear al agente desde otra cadena. **Corre en mainnet con fondos del usuario**: xARGOS solo cotiza y consulta el estado; el depósito lo envía la wallet del usuario y xARGOS no custodia ni firma nada. La receta, el guard y x402 siguen en devnet. Esquemas en `packages/shared/src/contract.ts` ("Fund").
+
+| Método | Ruta                                  | Respuesta              | Notas                                                                  |
+| ------ | ------------------------------------- | ---------------------- | ---------------------------------------------------------------------- |
+| GET    | `/fund/assets`                        | `FundAssetsResponse`   | Destino (USDC en Solana) y orígenes admitidos                          |
+| POST   | `/fund/quote` `FundQuoteRequest`      | `FundQuote`            | `dry: true` solo da el precio: sin `depositAddress` ni plazos          |
+| GET    | `/fund/status/:depositAddress?memo=`  | `FundStatusResponse`   | Los 7 estados de Aurora, tal cual                                      |
+| POST   | `/fund/deposit` `FundDepositRequest`  | 202                    | Avisa a Aurora del depósito para que lo detecte antes (opcional)       |
+
+Sin código de acceso: el jurado lo prueba con sus fondos. Con límite por IP.
+
+**Estados** (`FundStatus`): `PENDING_DEPOSIT` → `KNOWN_DEPOSIT_TX` → `PROCESSING` → `SUCCESS`; o `INCOMPLETE_DEPOSIT` → `REFUNDED`; o `FAILED`. Finales: `SUCCESS`, `REFUNDED` y `FAILED` (`FUND_FINAL_STATUSES`). `expired` no es de Aurora: lo calcula el front cuando pasa `timeWhenInactive` y una última consulta sigue en `PENDING_DEPOSIT`.
+
+**Dos plazos:** `timeWhenInactive` (la dirección deja de aceptar depósitos) y `deadline` (plazo de los reembolsos). Los dos son opcionales: con `dry: true` no vienen, y si falta `timeWhenInactive` se usa `deadline`.
+
+**Reglas del contrato:**
+
+- Una cotización real lleva `depositAddress` y una `dry` nunca: así no se enseña una dirección a la que no se debe enviar nada.
+- `recipient` es una dirección de Solana que escribe el usuario, **nunca** la clave del agente de la demo (no se puede exportar y caduca).
+- `refundTo` es una dirección EVM (`0x` + 40 hex).
+- Los enlaces (`FundTx.explorerUrl`) solo pueden ser `https`.
+- `FUND_UNAVAILABLE` (503) siempre lleva el cuerpo del contrato. El cliente lee primero el cuerpo y solo trata como "backend caído" un 502/503/504 **sin** cuerpo. Por eso el front con este contrato se despliega antes que el backend que lo emite.
+
+Las fixtures `fixtureFund*` son **provisionales** hasta tener la salida real del paso 0.
 
 ## Revert parseable
 
