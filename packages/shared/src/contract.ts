@@ -217,10 +217,16 @@ export const FundQuote = z
     /** Solo con dry: false. Adonde el usuario envía los fondos, en la cadena de origen. */
     depositAddress: z.string().min(1).optional(),
     depositMemo: z.string().min(1).optional(),
-    /** Desde aquí la dirección no acepta depósitos. Puede faltar: entonces manda `deadline`. */
-    timeWhenInactive: IsoDate.optional(),
-    /** Plazo de los reembolsos. */
+    /**
+     * Hasta aquí se envía: un depósito que llega después se reembolsa (Aurora, 4 nov). Manda en la
+     * cuenta atrás de la pantalla.
+     */
     deadline: IsoDate.optional(),
+    /**
+     * Desde aquí Aurora deja de vigilar la dirección: un depósito puede necesitar un reembolso
+     * manual. Nunca enviar después.
+     */
+    timeWhenInactive: IsoDate.optional(),
     /** Id de Aurora para el soporte y los logs. */
     correlationId: z.string().min(1).optional(),
   })
@@ -242,8 +248,12 @@ export const FundStatusResponse = z.object({
   depositMemo: z.string().min(1).optional(),
   status: FundStatus,
   updatedAt: IsoDate,
+  /** Lo que pidió la cotización. */
   amountIn: BaseUnits.optional(),
   amountInFormatted: z.string().min(1).optional(),
+  /** Lo que ha llegado. En INCOMPLETE_DEPOSIT es menos que `amountIn`: se puede completar. */
+  depositedAmount: BaseUnits.optional(),
+  depositedAmountFormatted: z.string().min(1).optional(),
   amountOut: BaseUnits.optional(),
   amountOutFormatted: z.string().min(1).optional(),
   refundedAmount: BaseUnits.optional(),
