@@ -111,6 +111,11 @@ describe("FundQuote", () => {
     expect(FundQuote.safeParse(withoutAddress).success).toBe(false);
   });
 
+  it("keeps the deposited amount apart from the quoted one in INCOMPLETE_DEPOSIT", () => {
+    const status = FundStatusResponse.parse(fixtures.fixtureFundIncompleteDeposit);
+    expect(BigInt(status.depositedAmount ?? "0")).toBeLessThan(BigInt(status.amountIn ?? "0"));
+  });
+
   it("accepts a real quote without timeWhenInactive or deadline", () => {
     const { timeWhenInactive: _a, deadline: _b, ...quote } = fixtures.fixtureFundQuote;
     expect(FundQuote.safeParse(quote).success).toBe(true);

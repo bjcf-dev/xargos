@@ -150,13 +150,21 @@ Sin código de acceso: el jurado lo prueba con sus fondos. Con límite por IP.
 
 **Estados** (`FundStatus`): `PENDING_DEPOSIT` → `KNOWN_DEPOSIT_TX` → `PROCESSING` → `SUCCESS`; o `INCOMPLETE_DEPOSIT` → `REFUNDED`; o `FAILED`. Finales: `SUCCESS`, `REFUNDED` y `FAILED` (`FUND_FINAL_STATUSES`). `expired` no es de Aurora: lo calcula el front cuando pasa `timeWhenInactive` y una última consulta sigue en `PENDING_DEPOSIT`.
 
-**Dos plazos:** `timeWhenInactive` (la dirección deja de aceptar depósitos) y `deadline` (plazo de los reembolsos). Los dos son opcionales: con `dry: true` no vienen, y si falta `timeWhenInactive` se usa `deadline`.
+**Dos plazos** (respuesta del equipo de Aurora, 4 nov):
+
+- `deadline`: **hasta aquí se envía**. Un depósito que llega después se reembolsa. Manda en la cuenta atrás de la pantalla y en `expired`.
+- `timeWhenInactive`: desde aquí Aurora **deja de vigilar** la dirección, y un depósito puede necesitar un reembolso manual. La pantalla avisa de no enviar nunca después.
+- Los dos son opcionales: con `dry: true` no vienen. Sus valores reales y el margen entre ellos salen del paso 0.
+
+**Depósito incompleto:** en `INCOMPLETE_DEPOSIT` el usuario **puede completar** lo que falta en la misma dirección, antes de `deadline`. `amountIn` es lo que pidió la cotización y `depositedAmount` lo que ha llegado. Si no se completa, se reembolsa (`REFUNDED`).
+
+**Cuenta de USDC del destinatario:** Aurora **no crea** la cuenta de USDC (ATA) en Solana. El destinatario tiene que haber tenido USDC antes, o la entrega falla. La pantalla lo pide y lo explica.
 
 **Reglas del contrato:**
 
 - Una cotización real lleva `depositAddress` y una `dry` nunca: así no se enseña una dirección a la que no se debe enviar nada.
 - `recipient` es una dirección de Solana que escribe el usuario, **nunca** la clave del agente de la demo (no se puede exportar y caduca).
-- `refundTo` es una dirección EVM (`0x` + 40 hex).
+- `refundTo` es una dirección EVM (`0x` + 40 hex), válida en Base, Arbitrum y Ethereum. Lo normal es la misma cuenta desde la que se deposita.
 - Los enlaces (`FundTx.explorerUrl`) solo pueden ser `https`.
 - `FUND_UNAVAILABLE` (503) siempre lleva el cuerpo del contrato. El cliente lee primero el cuerpo y solo trata como "backend caído" un 502/503/504 **sin** cuerpo. Por eso el front con este contrato se despliega antes que el backend que lo emite.
 

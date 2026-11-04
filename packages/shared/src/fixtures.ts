@@ -230,13 +230,13 @@ const QUOTE_BASE = {
 /** Solo el precio (dry: true): sin dirección de depósito ni plazos. */
 export const fixtureFundQuoteDry: FundQuote = { ...QUOTE_BASE, dry: true };
 
-/** Cotización real: dirección de depósito y los dos plazos (su relación real: paso 0). */
+/** Cotización real: dirección de depósito y los dos plazos (`deadline` antes; sus valores: paso 0). */
 export const fixtureFundQuote: FundQuote = {
   ...QUOTE_BASE,
   dry: false,
   depositAddress: FUND_DEPOSIT_ADDRESS,
-  timeWhenInactive: "2026-11-06T12:25:00.000Z",
-  deadline: "2026-11-06T12:30:00.000Z",
+  deadline: "2026-11-06T12:25:00.000Z",
+  timeWhenInactive: "2026-11-06T12:30:00.000Z",
   correlationId: "provisional-correlation-0001",
 };
 
@@ -250,8 +250,8 @@ function fundStatus(
     updatedAt: "2026-11-06T12:05:00.000Z",
     originTxs: [],
     destinationTxs: [],
-    timeWhenInactive: "2026-11-06T12:25:00.000Z",
-    deadline: "2026-11-06T12:30:00.000Z",
+    deadline: "2026-11-06T12:25:00.000Z",
+    timeWhenInactive: "2026-11-06T12:30:00.000Z",
     ...extra,
   };
 }
@@ -263,8 +263,10 @@ export const fixtureFundKnownDepositTx = fundStatus("KNOWN_DEPOSIT_TX", {
 });
 export const fixtureFundIncompleteDeposit = fundStatus("INCOMPLETE_DEPOSIT", {
   originTxs: [ORIGIN_TX],
-  amountIn: "1500000",
-  amountInFormatted: "1.5",
+  amountIn: "2000000",
+  amountInFormatted: "2.0",
+  depositedAmount: "1500000",
+  depositedAmountFormatted: "1.5",
 });
 export const fixtureFundProcessing = fundStatus("PROCESSING", {
   originTxs: [ORIGIN_TX],
@@ -281,11 +283,14 @@ export const fixtureFundSuccess = fundStatus("SUCCESS", {
 });
 export const fixtureFundRefunded = fundStatus("REFUNDED", {
   originTxs: [ORIGIN_TX],
-  amountIn: "1500000",
-  amountInFormatted: "1.5",
+  amountIn: "2000000",
+  amountInFormatted: "2.0",
+  depositedAmount: "1500000",
+  depositedAmountFormatted: "1.5",
   refundedAmount: "1500000",
   refundedAmountFormatted: "1.5",
-  refundReason: "PROVISIONAL: deposit below the quoted amount",
+  refundReason:
+    "PROVISIONAL: deposit below the quoted amount and not topped up before the deadline",
 });
 export const fixtureFundFailed = fundStatus("FAILED", { originTxs: [ORIGIN_TX] });
 
