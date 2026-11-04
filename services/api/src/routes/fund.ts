@@ -160,6 +160,8 @@ export function createFundRoutes(deps: FundRoutesDeps) {
           ? {}
           : present({ depositAddress: quote.depositAddress, depositMemo: quote.depositMemo })),
         ...present({
+          withdrawFee: quote.withdrawFee,
+          refundFee: quote.refundFee,
           deadline: quote.deadline,
           timeWhenInactive: quote.timeWhenInactive,
           correlationId: answer.correlationId ?? undefined,
