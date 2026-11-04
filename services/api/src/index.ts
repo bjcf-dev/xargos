@@ -61,7 +61,7 @@ const app = createApp({
     gate: new ShockGate(),
     steps: createShockSteps({
       rpc,
-      send: createSender(rpc, rpcSubscriptions, payer),
+      send: createSender(rpc, rpcSubscriptions, payer, { log: safeLog }),
       payer,
       whirlpool: address(config.WHIRLPOOL_ADDRESS),
       demoUsdc: address(config.DEMO_USDC_MINT),
@@ -86,7 +86,7 @@ const app = createApp({
   }),
   steps: createSetupSteps({
     rpc,
-    send: createSender(rpc, rpcSubscriptions, payer),
+    send: createSender(rpc, rpcSubscriptions, payer, { log: safeLog }),
     payer,
     circleUsdc: address(config.USDC_MINT),
     demoUsdc: address(config.DEMO_USDC_MINT),
