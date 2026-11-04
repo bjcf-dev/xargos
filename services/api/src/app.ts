@@ -13,6 +13,8 @@ export type AppDeps = {
   recipeRoutes: Hono;
   /** POST/GET /demo/price-shock, built in index.ts with the shared build store. */
   shockRoutes: Hono;
+  /** /fund/* (Aurora Intents, D31), built in index.ts. Absent in tests that do not need it. */
+  fundRoutes?: Hono;
   steps: SetupSteps;
   accessCode?: string | undefined;
   setupRateLimitPerHour: number;
@@ -53,6 +55,7 @@ export function createApp(deps: AppDeps) {
   );
   app.route("/", deps.recipeRoutes);
   app.route("/", deps.shockRoutes);
+  if (deps.fundRoutes) app.route("/", deps.fundRoutes);
   app.route(
     "/",
     createDemoRoutes({

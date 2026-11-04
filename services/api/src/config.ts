@@ -67,6 +67,11 @@ export const ConfigSchema = z.object({
   AURORA_MAX_USD: z.coerce.number().min(1).max(1000).default(25),
   /** Aurora's slippage tolerance, in basis points (100 = 1 %). */
   AURORA_SLIPPAGE_BPS: z.coerce.number().int().min(1).max(1000).default(100),
+  /**
+   * Shared with the Netlify proxy: only with it does the backend trust the client IP the proxy
+   * forwards (P0-1). Without it, every /fund/* client shares the proxy's bucket.
+   */
+  PROXY_SHARED_SECRET: z.string().min(16).optional(),
 });
 export type Config = z.infer<typeof ConfigSchema>;
 

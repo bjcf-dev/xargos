@@ -17,10 +17,12 @@ import { createPoolPrice } from "./demo/pool-price";
 import { ShockGate, ShockJobs } from "./demo/shock";
 import { createShockSteps } from "./demo/shock-steps";
 import { createSetupSteps } from "./demo/steps";
+import { createAuroraClient } from "./fund/aurora";
 import { safeLog } from "./http/log";
 import { RateLimiter } from "./http/rate-limit";
 import { asFacilitatorClient } from "./payment/local-facilitator";
 import { createExitOrcaLpRecipe } from "./recipes/exit-orca-lp";
+import { createFundRoutes } from "./routes/fund";
 import { createRecipeRoutes } from "./routes/recipes";
 import { createShockRoutes } from "./routes/shock";
 import { assertDevnet } from "./solana/assert-devnet";
@@ -57,7 +59,27 @@ const buildStore = new BuildStore();
 setNativeMintWrappingStrategy("ata");
 const payerSerial = createSerial();
 
+// Aurora (D31): only HTTP to its API. Without a key the routes exist and answer FUND_UNAVAILABLE.
+const MINUTE_MS = 60 * 1000;
+const fundRoutes = createFundRoutes({
+  client: config.AURORA_API_KEY
+    ? createAuroraClient({
+        apiUrl: config.AURORA_API_URL,
+        apiKey: config.AURORA_API_KEY,
+        log: safeLog,
+      })
+    : undefined,
+  originChains: config.AURORA_ORIGIN_CHAINS,
+  maxUsd: config.AURORA_MAX_USD,
+  slippageBps: config.AURORA_SLIPPAGE_BPS,
+  proxySecret: config.PROXY_SHARED_SECRET,
+  quoteLimiter: new RateLimiter(10, 60 * MINUTE_MS),
+  statusLimiter: new RateLimiter(60, MINUTE_MS),
+  globalQuoteLimiter: new RateLimiter(200, 60 * MINUTE_MS),
+});
+
 const app = createApp({
+  fundRoutes,
   shockRoutes: createShockRoutes({
     jobs: new ShockJobs(),
     gate: new ShockGate(),
