@@ -61,6 +61,7 @@ Registro de lo decidido en las sesiones de diseño (oct 2026). Si una decisión 
 | D27 | **Git:** `main` (jurado) ← `develop` (integración) ← `feat/*`/`fix/*`. Revisión cruzada obligatoria, CI `ci-ok`, rebase-merge a develop, merge commit a main. | Ver brief §7–§8.                                                                                                                                        |
 | D28 | **Repo público desde el primer día**, con gitleaks local y en CI.                                                                                             | El jurado lo necesita y las reglas de rama son gratis en repos públicos.                                                                                |
 | D29 | **Código previo permitido si se declara en el README** (confirmado por Giles, Encode, 20 oct).                                                                | —                                                                                                                                                       |
+| D32 | **La upgrade authority del guard es la clave `deployer`, que no está en ningún servidor** (1 nov). El servidor solo tiene `facilitator`: comisiones de x402, fondeo de agentes y PDA del snapshot. D31 queda reservada para Aurora. | Si alguien obtiene la clave del servidor, no puede subir una versión del guard que nunca revierta: la garantía no depende de la seguridad del hosting (revisión del backend, P0-4). |
 
 ## Ideas descartadas (no volver a ellas sin motivo nuevo)
 

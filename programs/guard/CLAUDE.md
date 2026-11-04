@@ -24,6 +24,7 @@ Delta suficiente pasa · delta insuficiente falla con `MinDeltaNotMet` y el log 
 
 - `anchor build` **antes** de `cargo test` (los tests cargan el `.so`; también regenera el IDL para Codama).
 - Despliegue solo con `Anchor.toml` (`cluster = "devnet"`, `wallet` en `~/.config/xargos/`). Nunca con la config global de Solana.
-- **Clave de deploy: `~/.config/xargos/facilitator-keypair.json`** (decidido por Billy el 28 oct). Es la que paga comisiones y la PDA del snapshot (D8), y queda como upgrade authority del programa. No se lee ni se imprime.
+- **Upgrade authority: `~/.config/xargos/deployer-keypair.json`** (`2LG4z3q6FxfCcBrJEnG6NwUa5U2wcRo5EwUnsRpkbZ2X`, desde el 1 nov; D32). Vive solo en el ordenador de Billy, nunca en un servidor. Para actualizar el programa: `--provider.wallet ~/.config/xargos/deployer-keypair.json`, con SOL en esa clave. `Anchor.toml` apunta todavía a `facilitator`, que ya no puede actualizarlo.
+- La clave `facilitator` vive en el servidor (Render): paga las comisiones de x402, fondea a los agentes y paga la PDA del snapshot (D8). No tiene ninguna autoridad sobre el guard. Ninguna de las dos se lee ni se imprime.
 - La clave del program ID se genera en `target/deploy/guard-keypair.json` (ignorada por git): copiarla a `~/.config/xargos/` antes de limpiar `target/`.
 - No importar crates de Orca ni hacer CPI a otros programas.
