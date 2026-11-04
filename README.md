@@ -46,6 +46,22 @@ All on **devnet**. Evidence is a transaction signature or a test, never a claim.
 
 Why it is built this way: [docs/decisions.md](docs/decisions.md) (D5–D8).
 
+The program's upgrade authority is a key that lives on no server (D32). Whoever gets into our backend still cannot replace the guard with one that never reverts.
+
+## Don't trust, verify
+
+The agent does not have to trust our backend. Before signing, the agent in the browser:
+
+1. **Checks the transaction** (`verifyRecipeTransaction` in `packages/shared`):
+   - the agent is the only signer;
+   - only known programs run;
+   - the guard runs exactly twice, at `snapshot` first and `assert_min_delta` last, with the promised `minDelta`;
+   - nothing touches the watched account before the snapshot;
+   - no instruction hands over control of the agent's accounts (System `Assign`, Token `Approve` or `SetAuthority`).
+2. **Simulates it and compares the agent's accounts** before and after: its wallet, its demo USDC, wSOL, the position NFT and the USDC it pays x402 with. It refuses to sign if the transaction would take SOL beyond the network fee, take or close the USDC it pays with, give another wallet control of an account, or deliver less than `minDelta`.
+
+If either check fails, nothing is signed or sent, and the demo says why.
+
 ## API
 
 Full contract and error table: [docs/api-contract.md](docs/api-contract.md).
@@ -68,7 +84,7 @@ Full contract and error table: [docs/api-contract.md](docs/api-contract.md).
 | The transaction expires before sending | Free rebuild for 120 s with the same `buildId`                                                 |
 | The outcome misses the minimum         | The whole transaction reverts on-chain; the agent only pays the recipe fee and the network fee |
 
-The first three rows are covered by tests in `services/api/src/routes/recipes.test.ts`. The last one is enforced by the guard and is not yet shown on devnet.
+The first three rows are covered by tests in `services/api/src/routes/recipes.test.ts` and `services/api/src/routes/payments-failed.test.ts`. The last one is enforced by the guard: see the demo B transactions in the status table above.
 
 ## Repository
 
