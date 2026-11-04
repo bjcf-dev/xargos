@@ -1,4 +1,13 @@
-import type { BuildResponse, DemoSetupStatus, PriceShockStatus, Recipe } from "./contract";
+import type {
+  BuildResponse,
+  DemoSetupStatus,
+  FundAssetsResponse,
+  FundQuote,
+  FundStatus,
+  FundStatusResponse,
+  PriceShockStatus,
+  Recipe,
+} from "./contract";
 import type { ErrorResponse } from "./errors";
 
 /**
@@ -135,5 +144,161 @@ export const fixtureErrorRebuildWindowClosed: ErrorResponse = {
   error: {
     code: "REBUILD_WINDOW_CLOSED",
     message: "The free rebuild window has closed. Request a new build.",
+  },
+};
+
+// ---------- Fund (Aurora Intents) ----------
+// PROVISIONAL: sacadas de la referencia de la Swap API de Aurora (campos y estados), no de una
+// respuesta real. Se sustituyen por la salida del paso 0 (local/aurora-step0-output.md, sin la key).
+// Los assetId, hashes y direcciones son ficticios; ninguno es un token, mint o cuenta real.
+
+const FUND_RECIPIENT = "FundRecipientDemo111111111111111111111111111";
+const FUND_REFUND_TO = "0x00000000000000000000000000000000000f00d1";
+const FUND_DEPOSIT_ADDRESS = "0x00000000000000000000000000000000000de905";
+const ORIGIN_TX = {
+  hash: "0x1111111111111111111111111111111111111111111111111111111111111111",
+  explorerUrl:
+    "https://basescan.org/tx/0x1111111111111111111111111111111111111111111111111111111111111111",
+};
+const DESTINATION_TX = {
+  hash: "5FundDemoDestinationTxSignature",
+  explorerUrl: "https://explorer.solana.com/tx/5FundDemoDestinationTxSignature",
+};
+
+export const fixtureFundAssets: FundAssetsResponse = {
+  destination: {
+    assetId: "provisional:sol-usdc",
+    symbol: "USDC",
+    blockchain: "sol",
+    decimals: 6,
+    priceUsd: 1,
+  },
+  origins: [
+    {
+      assetId: "provisional:base-usdc",
+      symbol: "USDC",
+      blockchain: "base",
+      decimals: 6,
+      priceUsd: 1,
+    },
+    {
+      assetId: "provisional:base-eth",
+      symbol: "ETH",
+      blockchain: "base",
+      decimals: 18,
+      priceUsd: 3000,
+    },
+    {
+      assetId: "provisional:arb-usdc",
+      symbol: "USDC",
+      blockchain: "arb",
+      decimals: 6,
+      priceUsd: 1,
+    },
+    {
+      assetId: "provisional:arb-eth",
+      symbol: "ETH",
+      blockchain: "arb",
+      decimals: 18,
+      priceUsd: 3000,
+    },
+    {
+      assetId: "provisional:eth-usdc",
+      symbol: "USDC",
+      blockchain: "eth",
+      decimals: 6,
+      priceUsd: 1,
+    },
+  ],
+};
+
+const QUOTE_BASE = {
+  originAsset: "provisional:base-usdc",
+  destinationAsset: "provisional:sol-usdc",
+  recipient: FUND_RECIPIENT,
+  refundTo: FUND_REFUND_TO,
+  amountIn: "2000000",
+  amountInFormatted: "2.0",
+  amountInUsd: "2.00",
+  amountOut: "1990000",
+  amountOutFormatted: "1.99",
+  amountOutUsd: "1.99",
+  minAmountOut: "1970100",
+  timeEstimateSeconds: 30,
+};
+
+/** Solo el precio (dry: true): sin dirección de depósito ni plazos. */
+export const fixtureFundQuoteDry: FundQuote = { ...QUOTE_BASE, dry: true };
+
+/** Cotización real: dirección de depósito y los dos plazos (su relación real: paso 0). */
+export const fixtureFundQuote: FundQuote = {
+  ...QUOTE_BASE,
+  dry: false,
+  depositAddress: FUND_DEPOSIT_ADDRESS,
+  timeWhenInactive: "2026-11-06T12:25:00.000Z",
+  deadline: "2026-11-06T12:30:00.000Z",
+  correlationId: "provisional-correlation-0001",
+};
+
+function fundStatus(
+  status: FundStatus,
+  extra: Partial<FundStatusResponse> = {},
+): FundStatusResponse {
+  return {
+    depositAddress: FUND_DEPOSIT_ADDRESS,
+    status,
+    updatedAt: "2026-11-06T12:05:00.000Z",
+    originTxs: [],
+    destinationTxs: [],
+    timeWhenInactive: "2026-11-06T12:25:00.000Z",
+    deadline: "2026-11-06T12:30:00.000Z",
+    ...extra,
+  };
+}
+
+/** Un estado de Aurora por fixture: los handlers MSW recorren los 7. */
+export const fixtureFundPendingDeposit = fundStatus("PENDING_DEPOSIT");
+export const fixtureFundKnownDepositTx = fundStatus("KNOWN_DEPOSIT_TX", {
+  originTxs: [ORIGIN_TX],
+});
+export const fixtureFundIncompleteDeposit = fundStatus("INCOMPLETE_DEPOSIT", {
+  originTxs: [ORIGIN_TX],
+  amountIn: "1500000",
+  amountInFormatted: "1.5",
+});
+export const fixtureFundProcessing = fundStatus("PROCESSING", {
+  originTxs: [ORIGIN_TX],
+  amountIn: "2000000",
+  amountInFormatted: "2.0",
+});
+export const fixtureFundSuccess = fundStatus("SUCCESS", {
+  originTxs: [ORIGIN_TX],
+  destinationTxs: [DESTINATION_TX],
+  amountIn: "2000000",
+  amountInFormatted: "2.0",
+  amountOut: "1990000",
+  amountOutFormatted: "1.99",
+});
+export const fixtureFundRefunded = fundStatus("REFUNDED", {
+  originTxs: [ORIGIN_TX],
+  amountIn: "1500000",
+  amountInFormatted: "1.5",
+  refundedAmount: "1500000",
+  refundedAmountFormatted: "1.5",
+  refundReason: "PROVISIONAL: deposit below the quoted amount",
+});
+export const fixtureFundFailed = fundStatus("FAILED", { originTxs: [ORIGIN_TX] });
+
+export const fixtureErrorFundQuoteFailed: ErrorResponse = {
+  error: {
+    code: "FUND_QUOTE_FAILED",
+    message: "Aurora could not quote this swap. Check the amount and the addresses.",
+  },
+};
+
+export const fixtureErrorFundUnavailable: ErrorResponse = {
+  error: {
+    code: "FUND_UNAVAILABLE",
+    message: "Funding from other chains is not available right now. Try again in a moment.",
   },
 };
