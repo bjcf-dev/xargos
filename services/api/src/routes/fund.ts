@@ -19,7 +19,6 @@ export const PROXY_SECRET_HEADER = "x-xargos-proxy-secret";
 const QUOTE_DEADLINE_MS = 30 * 60 * 1000;
 /** Aurora's own wait for solvers, under the 7 s of our client (D25). */
 const QUOTE_WAITING_MS = 3_000;
-const MIN_USD = 1;
 /** What the agent ends up with: USDC on Solana. Looked up in Aurora's list, never hard-coded. */
 const DESTINATION = { blockchain: "sol", symbol: "USDC" };
 /** What a user may send from the origin chains. */
@@ -29,6 +28,11 @@ export type FundRoutesDeps = {
   /** Without a client (no AURORA_API_KEY) every route answers FUND_UNAVAILABLE. */
   client: AuroraClient | undefined;
   originChains: readonly string[];
+  /**
+   * The smallest quote worth sending: Aurora's withdrawal fee is close to fixed (~0.25 USDC), so
+   * below a few dollars it eats a large share. Configurable (AURORA_MIN_USD).
+   */
+  minUsd: number;
   maxUsd: number;
   slippageBps: number;
   /** Without it, the proxy's client IP is never trusted and every client shares its bucket. */
@@ -46,7 +50,7 @@ export type FundRoutesDeps = {
  * No access code: judges test it with their own funds.
  */
 export function createFundRoutes(deps: FundRoutesDeps) {
-  const { client, originChains, maxUsd, slippageBps, proxySecret, now = Date.now } = deps;
+  const { client, originChains, minUsd, maxUsd, slippageBps, proxySecret, now = Date.now } = deps;
   const app = new Hono();
 
   /** The client's IP: the proxy's header only with the proxy's secret, else the connection's. */
@@ -113,11 +117,11 @@ export function createFundRoutes(deps: FundRoutesDeps) {
       if (!origin) return errorResponse(c, "VALIDATION_ERROR", "Unsupported origin asset");
       // Checked here so an amount out of range never reaches Aurora.
       const usd = (Number(amount) / 10 ** origin.decimals) * origin.priceUsd;
-      if (!(usd >= MIN_USD && usd <= maxUsd)) {
+      if (!(usd >= minUsd && usd <= maxUsd)) {
         return errorResponse(
           c,
           "VALIDATION_ERROR",
-          `The amount must be worth between ${MIN_USD} and ${maxUsd} USD`,
+          `The amount must be worth between ${minUsd} and ${maxUsd} USD`,
         );
       }
       if (deps.globalQuoteLimiter && !deps.globalQuoteLimiter.allow("all")) {

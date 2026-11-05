@@ -64,6 +64,11 @@ export const ConfigSchema = z.object({
         .filter(Boolean),
     ),
   /** A quote must be worth between 1 $ and this, checked before calling Aurora. */
+  /**
+   * The smallest quote, in USD. Aurora's withdrawal fee is close to fixed (~0.25 USDC on a 2 USDC
+   * quote, step 0): at 1 $ it would eat a quarter, at 5 $ about 5 %.
+   */
+  AURORA_MIN_USD: z.coerce.number().min(1).max(1000).default(5),
   AURORA_MAX_USD: z.coerce.number().min(1).max(1000).default(25),
   /** Aurora's slippage tolerance, in basis points (100 = 1 %). */
   AURORA_SLIPPAGE_BPS: z.coerce.number().int().min(1).max(1000).default(100),
@@ -87,6 +92,9 @@ export function parseConfig(env: Record<string, string | undefined>): Config {
   const { PAYER_KEYPAIR, PAYER_KEYPAIR_PATH, APP_ENV, DEMO_ACCESS_CODE } = result.data;
   if (Boolean(PAYER_KEYPAIR) === Boolean(PAYER_KEYPAIR_PATH)) {
     throw new Error("Invalid configuration: set exactly one of PAYER_KEYPAIR_PATH, PAYER_KEYPAIR");
+  }
+  if (result.data.AURORA_MIN_USD > result.data.AURORA_MAX_USD) {
+    throw new Error("Invalid configuration: AURORA_MIN_USD, AURORA_MAX_USD");
   }
   if (APP_ENV !== "local" && !DEMO_ACCESS_CODE) {
     throw new Error(`Invalid configuration: DEMO_ACCESS_CODE is required when APP_ENV=${APP_ENV}`);
