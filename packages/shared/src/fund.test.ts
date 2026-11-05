@@ -128,6 +128,19 @@ describe("FundQuote", () => {
   });
 });
 
+describe("FundStatusResponse", () => {
+  // Aurora's reference also allows a status answer with only `status` (anyOf, shape 2).
+  it("accepts the short answer: only the address, the status and empty transaction lists", () => {
+    const short = {
+      depositAddress: "0xabc",
+      status: "PENDING_DEPOSIT",
+      originTxs: [],
+      destinationTxs: [],
+    };
+    expect(FundStatusResponse.safeParse(short).success).toBe(true);
+  });
+});
+
 describe("FundTx", () => {
   it.each(["http://basescan.org/tx/0x1", "javascript:alert(1)", "not a url"])(
     "rejects the link %s: only https",
