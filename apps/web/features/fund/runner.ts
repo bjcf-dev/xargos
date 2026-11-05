@@ -80,17 +80,23 @@ export async function trackDeposit(
     if (state.status !== "tracking") break;
     if (limit !== undefined && now() >= limit) emit({ type: "DEADLINE_PASSED" });
     const { depositAddress, depositMemo } = state.deposit;
+    let pause = intervalMs;
     try {
       emit({
         type: "STATUS_RECEIVED",
         status: await api.status(depositAddress, depositMemo, { signal }),
       });
     } catch (error) {
-      emit({ type: "STATUS_FAILED", error: toFundError(error) });
+      const failure = toFundError(error);
+      emit({ type: "STATUS_FAILED", error: failure });
+      // Un 429 dice cuánto esperar: nunca se consulta antes de eso.
+      if (failure.retryAfterSeconds !== undefined) {
+        pause = Math.max(intervalMs, failure.retryAfterSeconds * 1_000);
+      }
     }
     if (done()) break;
     try {
-      await sleep(intervalMs, signal);
+      await sleep(pause, signal);
     } catch {
       break;
     }
