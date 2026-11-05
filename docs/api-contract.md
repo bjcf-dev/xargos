@@ -152,7 +152,7 @@ Sin código de acceso: el jurado lo prueba con sus fondos. Con límite por IP.
 
 **Dos plazos** (respuesta del equipo de Aurora, 4 nov):
 
-- `deadline`: **hasta aquí se envía**. Un depósito que llega después se reembolsa. Manda en la cuenta atrás de la pantalla y en `expired`.
+- `deadline`: **hasta aquí se envía**. Un depósito que llega después (y antes de `timeWhenInactive`) se reembolsa **automáticamente** (Aurora, 5 nov). Manda en la cuenta atrás de la pantalla y en `expired`.
 - `timeWhenInactive`: desde aquí Aurora **deja de vigilar** la dirección, y un depósito puede necesitar un reembolso manual. La pantalla avisa de no enviar nunca después.
 - Los dos son opcionales: con `dry: true` no vienen. Sus valores reales y el margen entre ellos salen del swap real (B18).
 
@@ -160,7 +160,7 @@ Sin código de acceso: el jurado lo prueba con sus fondos. Con límite por IP.
 
 **Depósito incompleto:** en `INCOMPLETE_DEPOSIT` el usuario **puede completar** lo que falta en la misma dirección, antes de `deadline`. `amountIn` es lo que pidió la cotización y `depositedAmount` lo que ha llegado. Si no se completa, se reembolsa (`REFUNDED`).
 
-**Cuenta de USDC del destinatario:** Aurora **no crea** la cuenta de USDC (ATA) en Solana. El destinatario tiene que haber tenido USDC antes, o la entrega falla. La pantalla lo pide y lo explica.
+**Cuenta de USDC del destinatario** (Aurora, 5 nov): si el destinatario no tiene cuenta de USDC (ATA) en Solana, **Aurora la crea y la paga el usuario**. El primer fondeo a una dirección nueva cuesta más que los siguientes. La pantalla lo avisa.
 
 **Reglas del contrato:**
 
