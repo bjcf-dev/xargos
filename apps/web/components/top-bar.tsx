@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ModeBadge } from "@/components/mode-badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { buttonVariants } from "@/components/ui/button";
+import { auroraEnabled } from "@/lib/features";
 import { isActive } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +14,10 @@ export const NAV = [
   { href: "/demo", label: "Demo" },
   { href: "/failed-payments", label: "Failed payments" },
 ] as const;
+
+/** /fund solo existe con la bandera de Aurora (D31): sin ella, ni la página ni el enlace. */
+const FUND_NAV = { href: "/fund", label: "Fund" } as const;
+const navItems = () => (auroraEnabled ? [...NAV, FUND_NAV] : NAV);
 
 /**
  * La barra de toda la app (como las webs de referencia): fija arriba al desplazar, también en el
@@ -40,7 +45,7 @@ export function TopBar({ pathname }: { pathname: string }) {
         </Link>
         <div className="order-last flex w-full min-w-0 items-center gap-2 lg:order-none lg:w-auto lg:flex-1">
           <nav aria-label="Main" className="-mx-1 flex min-w-0 flex-1 gap-1 overflow-x-auto">
-            {NAV.map(({ href, label }) => {
+            {navItems().map(({ href, label }) => {
               const active = isActive(pathname, href);
               const className = cn(
                 "shrink-0 rounded-lg px-3 py-1.5 text-sm whitespace-nowrap transition-colors",
@@ -71,7 +76,7 @@ export function TopBar({ pathname }: { pathname: string }) {
           </nav>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <ModeBadge />
+          <ModeBadge funds={isActive(pathname, "/fund")} />
           <ThemeToggle />
           {/* En el móvil no cabe: ahí el enlace "Demo" hace lo mismo. */}
           <Link
