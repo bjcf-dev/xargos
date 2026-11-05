@@ -1,11 +1,14 @@
-import type { ErrorCode } from "@xargos/shared";
-import type { FundQuote, FundQuoteRequest, FundStatus, FundStatusResponse } from "./contract";
-
-/** Los dos errores de fund llegan con #97; hasta entonces se suman aquí (PROVISIONAL). */
-export type FundErrorCode = ErrorCode | "FUND_QUOTE_FAILED" | "FUND_UNAVAILABLE";
+import type {
+  ErrorCode,
+  FundQuote,
+  FundQuoteRequest,
+  FundStatus,
+  FundStatusResponse,
+} from "@xargos/shared";
 
 export type FundError = {
-  code: FundErrorCode;
+  /** Incluye FUND_QUOTE_FAILED (Aurora no cotiza) y FUND_UNAVAILABLE (Aurora no responde). */
+  code: ErrorCode;
   message: string;
   retryAfterSeconds?: number;
   /** El backend no contestó. */

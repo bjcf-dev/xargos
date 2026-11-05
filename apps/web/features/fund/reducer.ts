@@ -1,4 +1,4 @@
-import { FUND_FINAL_STATUSES, type FundQuote } from "./contract";
+import { FUND_FINAL_STATUSES, type FundQuote } from "@xargos/shared";
 import type { Deposit, FundError, FundEvent, FundState } from "./types";
 
 /** Aurora ya no cambiará nada: SUCCESS, REFUNDED o FAILED. */

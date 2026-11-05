@@ -1,5 +1,5 @@
+import type { FundQuoteRequest } from "@xargos/shared";
 import { useEffect, useReducer, useRef, useState } from "react";
-import type { FundQuoteRequest } from "./contract";
 import { fundReducer, isSettled } from "./reducer";
 import { type FundApi, type FundRunnerDeps, runDeposit, runPreview, trackDeposit } from "./runner";
 import { createDepositStore, type DepositStore } from "./storage";

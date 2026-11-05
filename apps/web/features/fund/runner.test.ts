@@ -1,6 +1,6 @@
+import type { FundQuote, FundQuoteRequest, FundStatus, FundStatusResponse } from "@xargos/shared";
 import { describe, expect, it, vi } from "vitest";
 import { ApiClientError } from "@/lib/api/errors";
-import type { FundQuote, FundQuoteRequest, FundStatus, FundStatusResponse } from "./contract";
 import { type FundApi, runDeposit, runPreview, sendBy, trackDeposit } from "./runner";
 import type { Deposit, FundEvent, FundState } from "./types";
 
@@ -112,7 +112,7 @@ describe("trackDeposit", () => {
   });
 
   it("keeps polling through failed checks", async () => {
-    const down = new ApiClientError("FUND_UNAVAILABLE" as never, "down", { status: 503 });
+    const down = new ApiClientError("FUND_UNAVAILABLE", "down", { status: 503 });
     const { api } = fakeApi([down, new TypeError("fetch failed"), "SUCCESS"]);
     const clock = fakeClock(DEADLINE - 60_000);
     const events: FundEvent[] = [];
@@ -265,7 +265,7 @@ describe("runPreview and runDeposit", () => {
   });
 
   it("dispatches a failed quote with its code", async () => {
-    const rejected = new ApiClientError("FUND_QUOTE_FAILED" as never, "Amount too low", {
+    const rejected = new ApiClientError("FUND_QUOTE_FAILED", "Amount too low", {
       status: 400,
       rejected: true,
     });

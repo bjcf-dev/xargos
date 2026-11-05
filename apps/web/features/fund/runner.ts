@@ -1,7 +1,7 @@
+import type { FundQuote, FundQuoteRequest, FundStatusResponse } from "@xargos/shared";
 import type { Dispatch } from "react";
 import { ApiClientError } from "@/lib/api/errors";
 import { sleep as wait } from "@/lib/api/poll";
-import type { FundQuote, FundQuoteRequest, FundStatusResponse } from "./contract";
 import { fundReducer, isSettled } from "./reducer";
 import type { Deposit, FundError, FundEvent, FundState } from "./types";
 
