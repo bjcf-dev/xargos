@@ -264,6 +264,17 @@ describe("runPreview and runDeposit", () => {
     expect(events.map((e) => e.type)).toEqual(["DEPOSIT_REQUESTED", "DEPOSIT_RECEIVED"]);
   });
 
+  it("marks a failed price as dry, so it never undoes a deposit request", async () => {
+    const { api } = fakeApi([], async () => {
+      throw new ApiClientError("FUND_UNAVAILABLE", "down", { status: 503 });
+    });
+    const events: FundEvent[] = [];
+
+    await runPreview({ api }, (e) => events.push(e), REQUEST, new AbortController().signal);
+
+    expect(events.at(-1)).toMatchObject({ type: "QUOTE_FAILED", dry: true });
+  });
+
   it("dispatches a failed quote with its code", async () => {
     const rejected = new ApiClientError("FUND_QUOTE_FAILED", "Amount too low", {
       status: 400,

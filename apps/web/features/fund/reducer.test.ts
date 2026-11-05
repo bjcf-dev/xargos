@@ -93,7 +93,40 @@ describe("fundReducer: quoting", () => {
       { status: "requesting", request: { ...REQUEST, dry: false } },
       { type: "DEPOSIT_RECEIVED", quote: QUOTE },
     );
-    expect(state).toEqual({ status: "tracking", deposit: DEPOSIT });
+    // Recién creada, nada ha llegado: así "sin estado" solo significa "recién recargado".
+    expect(state).toEqual({ status: "tracking", deposit: DEPOSIT, aurora: "PENDING_DEPOSIT" });
+  });
+
+  it("asks for the deposit address while a price is still loading", () => {
+    const real = { ...REQUEST, dry: false };
+    expect(
+      fundReducer(
+        { status: "previewing", request: REQUEST },
+        { type: "DEPOSIT_REQUESTED", request: real },
+      ),
+    ).toEqual({ status: "requesting", request: real });
+  });
+
+  it("replaces a price request that is still loading with the new one", () => {
+    const three = { ...REQUEST, amount: "3000000" };
+    expect(
+      fundReducer(
+        { status: "previewing", request: REQUEST },
+        { type: "PREVIEW_REQUESTED", request: three },
+      ),
+    ).toEqual({ status: "previewing", request: three });
+  });
+
+  it("ignores a late price failure while the address is being requested", () => {
+    const state: FundState = { status: "requesting", request: { ...REQUEST, dry: false } };
+    const error = { code: "FUND_UNAVAILABLE" as const, message: "down" };
+    expect(fundReducer(state, { type: "QUOTE_FAILED", error, dry: true })).toBe(state);
+    expect(
+      fundReducer(
+        { status: "previewing", request: REQUEST },
+        { type: "QUOTE_FAILED", error, dry: true },
+      ),
+    ).toEqual({ status: "error", error, request: REQUEST });
   });
 
   // Sin dirección no hay adónde enviar: nunca se enseña una pantalla de depósito vacía.

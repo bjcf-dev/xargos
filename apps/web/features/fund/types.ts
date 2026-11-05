@@ -58,7 +58,8 @@ export type FundEvent =
   | { type: "PREVIEW_RECEIVED"; preview: FundQuote }
   | { type: "DEPOSIT_REQUESTED"; request: FundQuoteRequest }
   | { type: "DEPOSIT_RECEIVED"; quote: FundQuote }
-  | { type: "QUOTE_FAILED"; error: FundError }
+  /** `dry`: falló un precio, no la petición de la dirección. */
+  | { type: "QUOTE_FAILED"; error: FundError; dry?: true }
   | { type: "STATUS_RECEIVED"; status: FundStatusResponse }
   | { type: "STATUS_FAILED"; error: FundError }
   /** Llega con el plazo vencido (la hora la decide quien despacha). */
