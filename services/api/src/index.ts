@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 import { setNativeMintWrappingStrategy } from "@orca-so/whirlpools";
+import { fetchWhirlpool } from "@orca-so/whirlpools-client";
 import {
   address,
   createKeyPairSignerFromBytes,
@@ -12,6 +13,7 @@ import { registerExactSvmScheme as registerFacilitator } from "@x402/svm/exact/f
 import { createApp } from "./app";
 import { parseConfig } from "./config";
 import { createPayerFunds } from "./demo/funds";
+import { createPoolPrice } from "./demo/pool-price";
 import { ShockGate, ShockJobs } from "./demo/shock";
 import { createShockSteps } from "./demo/shock-steps";
 import { createSetupSteps } from "./demo/steps";
@@ -100,6 +102,10 @@ const app = createApp({
   accessCode: config.DEMO_ACCESS_CODE,
   setupRateLimitPerHour: config.SETUP_RATE_LIMIT_PER_HOUR,
   setupGlobalLimitPerHour: config.SETUP_GLOBAL_LIMIT_PER_HOUR,
+  poolPrice: createPoolPrice({
+    readSqrtPrice: async () =>
+      (await fetchWhirlpool(rpc, address(config.WHIRLPOOL_ADDRESS))).data.sqrtPrice,
+  }),
   funds: createPayerFunds({
     rpc,
     payer: payer.address,
