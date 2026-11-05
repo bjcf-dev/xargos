@@ -51,7 +51,7 @@ describe("createApp", () => {
     expect(await res.json()).toEqual({ ok: true, payer: { sol: "1", usdc: "2" } });
   });
 
-  it("stays healthy without knowing the balances, so Railway does not restart it", async () => {
+  it("stays healthy without knowing the balances, so Render does not restart it", async () => {
     const funds = { read: async () => null, enough: async () => true };
     const res = await app(new Hono(), { funds }).request("/health");
     expect(res.status).toBe(200);

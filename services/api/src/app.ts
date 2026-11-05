@@ -40,7 +40,7 @@ export function createApp(deps: AppDeps) {
     }),
   );
 
-  // Railway's health check: it must answer even if the RPC is down.
+  // Render's health check: it must answer even if the RPC is down.
   app.get("/health", async (c) =>
     c.json({ ok: true, payer: deps.funds ? await deps.funds.read() : null }),
   );

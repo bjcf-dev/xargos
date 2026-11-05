@@ -40,3 +40,20 @@ src/
 
 - **Devolver el pool a su precio.** El candado y el precio base del shock viven en memoria: tras un reinicio con el pool bajo, nadie lo restaura. `RESTORE_TO=134 pnpm --filter @xargos/api demo:shock` lo sube a ese precio, sin hacer shock. Solo sube: si el pool está por encima, no hace nada.
 - **Saldo del `payer`.** `/health` lo enseña. Por debajo de `MIN_PAYER_LAMPORTS` los setups nuevos responden `RATE_LIMITED`.
+
+## Despliegue en Render
+
+Un solo servicio, `xargos-api` (https://xargos-api.onrender.com), plan **Starter**, sin staging aparte (D26).
+
+| Ajuste | Valor |
+| --- | --- |
+| Rama | `develop`, con **auto-deploy desactivado**: el código nuevo solo llega con un deploy manual |
+| Build | `corepack enable && pnpm install --frozen-lockfile --prod=false` (`--prod=false` porque `tsx` es dependencia de desarrollo) |
+| Start | `pnpm --filter @xargos/api start` (tsx sobre el código fuente; no hay `dist/`) |
+| Health check | `/health` |
+| Node | variable `NODE_VERSION=22.23.4` |
+
+**Variables** (solo nombres; los valores, en el panel de Render, nunca en el repo): `NODE_VERSION`, `SOLANA_CLUSTER`, `APP_ENV`, `RPC_URL`, `PAYER_KEYPAIR`, `USDC_MINT`, `DEMO_USDC_MINT`, `GUARD_PROGRAM_ID`, `WHIRLPOOL_ADDRESS`, `PAY_TO_ADDRESS`, `PUBLIC_RESOURCE_URL`, `DEMO_ACCESS_CODE`, y para el módulo fund `AURORA_API_KEY` y `PROXY_SHARED_SECRET`. Secretas: `RPC_URL`, `PAYER_KEYPAIR`, `DEMO_ACCESS_CODE`, `AURORA_API_KEY` y `PROXY_SHARED_SECRET`. `PORT` no se pone: la asigna Render.
+
+**Desplegar:** Manual Deploy → Deploy latest commit en el panel, o `render deploys create srv-dbjfppetlv9c73d3lpmg --commit <sha> --wait`. Después: `/health` responde 200 y una demo A en la web pública.
+
