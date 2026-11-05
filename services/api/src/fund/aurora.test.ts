@@ -134,6 +134,17 @@ describe("createAuroraClient", () => {
     expect(s.requests[1]?.url).toContain("depositMemo=m+1");
   });
 
+  it("accepts the short status answer that only carries the status", async () => {
+    // The reference's shape 2: `{ status }` and nothing else.
+    const s = setup([{ body: { status: "PENDING_DEPOSIT" } }]);
+    expect(await s.client.status("0xabc")).toEqual({ status: "PENDING_DEPOSIT" });
+  });
+
+  it("does not take a broken full answer for a short one", async () => {
+    const s = setup([{ body: { status: "SUCCESS", swapDetails: {} } }]);
+    expect((await failure(s.client.status("0xabc"))).kind).toBe("unavailable");
+  });
+
   it("turns a 400 into a rejection with Aurora's reason", async () => {
     const s = setup([{ status: 400, body: { message: "Amount is too low", statusCode: 400 } }]);
     const error = await failure(s.client.quote(quoteRequest));
