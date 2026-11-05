@@ -18,3 +18,18 @@ export function formatUnits(base: string | bigint, decimals: number): string {
   const fraction = (value % unit).toString().padStart(decimals, "0").replace(/0+$/, "");
   return fraction ? `${whole}.${fraction}` : `${whole}`;
 }
+
+/**
+ * Texto decimal que escribe el usuario → unidades base, exacto ("2,5", 6 → 2500000n).
+ * Acepta una coma como separador decimal. undefined si no es un número positivo o lleva más
+ * decimales de los que tiene el token: nunca se redondea un importe.
+ */
+export function parseUnits(text: string, decimals: number): bigint | undefined {
+  const raw = text.trim().replace(",", ".");
+  if (!/^(\d+\.?\d*|\.\d+)$/.test(raw)) return undefined;
+  const [whole = "", fraction = ""] = raw.split(".");
+  if (fraction.length > decimals) return undefined;
+  return (
+    BigInt(whole || "0") * 10n ** BigInt(decimals) + BigInt(fraction.padEnd(decimals, "0") || "0")
+  );
+}
