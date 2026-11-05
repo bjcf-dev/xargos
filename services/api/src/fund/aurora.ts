@@ -84,17 +84,20 @@ export type AuroraQuoteResponse = z.infer<typeof AuroraQuoteResponse>;
 
 const AuroraTx = z.object({ hash: z.string(), explorerUrl: z.string() });
 
-export const AuroraStatusResponse = z.object({
+const AuroraSwapStatus = z.enum([
+  "KNOWN_DEPOSIT_TX",
+  "PENDING_DEPOSIT",
+  "INCOMPLETE_DEPOSIT",
+  "PROCESSING",
+  "SUCCESS",
+  "REFUNDED",
+  "FAILED",
+]);
+
+/** Shape 1 of the reference: the full status. */
+const AuroraFullStatus = z.object({
   correlationId: z.string(),
-  status: z.enum([
-    "KNOWN_DEPOSIT_TX",
-    "PENDING_DEPOSIT",
-    "INCOMPLETE_DEPOSIT",
-    "PROCESSING",
-    "SUCCESS",
-    "REFUNDED",
-    "FAILED",
-  ]),
+  status: AuroraSwapStatus,
   updatedAt: z.string(),
   quoteResponse: z.object({ quote: AuroraQuote.partial() }).loose(),
   swapDetails: z.object({
@@ -111,6 +114,17 @@ export const AuroraStatusResponse = z.object({
     refundReason: z.string().nullish(),
   }),
 });
+
+/**
+ * GET /api/status answers `anyOf` two shapes (reference, get-swap-status): the full one, or only
+ * `status`. Both are accepted; the short one carries no amounts, transactions or deadlines.
+ */
+export const AuroraStatusResponse = z.union([
+  AuroraFullStatus,
+  // Strict: a full answer missing a field must not pass as a short one and lose its amounts.
+  z.strictObject({ status: AuroraSwapStatus }),
+]);
+
 export type AuroraStatusResponse = z.infer<typeof AuroraStatusResponse>;
 
 /**
