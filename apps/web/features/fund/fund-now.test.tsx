@@ -56,6 +56,8 @@ describe("FundNowBlock", () => {
     expect(screen.queryByText(ADDRESS)).toBeNull();
     expect(screen.queryByRole("button", { name: /copy/i })).toBeNull();
     expect(screen.getByText(/don't send to this address/i)).toBeTruthy();
+    // El título ya no dice "Send exactly…": se contradiría con el aviso.
+    expect(screen.getByRole("heading", { name: "Time's up" })).toBeTruthy();
   });
 
   it("stops asking for the rest once the time to send is up", () => {

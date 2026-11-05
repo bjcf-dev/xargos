@@ -55,6 +55,7 @@ export const FUND_COPY = {
       `No funds moved. Don't send to this address anymore. If you already sent, it comes back to ${refundTo} automatically.`,
     retrying: "Can't reach Aurora right now, retrying…",
     checking: "Checking your deposit…",
+    timeUpTitle: "Time's up",
     timeUp: "Time's up. Don't send to this address anymore.",
     timeUpIncomplete:
       "Time's up. Don't send more to this address: what arrived goes back to you automatically.",
