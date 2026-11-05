@@ -36,6 +36,17 @@ src/
 - Confirmar si el middleware oficial liquida solo con respuesta 2xx.
 - Que la URL del recurso coincida con la pública del proxy (D20).
 
+## Módulo fund (Aurora Intents, D31)
+
+- **Qué es:** solo HTTP a la API de Aurora (`src/fund/aurora.ts`) y rutas `/fund/*` (`src/routes/fund.ts`). Corre en mainnet con los fondos del usuario; aquí no hay RPC, mint ni claves de mainnet, y `assertDevnet` no cambia.
+- **Variables:** `AURORA_*` y `PROXY_SHARED_SECRET`, todas opcionales. Sin `AURORA_API_KEY`, `/fund/*` responde `FUND_UNAVAILABLE` (503) y el resto arranca igual.
+- **La API key va en la ruta** (`/api/quote/<key>`): nunca se registra una URL de Aurora; se registra la llamada, el status y el `correlationId`. `redact()` tapa la key por si acaso.
+- **Límite por IP:** solo se usa `x-xargos-client-ip` si llega `x-xargos-proxy-secret` igual a `PROXY_SHARED_SECRET`. El mismo valor tiene que estar en Netlify.
+- **Lo que sabemos de Aurora por pruebas reales** (paso 0, 4 nov), no por su documentación:
+  - `GET /api/tokens` devuelve `{ tokens, asset_stats }`, no una lista suelta.
+  - Una cotización tarda unos 3 s.
+  - De 2 USDC llegan unos 1,75 (`withdrawFee`).
+
 ## Operación
 
 - **Devolver el pool a su precio.** El candado y el precio base del shock viven en memoria: tras un reinicio con el pool bajo, nadie lo restaura. `RESTORE_TO=134 pnpm --filter @xargos/api demo:shock` lo sube a ese precio, sin hacer shock. Solo sube: si el pool está por encima, no hace nada.
