@@ -60,11 +60,12 @@ describe("fund mock handlers", () => {
     expect(quote.amountIn).toBe("2000000");
   });
 
-  it("refuses an amount below 1 like Aurora would", async () => {
+  // Como la ruta de #101: fuera del rango en USD responde VALIDATION_ERROR, sin llamar a Aurora.
+  it("refuses an amount below 1 like the backend would", async () => {
     server.resetHandlers(...createFundHandlers());
     await expect(api.fundQuote(request("0.5", true))).rejects.toMatchObject({
-      code: "FUND_QUOTE_FAILED",
-      message: "Amount too low",
+      code: "VALIDATION_ERROR",
+      message: "The amount must be worth between 1 and 25 USD",
     });
   });
 
