@@ -134,6 +134,22 @@ describe("trackDeposit", () => {
     expect(events[1]).toMatchObject({ error: { code: "INTERNAL" } });
   });
 
+  it("waits as long as a 429 asks before checking again, never less than the interval", async () => {
+    const slowDown = (s: number) =>
+      new ApiClientError("RATE_LIMITED", "slow down", { status: 429, retryAfterSeconds: s });
+    const { api } = fakeApi([slowDown(30), slowDown(1), "SUCCESS"]);
+    const clock = fakeClock(DEADLINE - 120_000);
+
+    await trackDeposit(
+      { api, now: clock.now, sleep: clock.sleep, intervalMs: 5_000 },
+      () => {},
+      tracking(),
+      new AbortController().signal,
+    );
+
+    expect(clock.slept).toEqual([30_000, 5_000]);
+  });
+
   it("makes one last check after the deadline and expires if nothing arrived", async () => {
     const { api, calls } = fakeApi(["PENDING_DEPOSIT", "PENDING_DEPOSIT"]);
     const clock = fakeClock(DEADLINE - 5_000);
