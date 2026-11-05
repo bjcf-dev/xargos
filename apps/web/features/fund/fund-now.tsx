@@ -4,6 +4,7 @@ import { ExternalLinkIcon } from "lucide-react";
 import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { FUND_COPY } from "./copy";
 import { formatCountdown, useCountdown } from "./countdown";
 import type { FundLink, FundNow, FundTone } from "./view";
 
@@ -27,8 +28,7 @@ function Address({ value, label }: { value: string; label: string }) {
   );
 }
 
-function SendBy({ deadline }: { deadline: number | undefined }) {
-  const left = useCountdown(deadline);
+function SendBy({ left }: { left: number | undefined }) {
   if (left === undefined) return null;
   return (
     <p className="text-sm">
@@ -75,6 +75,9 @@ export function FundNowBlock({
   onNewQuote(): void;
 }) {
   const finished = now.kind === "success" || now.kind === "refunded";
+  // Con el plazo vencido no se ofrece la dirección: lo que llegue ahora vuelve como reembolso.
+  const left = useCountdown(deadline);
+  const timeUp = left === 0;
   return (
     <section className={cn("flex flex-col gap-3 border-l-4 py-1 pl-4", TONE[tone].border)}>
       <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
@@ -91,11 +94,19 @@ export function FundNowBlock({
       {(now.kind === "send" || now.kind === "incomplete") && (
         <>
           {now.kind === "incomplete" && <p className="text-sm text-muted-foreground">{now.note}</p>}
-          <Address value={now.address} label="Copy the deposit address" />
-          {now.memo && <Address value={now.memo} label="Copy the memo" />}
-          <SendBy deadline={deadline} />
-          {now.kind === "send" && (
-            <p className="text-sm text-muted-foreground">From your own wallet.</p>
+          {timeUp ? (
+            <p className="text-sm font-medium text-warning">
+              {now.kind === "send" ? FUND_COPY.now.timeUp : FUND_COPY.now.timeUpIncomplete}
+            </p>
+          ) : (
+            <>
+              <Address value={now.address} label="Copy the deposit address" />
+              {now.memo && <Address value={now.memo} label="Copy the memo" />}
+              <SendBy left={left} />
+              {now.kind === "send" && (
+                <p className="text-sm text-muted-foreground">From your own wallet.</p>
+              )}
+            </>
           )}
         </>
       )}

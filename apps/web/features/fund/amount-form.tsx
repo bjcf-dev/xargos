@@ -63,14 +63,15 @@ export function AmountForm({
   const previewRef = useRef(onPreview);
   previewRef.current = onPreview;
   const askedFor = useRef<string | null>(null);
+  const pending = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const readyKey = ready ? JSON.stringify(ready) : null;
   useEffect(() => {
     if (!readyKey || readyKey === askedFor.current) return;
-    const timer = setTimeout(() => {
+    pending.current = setTimeout(() => {
       askedFor.current = readyKey;
       previewRef.current({ ...(JSON.parse(readyKey) as Fields), dry: true });
     }, FUND_PREVIEW_DELAY_MS);
-    return () => clearTimeout(timer);
+    return () => clearTimeout(pending.current);
   }, [readyKey]);
 
   const current = (request: Fields) => ready !== undefined && sameRequest(request, ready);
@@ -86,7 +87,11 @@ export function AmountForm({
       className="flex flex-col gap-4"
       onSubmit={(event) => {
         event.preventDefault();
-        if (ready && !requesting) onRequest({ ...ready, dry: false });
+        if (!ready || requesting) return;
+        // El precio pendiente ya no hace falta: saldría después y competiría con la dirección.
+        clearTimeout(pending.current);
+        askedFor.current = readyKey;
+        onRequest({ ...ready, dry: false });
       }}
     >
       <div className="grid gap-4 sm:grid-cols-2">
