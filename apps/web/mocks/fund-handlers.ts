@@ -150,8 +150,11 @@ export function createFundHandlers({
             address[2] === "3"
               ? (fixtureFundRefunded.refundReason ?? "Incomplete deposit")
               : "The swap could not be completed",
+          // Como la fixture del paso 0: lo que llegó y lo que vuelve.
           ...(back !== undefined
             ? {
+                depositedAmount: back.toString(),
+                depositedAmountFormatted: formatUnits(back, decimals),
                 refundedAmount: back.toString(),
                 refundedAmountFormatted: formatUnits(back, decimals),
               }
