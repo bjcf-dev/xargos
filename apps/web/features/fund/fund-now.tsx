@@ -88,7 +88,9 @@ export function FundNowBlock({
         tabIndex={-1}
         className={cn("text-xl font-semibold outline-offset-4", TONE[tone].title)}
       >
-        {now.title}
+        {timeUp && (now.kind === "send" || now.kind === "incomplete")
+          ? FUND_COPY.now.timeUpTitle
+          : now.title}
       </h3>
 
       {(now.kind === "send" || now.kind === "incomplete") && (
