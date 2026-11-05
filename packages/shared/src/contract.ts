@@ -254,7 +254,8 @@ export const FundStatusResponse = z.object({
   depositAddress: z.string().min(1),
   depositMemo: z.string().min(1).optional(),
   status: FundStatus,
-  updatedAt: IsoDate,
+  /** Opcional: la respuesta corta de Aurora solo trae `status`. */
+  updatedAt: IsoDate.optional(),
   /** Lo que pidió la cotización. */
   amountIn: BaseUnits.optional(),
   amountInFormatted: z.string().min(1).optional(),

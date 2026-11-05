@@ -148,13 +148,15 @@ Fondear al agente desde otra cadena. **Corre en mainnet con fondos del usuario**
 
 Sin código de acceso: el jurado lo prueba con sus fondos. Con límite por IP.
 
-**Estados** (`FundStatus`): `PENDING_DEPOSIT` → `KNOWN_DEPOSIT_TX` → `PROCESSING` → `SUCCESS`; o `INCOMPLETE_DEPOSIT` → `REFUNDED`; o `FAILED`. Finales: `SUCCESS`, `REFUNDED` y `FAILED` (`FUND_FINAL_STATUSES`). `expired` no es de Aurora: lo calcula el front cuando pasa `timeWhenInactive` y una última consulta sigue en `PENDING_DEPOSIT`.
+**Estados** (`FundStatus`): `PENDING_DEPOSIT` → `KNOWN_DEPOSIT_TX` → `PROCESSING` → `SUCCESS`; o `INCOMPLETE_DEPOSIT` → `REFUNDED`; o `FAILED`. Finales: `SUCCESS`, `REFUNDED` y `FAILED` (`FUND_FINAL_STATUSES`). `expired` no es de Aurora: lo calcula el front cuando pasa `deadline` y una última consulta sigue en `PENDING_DEPOSIT`.
 
 **Dos plazos** (respuesta del equipo de Aurora, 4 nov):
 
 - `deadline`: **hasta aquí se envía**. Un depósito que llega después se reembolsa. Manda en la cuenta atrás de la pantalla y en `expired`.
 - `timeWhenInactive`: desde aquí Aurora **deja de vigilar** la dirección, y un depósito puede necesitar un reembolso manual. La pantalla avisa de no enviar nunca después.
-- Los dos son opcionales: con `dry: true` no vienen. Sus valores reales y el margen entre ellos salen del paso 0.
+- Los dos son opcionales: con `dry: true` no vienen. Sus valores reales y el margen entre ellos salen del swap real (B18).
+
+**Respuesta corta de `status`:** la referencia de Aurora admite una respuesta con **solo `status`**. Entonces `FundStatusResponse` lleva solo `depositAddress`, `status` y las listas de transacciones vacías; `updatedAt` y el resto son opcionales.
 
 **Depósito incompleto:** en `INCOMPLETE_DEPOSIT` el usuario **puede completar** lo que falta en la misma dirección, antes de `deadline`. `amountIn` es lo que pidió la cotización y `depositedAmount` lo que ha llegado. Si no se completa, se reembolsa (`REFUNDED`).
 
