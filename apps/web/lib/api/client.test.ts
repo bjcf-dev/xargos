@@ -1,6 +1,9 @@
 // @vitest-environment node
 import {
   fixtureBuildResponse,
+  fixtureFundAssets,
+  fixtureFundQuote,
+  fixtureFundSuccess,
   fixtureRecipe,
   fixtureSetupReady,
   fixtureShockConfirmed,
@@ -343,5 +346,65 @@ describe("parseRetryAfter", () => {
     for (const value of [null, "", " ", "-3", "1.5", "soon"]) {
       expect(parseRetryAfter(value, NOW)).toBeUndefined();
     }
+  });
+});
+
+describe("fund calls", () => {
+  const REQUEST = {
+    originAsset: fixtureFundQuote.originAsset,
+    amount: "2000000",
+    recipient: fixtureFundQuote.recipient,
+    refundTo: fixtureFundQuote.refundTo,
+    dry: false,
+  };
+
+  it("reads the fund origins from GET /fund/assets", async () => {
+    const { fetch, calls } = fakeFetch(() => json(fixtureFundAssets));
+    const api = createApiClient({ fetch, baseUrl: BASE });
+
+    await expect(api.fundAssets()).resolves.toEqual(fixtureFundAssets);
+    expect(calls[0]).toMatchObject({ url: `${BASE}/fund/assets`, method: "GET" });
+  });
+
+  it("posts a quote request to /fund/quote", async () => {
+    const { fetch, calls } = fakeFetch(() => json(fixtureFundQuote));
+    const api = createApiClient({ fetch, baseUrl: BASE });
+
+    await expect(api.fundQuote(REQUEST)).resolves.toEqual(fixtureFundQuote);
+    expect(calls[0]).toMatchObject({ url: `${BASE}/fund/quote`, method: "POST", body: REQUEST });
+  });
+
+  it("asks for a deposit's status, with its memo when there is one", async () => {
+    const { fetch, calls } = fakeFetch(() => json(fixtureFundSuccess));
+    const api = createApiClient({ fetch, baseUrl: BASE });
+
+    await expect(api.fundStatus("0xabc", "m1")).resolves.toEqual(fixtureFundSuccess);
+    await api.fundStatus("0xabc");
+    expect(calls.map((c) => c.url)).toEqual([
+      `${BASE}/fund/status/0xabc?memo=m1`,
+      `${BASE}/fund/status/0xabc`,
+    ]);
+  });
+
+  it("keeps Aurora's refusal to quote as FUND_QUOTE_FAILED", async () => {
+    const { fetch } = fakeFetch(() =>
+      json({ error: { code: "FUND_QUOTE_FAILED", message: "Amount too low" } }, 400),
+    );
+    const error = await catchError(createApiClient({ fetch, baseUrl: BASE }).fundQuote(REQUEST));
+
+    expect(error).toMatchObject({
+      code: "FUND_QUOTE_FAILED",
+      message: "Amount too low",
+      rejected: true,
+    });
+  });
+
+  it("does not take a 503 from Aurora for an unreachable backend", async () => {
+    const { fetch } = fakeFetch(() =>
+      json({ error: { code: "FUND_UNAVAILABLE", message: "Aurora is not answering" } }, 503),
+    );
+    const error = await catchError(createApiClient({ fetch, baseUrl: BASE }).fundStatus("0xabc"));
+
+    expect(error).toMatchObject({ code: "FUND_UNAVAILABLE", unreachable: false, status: 503 });
   });
 });

@@ -5,6 +5,10 @@ import {
   type DemoSetupRequest,
   DemoSetupStatus,
   ErrorResponse,
+  FundAssetsResponse,
+  FundQuote,
+  type FundQuoteRequest,
+  FundStatusResponse,
   PriceShockAccepted,
   type PriceShockRequest,
   PriceShockStatus,
@@ -43,7 +47,7 @@ export type BuildResult = {
   paymentResponse?: string;
 };
 
-/** Status de pasarela: el backend no contestó (Railway dormido, Netlify sin respuesta). */
+/** Status de pasarela: el backend no contestó (Render sin responder, Netlify sin respuesta). */
 const GATEWAY_STATUS: ReadonlySet<number> = new Set([502, 503, 504]);
 
 /**
@@ -167,6 +171,13 @@ export function createApiClient({
       request(PriceShockAccepted, routes.priceShock, body, options),
     getPriceShockStatus: (shockId: string, options?: CallOptions) =>
       request(PriceShockStatus, routes.priceShockStatus(shockId), undefined, options),
+    /** /fund (Aurora Intents, mainnet, D31): desde dónde se puede enviar y qué se recibe. */
+    fundAssets: (options?: CallOptions) =>
+      request(FundAssetsResponse, routes.fund.assets, undefined, options),
+    fundQuote: (body: FundQuoteRequest, options?: CallOptions) =>
+      request(FundQuote, routes.fund.quote, body, options),
+    fundStatus: (depositAddress: string, memo?: string, options?: CallOptions) =>
+      request(FundStatusResponse, routes.fund.status(depositAddress, memo), undefined, options),
   };
 }
 

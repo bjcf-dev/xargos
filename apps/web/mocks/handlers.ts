@@ -11,6 +11,7 @@ import {
   type PriceShockStatus,
 } from "@xargos/shared";
 import { delay, HttpResponse, http } from "msw";
+import { createFundHandlers } from "./fund-handlers";
 
 // Cualquier origen: en el navegador es el de la página; en tests, el que use el cliente.
 const API = "*/api/xargos";
@@ -133,5 +134,8 @@ export function createHandlers({ latencyMs = 0 }: { latencyMs?: number } = {}) {
           : { ...fixtureShockConfirmed, shockId: params.shockId };
       return HttpResponse.json(status);
     }),
+
+    // /fund (Aurora Intents): un escenario por importe, ver fund-handlers.ts.
+    ...createFundHandlers({ latencyMs }),
   ];
 }
