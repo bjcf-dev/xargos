@@ -174,6 +174,16 @@ describe("FundScreen", () => {
     await screen.findByLabelText(/amount/i);
   });
 
+  it("lets the user try again when the origins do not load with a deposit on its way", async () => {
+    const { api } = fakeApi({ assetsFailFirst: true });
+    render(<FundScreen api={api} store={memoryStore(DEPOSIT)} intervalMs={1} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /try again/i }));
+
+    // Con los orígenes ya cargados, la red vuelve al texto: es lo que dice dónde enviar.
+    await screen.findByRole("heading", { name: "Send exactly 2 USDC on Base" });
+  });
+
   it("keeps the deposit while a check fails, and says it is retrying", async () => {
     const { api, control } = fakeApi();
     control.failing = true;

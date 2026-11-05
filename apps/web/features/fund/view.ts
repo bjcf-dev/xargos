@@ -14,6 +14,8 @@ export type FundTone = "progress" | "action" | "success" | "info" | "danger";
 /** El bloque grande, el único paso abierto. */
 export type FundNow =
   | { kind: "form" }
+  /** Recién recargado: aún no se sabe si ya llegó algo, así que no se pide enviar nada. */
+  | { kind: "checking"; title: string }
   | { kind: "send"; title: string; address: string; memo?: string }
   | { kind: "incomplete"; title: string; note: string; address: string; memo?: string }
   | { kind: "arriving"; title: string; stage: 1 | 2; estimate?: string }
@@ -113,7 +115,16 @@ export function fundView(state: FundState, origins: FundAsset[] | undefined): Fu
     ...(isSettled(state) ? {} : { upcoming: FUND_COPY.line.upcoming(ellipsify(quote.recipient)) }),
   };
 
-  if (aurora === undefined || aurora === "PENDING_DEPOSIT") {
+  if (aurora === undefined) {
+    return {
+      ...base,
+      done,
+      now: { kind: "checking", title: FUND_COPY.now.checking },
+      tone: "progress",
+    };
+  }
+
+  if (aurora === "PENDING_DEPOSIT") {
     return {
       ...base,
       done,

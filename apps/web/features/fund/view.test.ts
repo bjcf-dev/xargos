@@ -80,7 +80,7 @@ describe("fundView", () => {
   });
 
   it("asks to send the exact amount while nothing has arrived", () => {
-    for (const state of [tracking(undefined), tracking("PENDING_DEPOSIT")]) {
+    for (const state of [tracking("PENDING_DEPOSIT")]) {
       const view = fundView(state, ORIGINS);
       expect(view.done).toEqual([{ text: QUOTE_LINE }]);
       expect(view.now).toEqual({
@@ -94,8 +94,20 @@ describe("fundView", () => {
     }
   });
 
+  // Tras recargar no se sabe aún si ya llegó algo: nunca se pide enviar el importe entero a ciegas.
+  it("checks a restored deposit before asking to send anything", () => {
+    const view = fundView(tracking(undefined), ORIGINS);
+    expect(view.now).toEqual({ kind: "checking", title: "Checking your deposit…" });
+    expect(view.done).toEqual([{ text: QUOTE_LINE }]);
+    expect(JSON.stringify(view)).not.toContain(DEPOSIT.depositAddress);
+  });
+
   it("carries the memo when the deposit has one", () => {
-    const state: FundState = { status: "tracking", deposit: { ...DEPOSIT, depositMemo: "m1" } };
+    const state: FundState = {
+      status: "tracking",
+      deposit: { ...DEPOSIT, depositMemo: "m1" },
+      aurora: "PENDING_DEPOSIT",
+    };
     expect(fundView(state, ORIGINS).now).toMatchObject({ kind: "send", memo: "m1" });
   });
 

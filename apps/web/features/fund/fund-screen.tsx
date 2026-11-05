@@ -60,6 +60,19 @@ export function FundScreen({
     panel.current?.querySelector<HTMLElement>("[data-step-title]")?.focus();
   }, [nowKey]);
 
+  const assetsError =
+    assets.status === "error" ? (
+      <Alert variant="destructive" role="alert">
+        <AlertTitle>{fundErrorText(assets.error).title}</AlertTitle>
+        <AlertDescription className="flex flex-col items-start gap-2">
+          {fundErrorText(assets.error).hint}
+          <Button type="button" variant="outline" size="sm" onClick={assets.retry}>
+            Try again
+          </Button>
+        </AlertDescription>
+      </Alert>
+    ) : null;
+
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
@@ -107,14 +120,18 @@ export function FundScreen({
 
       <div ref={panel}>
         {view.now.kind !== "form" ? (
-          <FundNowBlock
-            now={view.now}
-            tone={view.tone}
-            deadline={deadline}
-            canStartOver={view.canStartOver}
-            onStartOver={() => startOver()}
-            onNewQuote={() => startOver(deposit ? formFromQuote(deposit.quote) : undefined)}
-          />
+          <div className="flex flex-col gap-4">
+            {/* Sin orígenes no se sabe la red ni el token: lo que dice dónde enviar. */}
+            {assetsError}
+            <FundNowBlock
+              now={view.now}
+              tone={view.tone}
+              deadline={deadline}
+              canStartOver={view.canStartOver}
+              onStartOver={() => startOver()}
+              onNewQuote={() => startOver(deposit ? formFromQuote(deposit.quote) : undefined)}
+            />
+          </div>
         ) : assets.status === "loading" ? (
           <div className="flex flex-col gap-3" aria-busy="true">
             <Skeleton className="h-10 w-full" />
@@ -122,15 +139,7 @@ export function FundScreen({
             <Skeleton className="h-10 w-2/3" />
           </div>
         ) : assets.status === "error" ? (
-          <Alert variant="destructive" role="alert">
-            <AlertTitle>{fundErrorText(assets.error).title}</AlertTitle>
-            <AlertDescription className="flex flex-col items-start gap-2">
-              {fundErrorText(assets.error).hint}
-              <Button type="button" variant="outline" size="sm" onClick={assets.retry}>
-                Try again
-              </Button>
-            </AlertDescription>
-          </Alert>
+          assetsError
         ) : (
           <AmountForm
             key={form.key}

@@ -146,6 +146,18 @@ describe("AmountForm", () => {
     expect(onRequest).toHaveBeenCalledWith({ ...REQUEST, dry: false });
   });
 
+  // Un precio que saliera después de pedir la dirección competiría con ella.
+  it("drops the pending price when the address is asked for first", () => {
+    const { onPreview, onRequest } = setup();
+    fillValid();
+
+    fireEvent.click(screen.getByRole("button", { name: /get deposit address/i }));
+    wait(FUND_PREVIEW_DELAY_MS * 2);
+
+    expect(onRequest).toHaveBeenCalledOnce();
+    expect(onPreview).not.toHaveBeenCalled();
+  });
+
   it("cannot ask twice while the address is on its way", () => {
     const { rerender } = setup();
     fillValid();

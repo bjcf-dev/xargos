@@ -48,6 +48,37 @@ describe("FundNowBlock", () => {
     expect(document.body.textContent).not.toMatch(/0:00|NaN/);
   });
 
+  it("stops offering the address once the time to send is up", () => {
+    show(
+      { kind: "send", title: "Send exactly 2 USDC on Base", address: ADDRESS },
+      { deadline: Date.now() - 1_000 },
+    );
+    expect(screen.queryByText(ADDRESS)).toBeNull();
+    expect(screen.queryByRole("button", { name: /copy/i })).toBeNull();
+    expect(screen.getByText(/don't send to this address/i)).toBeTruthy();
+  });
+
+  it("stops asking for the rest once the time to send is up", () => {
+    show(
+      {
+        kind: "incomplete",
+        title: "Send 0.8 USDC more",
+        note: "To the same address…",
+        address: ADDRESS,
+      },
+      { tone: "action", deadline: Date.now() - 1_000 },
+    );
+    expect(screen.queryByText(ADDRESS)).toBeNull();
+    expect(screen.getByText(/don't send more/i)).toBeTruthy();
+  });
+
+  it("only says it is checking while a restored deposit is looked up", () => {
+    show({ kind: "checking", title: "Checking your deposit…" }, { deadline: Date.now() + 60_000 });
+    expect(screen.getByRole("heading", { name: "Checking your deposit…" })).toBeTruthy();
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.queryByText(/send within/i)).toBeNull();
+  });
+
   it("shows the memo with its own copy button when there is one", () => {
     show({ kind: "send", title: "Send exactly 2", address: ADDRESS, memo: "m1" });
     expect(screen.getByText("m1")).toBeTruthy();
