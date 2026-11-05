@@ -12,7 +12,7 @@ export const ConfigSchema = z.object({
    */
   APP_ENV: z.enum(["local", "staging", "production"]).default("production"),
   RPC_URL: z.url(),
-  /** Local runs: path to the payer keypair file. Railway has no files: use PAYER_KEYPAIR there. */
+  /** Local runs: path to the payer keypair file. Render has no files: use PAYER_KEYPAIR there. */
   PAYER_KEYPAIR_PATH: z.string().min(1).optional(),
   /** The payer keypair as a JSON array of bytes, set only in the host's variables panel. */
   PAYER_KEYPAIR: z.string().min(1).optional(),

@@ -2,7 +2,7 @@ import type { DemoSetupStatus } from "@xargos/shared";
 
 const HOUR_MS = 60 * 60 * 1000;
 
-/** In-memory state of the demo setups. One process on Railway is enough for the demo. */
+/** In-memory state of the demo setups. One process on Render is enough for the demo. */
 export class SetupJobs {
   private readonly jobs = new Map<string, DemoSetupStatus>();
   private readonly createdAt = new Map<string, number>();
