@@ -33,7 +33,7 @@ components/ui/              # shadcn
 - **El agente paga x402 desde el navegador** (`lib/x402/payer.ts`, F8): `@x402/fetch` con su clave y el esquema `exact` leyendo el mint por `/api/xargos/rpc`. Solo paga `exact` en devnet, en `recipe.price.mint` y como mucho `recipe.price.amount`. Solo un build nuevo pasa el `payer`; el rebuild gratis (D19) nunca. Si el agente no paga, el error va `rejected` (no se cobró) con el motivo.
 - `/demo/setup` y `/demo/price-shock` son asíncronos: progreso por fases con polling, y mensajes claros para `RATE_LIMITED` y `ACCESS_DENIED`.
 - `NEXT_PUBLIC_API_MODE=mock | local | staging`; por defecto `mock`, que funciona sin backend ni secretos.
-- **`/fund` en modo mock** (`mocks/fund-handlers.ts`): el escenario sale de la parte entera del importe. Por debajo de 1, la cotización falla; 3, depósito incompleto y reembolso; 4, caduca sin enviar (20 s para enviar); 5, reembolsado; 6, Aurora no termina; 7, una consulta da 503 y luego sigue bien; cualquier otro, éxito. El escenario va en la dirección de depósito, así que se sigue igual tras recargar.
+- **`/fund` en modo mock** (`mocks/fund-handlers.ts`): el escenario sale de la parte entera del importe. Por debajo de 1, el backend lo rechaza (`VALIDATION_ERROR`, como en #101); 3, depósito incompleto y reembolso; 4, caduca sin enviar (20 s para enviar); 5, reembolsado; 6, Aurora no termina; 7, una consulta da 503 y luego sigue bien; cualquier otro, éxito. El escenario va en la dirección de depósito, así que se sigue igual tras recargar.
 
 ## Netlify
 

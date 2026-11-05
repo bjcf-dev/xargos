@@ -22,7 +22,7 @@ const apiError = (code: ErrorCode, message: string) =>
 /**
  * Qué pasa con el depósito, según la parte entera del importe (en unidades del token). Así se
  * recorren los 8 estados de /fund en modo mock sin backend:
- * < 1 la cotización falla · 3 incompleto y reembolsado · 4 caduca sin enviar ·
+ * < 1 el backend lo rechaza (VALIDATION_ERROR, como #101) · 3 incompleto y reembolsado · 4 caduca sin enviar ·
  * 5 reembolsado · 6 Aurora falla · 7 una consulta da 503 y luego bien · el resto, éxito.
  */
 type Scenario = "2" | "3" | "4" | "5" | "6" | "7";
@@ -71,7 +71,9 @@ export function createFundHandlers({
     if (!asset) return { error: apiError("FUND_QUOTE_FAILED", "This token is not supported") };
     const amountIn = BigInt(body.amount);
     if (amountIn < 10n ** BigInt(asset.decimals)) {
-      return { error: apiError("FUND_QUOTE_FAILED", "Amount too low") };
+      return {
+        error: apiError("VALIDATION_ERROR", "The amount must be worth between 1 and 25 USD"),
+      };
     }
     const usd = Number(formatUnits(amountIn, asset.decimals)) * asset.priceUsd;
     const out = Math.max(0, usd - WITHDRAW_FEE_USD);
