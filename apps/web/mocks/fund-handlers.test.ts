@@ -163,7 +163,11 @@ describe("fund mock handlers", () => {
     await api.fundStatus(address);
     await api.fundStatus(address);
     const refunded = await api.fundStatus(address);
-    expect(refunded).toMatchObject({ status: "REFUNDED", refundedAmount: "2250000" });
+    expect(refunded).toMatchObject({
+      status: "REFUNDED",
+      depositedAmount: "2250000",
+      refundedAmount: "2250000",
+    });
     expect(refunded.originTxs.length).toBeGreaterThan(0);
   });
 
