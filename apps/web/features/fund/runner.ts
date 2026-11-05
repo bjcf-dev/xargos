@@ -39,7 +39,8 @@ export function sendBy(deposit: Deposit): number | undefined {
   return deposit.timeWhenInactive ? Date.parse(deposit.timeWhenInactive) : undefined;
 }
 
-function toFundError(error: unknown): FundError {
+/** Cualquier fallo de una llamada de /fund → el error que entiende la pantalla. */
+export function toFundError(error: unknown): FundError {
   if (error instanceof ApiClientError) {
     return {
       code: error.code,
