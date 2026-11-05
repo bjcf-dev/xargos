@@ -38,6 +38,8 @@ Criterios (página del reto en Encode):
 Lo nuestro: Swap API, de Base, Arbitrum o Ethereum a USDC en Solana, para fondear al agente que paga recetas con x402 ([D31](decisions.md)).
 
 
+## Requisitos de entrega
+
 - Demo funcionando (devnet basta).
 - Repo con README e instrucciones de instalación.
 - Vídeo de 2–4 minutos.
