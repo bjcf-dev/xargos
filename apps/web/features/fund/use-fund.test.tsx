@@ -99,6 +99,21 @@ describe("useFund", () => {
     expect(memory.saved()).toEqual(DEPOSIT);
   });
 
+  // Un precio en vivo que sale tarde (la pantalla espera a que se deje de teclear) no puede
+  // cancelar la petición de la dirección: el botón se quedaría en "Getting the address…".
+  it("keeps asking for the deposit address when a late price request comes in", async () => {
+    const { api } = fakeApi(["PENDING_DEPOSIT"]);
+    const { store } = memoryStore();
+    const { result } = renderHook(() => useFund({ api, store, intervalMs: 1 }));
+
+    act(() => {
+      result.current.requestDeposit(REQUEST);
+      result.current.preview(REQUEST);
+    });
+
+    await waitFor(() => expect(result.current.state.status).toBe("tracking"));
+  });
+
   it("picks the saved deposit up again after a reload", async () => {
     const { api, statusCalls } = fakeApi(["PROCESSING", "SUCCESS"]);
     const { store } = memoryStore(DEPOSIT);

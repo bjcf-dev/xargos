@@ -22,14 +22,17 @@ function trackingAddress(state: FundState): string | null {
 /**
  * /fund para las pantallas (F15): la máquina de F14 más las acciones que la mueven.
  * Al montar recupera el depósito guardado; mientras haya uno sin cerrar lo sigue, y desmontar
- * aborta el seguimiento. Una cotización nueva aborta la anterior.
+ * aborta el seguimiento. Un precio nuevo cancela el anterior, y pedir la dirección cancela el precio
+ * pendiente; un precio nunca cancela la petición de la dirección.
  */
 export function useFund({ api, store: given, intervalMs, now }: UseFundOptions) {
   const [store] = useState(() => given ?? createDepositStore());
   const [state, dispatch] = useReducer(fundReducer, initialFundState);
   const stateRef = useRef(state);
   stateRef.current = state;
-  const quoting = useRef<AbortController | null>(null);
+  // Dos canales: un precio que sale tarde no puede abortar la petición de la dirección.
+  const pricing = useRef<AbortController | null>(null);
+  const requesting = useRef<AbortController | null>(null);
 
   const deps: FundRunnerDeps = {
     api,
@@ -61,21 +64,30 @@ export function useFund({ api, store: given, intervalMs, now }: UseFundOptions) 
     return () => controller.abort();
   }, [address]);
 
-  useEffect(() => () => quoting.current?.abort(), []);
+  useEffect(
+    () => () => {
+      pricing.current?.abort();
+      requesting.current?.abort();
+    },
+    [],
+  );
 
-  function begin(): AbortSignal {
-    quoting.current?.abort();
-    quoting.current = new AbortController();
-    return quoting.current.signal;
+  function begin(channel: typeof pricing): AbortSignal {
+    channel.current?.abort();
+    channel.current = new AbortController();
+    return channel.current.signal;
   }
 
   return {
     state,
     /** Aurora ya no cambiará nada (SUCCESS, REFUNDED o FAILED). */
     settled: isSettled(state),
-    preview: (request: FundQuoteRequest) => void runPreview(deps, dispatch, request, begin()),
-    requestDeposit: (request: FundQuoteRequest) =>
-      void runDeposit(deps, dispatch, request, begin()),
+    preview: (request: FundQuoteRequest) =>
+      void runPreview(deps, dispatch, request, begin(pricing)),
+    requestDeposit: (request: FundQuoteRequest) => {
+      pricing.current?.abort();
+      void runDeposit(deps, dispatch, request, begin(requesting));
+    },
     reset: () => dispatch({ type: "RESET" }),
   };
 }
