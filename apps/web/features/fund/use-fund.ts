@@ -85,6 +85,8 @@ export function useFund({ api, store: given, intervalMs, now }: UseFundOptions) 
     preview: (request: FundQuoteRequest) =>
       void runPreview(deps, dispatch, request, begin(pricing)),
     requestDeposit: (request: FundQuoteRequest) => {
+      // Cada cotización real crea una dirección en Aurora: con un depósito en curso, ninguna más.
+      if (trackingAddress(stateRef.current)) return;
       pricing.current?.abort();
       void runDeposit(deps, dispatch, request, begin(requesting));
     },

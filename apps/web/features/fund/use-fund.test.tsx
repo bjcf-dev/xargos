@@ -1,6 +1,6 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { FundQuote, FundQuoteRequest, FundStatus } from "@xargos/shared";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FundApi } from "./runner";
 import type { DepositStore } from "./storage";
 import type { Deposit } from "./types";
@@ -112,6 +112,20 @@ describe("useFund", () => {
     });
 
     await waitFor(() => expect(result.current.state.status).toBe("tracking"));
+  });
+
+  // Cada cotización real crea una dirección en Aurora: con un depósito en curso no se pide otra.
+  it("asks for no new address while a deposit is on its way", async () => {
+    const { api } = fakeApi(["PENDING_DEPOSIT"]);
+    const quote = vi.spyOn(api, "quote");
+    const { store } = memoryStore(DEPOSIT);
+    const { result } = renderHook(() => useFund({ api, store, intervalMs: 1 }));
+    await waitFor(() => expect(result.current.state).toMatchObject({ aurora: "PENDING_DEPOSIT" }));
+
+    act(() => result.current.requestDeposit(REQUEST));
+
+    expect(quote).not.toHaveBeenCalled();
+    expect(result.current.state).toMatchObject({ status: "tracking", deposit: DEPOSIT });
   });
 
   it("picks the saved deposit up again after a reload", async () => {
