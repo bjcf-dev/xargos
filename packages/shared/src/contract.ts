@@ -190,7 +190,10 @@ export const FundQuoteRequest = z.object({
   originAsset: z.string().min(1),
   /** Unidades base del token de origen. El backend comprueba el rango en USD. */
   amount: z.string().regex(/^0*[1-9]\d*$/, "Amount must be base units greater than zero"),
-  /** Quien recibe el USDC en Solana. Lo escribe el usuario: nunca la clave del agente de la demo. */
+  /**
+   * Quien recibe el USDC en Solana. Lo escribe el usuario: nunca la clave del agente de la demo.
+   * Si no tiene cuenta de USDC, Aurora la crea y la paga el usuario (el primer fondeo cuesta más).
+   */
   recipient: Address,
   refundTo: EvmAddress,
   /** true: solo precio, sin dirección de depósito ni movimiento de fondos. */
