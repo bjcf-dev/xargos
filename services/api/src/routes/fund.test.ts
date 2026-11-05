@@ -140,11 +140,12 @@ function fakeClient(overrides: Partial<AuroraClient> = {}) {
 
 function setup(
   client: AuroraClient | undefined,
-  options: { quotesPerIp?: number; proxySecret?: string } = {},
+  options: { quotesPerIp?: number; proxySecret?: string; minUsd?: number } = {},
 ) {
   const app = createFundRoutes({
     client,
     originChains: ["base", "arb", "eth"],
+    minUsd: options.minUsd ?? 1,
     maxUsd: 25,
     slippageBps: 100,
     proxySecret: options.proxySecret,
@@ -234,6 +235,14 @@ describe("POST /fund/quote", () => {
     const res = await setup(client).post("/fund/quote", { ...validQuote, ...change });
     expect(res.status).toBe(400);
     expect(await errorCode(res)).toBe("VALIDATION_ERROR");
+    expect(quotes).toHaveLength(0);
+  });
+
+  it("uses the configured minimum, 5 USD by default in production", async () => {
+    const { client, quotes } = fakeClient();
+    const res = await setup(client, { minUsd: 5 }).post("/fund/quote", validQuote); // 2 USDC
+    expect(res.status).toBe(400);
+    expect(ErrorResponse.parse(await res.json()).error.message).toContain("between 5 and 25 USD");
     expect(quotes).toHaveLength(0);
   });
 

@@ -94,4 +94,11 @@ describe("parseConfig", () => {
   ])("only talks to Aurora's host over https, not %s", (url) => {
     expect(() => parseConfig({ ...valid, AURORA_API_URL: url })).toThrow(/AURORA_API_URL/);
   });
+
+  it("defaults the Aurora minimum to 5 USD and refuses a minimum above the maximum", () => {
+    expect(parseConfig(valid).AURORA_MIN_USD).toBe(5);
+    expect(() => parseConfig({ ...valid, AURORA_MIN_USD: "30", AURORA_MAX_USD: "25" })).toThrow(
+      /AURORA_MIN_USD/,
+    );
+  });
 });

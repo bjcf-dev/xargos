@@ -70,6 +70,7 @@ const fundRoutes = createFundRoutes({
       })
     : undefined,
   originChains: config.AURORA_ORIGIN_CHAINS,
+  minUsd: config.AURORA_MIN_USD,
   maxUsd: config.AURORA_MAX_USD,
   slippageBps: config.AURORA_SLIPPAGE_BPS,
   proxySecret: config.PROXY_SHARED_SECRET,
