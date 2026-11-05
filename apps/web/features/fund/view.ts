@@ -20,7 +20,7 @@ export type FundNow =
   | { kind: "incomplete"; title: string; note: string; address: string; memo?: string }
   | { kind: "arriving"; title: string; stage: 1 | 2; estimate?: string }
   | { kind: "success" | "refunded"; title: string; note: string; links: FundLink[] }
-  | { kind: "failed"; title: string; note: string; address: string }
+  | { kind: "failed"; title: string; note: string; address: string; support: FundLink }
   | { kind: "expired"; title: string; note: string };
 
 export type FundView = {
@@ -205,6 +205,7 @@ export function fundView(state: FundState, origins: FundAsset[] | undefined): Fu
           title: FUND_COPY.now.failed,
           note: FUND_COPY.now.failedNote,
           address: deposit.depositAddress,
+          support: { ...FUND_COPY.now.support },
         },
         tone: "danger",
       };

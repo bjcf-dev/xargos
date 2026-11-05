@@ -50,6 +50,8 @@ export const FUND_COPY = {
       `To ${words(refundTo, network && `on ${network}`)}.${reason ? ` Reason: ${reason}.` : ""}`,
     failed: "Aurora couldn't complete the swap",
     failedNote: "Keep this deposit address: Aurora's support needs it to find your funds.",
+    /** El canal oficial de Aurora en Telegram (lo pasó Leandro, 5 nov). */
+    support: { href: "https://t.me/auroraisnear", label: "Ask Aurora's support on Telegram" },
     expired: "Time ran out. Nothing was sent",
     expiredNote: (refundTo: string) =>
       `No funds moved. Don't send to this address anymore. If you already sent, it comes back to ${refundTo} automatically.`,
@@ -65,6 +67,9 @@ export const FUND_COPY = {
 /** Qué enseñar cuando falla una llamada de /fund: título corto y qué hacer. */
 export function fundErrorText(error: FundError): { title: string; hint: string } {
   switch (error.code) {
+    // Importe fuera del rango del backend (p. ej. "between 5 and 25 USD"): el mensaje lo dice.
+    case "VALIDATION_ERROR":
+      return { title: "Check the amount", hint: error.message };
     case "FUND_QUOTE_FAILED":
       return {
         title: "Aurora can't quote this",

@@ -215,6 +215,9 @@ describe("fundView", () => {
       address: DEPOSIT.depositAddress,
     });
     expect(JSON.stringify(view.now)).not.toMatch(/refund|returned|comes back/i);
+    expect(view.now).toMatchObject({
+      support: { href: "https://t.me/auroraisnear", label: "Ask Aurora's support on Telegram" },
+    });
     expect(view.canStartOver).toBe(true);
   });
 

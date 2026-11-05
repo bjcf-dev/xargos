@@ -8,6 +8,18 @@ describe("fundErrorText", () => {
     expect(text.hint).toContain("Amount too low");
   });
 
+  // El backend rechaza un importe fuera de su rango (p. ej. "between 5 and 25 USD") con
+  // VALIDATION_ERROR: es el importe, no la conexión.
+  it("passes on why the amount was refused, not a connection problem", () => {
+    const text = fundErrorText({
+      code: "VALIDATION_ERROR",
+      message: "The amount must be worth between 5 and 25 USD",
+    });
+    expect(text.title).toBe("Check the amount");
+    expect(text.hint).toContain("between 5 and 25 USD");
+    expect(text.title).not.toMatch(/reach/i);
+  });
+
   it("says Aurora is not answering, and to try again", () => {
     expect(fundErrorText({ code: "FUND_UNAVAILABLE", message: "down" })).toEqual({
       title: "Aurora isn't answering right now",
