@@ -109,7 +109,13 @@ async function quoteStep(
     const quote = await api.quote(request, { signal });
     if (!signal.aborted) dispatch(received(quote));
   } catch (error) {
-    if (!signal.aborted) dispatch({ type: "QUOTE_FAILED", error: toFundError(error) });
+    if (!signal.aborted) {
+      dispatch({
+        type: "QUOTE_FAILED",
+        error: toFundError(error),
+        ...(request.dry ? { dry: true as const } : {}),
+      });
+    }
   }
 }
 

@@ -27,6 +27,14 @@ const NO_ADDRESS: FundError = {
   message: "The quote came back without a deposit address",
 };
 
+/** Donde se puede pedir un precio o la dirección: aún no hay dinero en juego. */
+const PRICE_STATES: ReadonlySet<FundState["status"]> = new Set([
+  "idle",
+  "previewing",
+  "previewed",
+  "error",
+]);
+
 /**
  * Reducer puro de /fund. Un evento que no aplica al estado actual devuelve el MISMO objeto.
  * Mientras se sigue un depósito nunca se pierde su dirección: los fallos de consulta se
@@ -35,9 +43,9 @@ const NO_ADDRESS: FundError = {
 export function fundReducer(state: FundState, event: FundEvent): FundState {
   switch (event.type) {
     case "PREVIEW_REQUESTED":
-      if (state.status !== "idle" && state.status !== "previewed" && state.status !== "error") {
-        return state;
-      }
+      // Desde `previewing` también: el precio nuevo sustituye al que aún no ha llegado (el hook
+      // aborta la petición vieja), así nunca se empareja un precio con otro importe.
+      if (!PRICE_STATES.has(state.status)) return state;
       return { status: "previewing", request: event.request };
 
     case "PREVIEW_RECEIVED":
@@ -45,9 +53,8 @@ export function fundReducer(state: FundState, event: FundEvent): FundState {
       return { status: "previewed", request: state.request, preview: event.preview };
 
     case "DEPOSIT_REQUESTED":
-      if (state.status !== "previewed" && state.status !== "idle" && state.status !== "error") {
-        return state;
-      }
+      // Desde `previewing` también: si no, pulsar mientras carga el precio no haría nada.
+      if (!PRICE_STATES.has(state.status)) return state;
       return {
         status: "requesting",
         request: event.request,
@@ -58,11 +65,14 @@ export function fundReducer(state: FundState, event: FundEvent): FundState {
       if (state.status !== "requesting") return state;
       const deposit = depositOf(event.quote);
       if (!deposit) return { status: "error", error: NO_ADDRESS, request: state.request };
-      return { status: "tracking", deposit };
+      // Recién creada, nada ha llegado todavía: sin estado de Aurora solo queda "recién recargado".
+      return { status: "tracking", deposit, aurora: "PENDING_DEPOSIT" };
     }
 
     case "QUOTE_FAILED":
       if (state.status !== "previewing" && state.status !== "requesting") return state;
+      // Un precio que falla tarde no pisa la petición de la dirección.
+      if (event.dry && state.status !== "previewing") return state;
       return { status: "error", error: event.error, request: state.request };
 
     case "STATUS_RECEIVED": {
