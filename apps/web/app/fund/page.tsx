@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { fundApi } from "@/features/fund/api";
 import { FundScreen } from "@/features/fund/fund-screen";
 import { auroraEnabled } from "@/lib/features";
 
@@ -11,7 +10,7 @@ export default function FundPage() {
   if (!auroraEnabled) notFound();
   return (
     <main className="mx-auto max-w-4xl px-6 py-8">
-      <FundScreen api={fundApi} />
+      <FundScreen />
     </main>
   );
 }

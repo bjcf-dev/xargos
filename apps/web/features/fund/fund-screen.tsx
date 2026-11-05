@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { AmountForm } from "./amount-form";
+import { fundApi } from "./api";
 import { FUND_COPY, fundErrorText } from "./copy";
 import { type FundForm, formFromQuote } from "./form";
 import { FundNowBlock } from "./fund-now";
@@ -21,11 +22,12 @@ import { fundView } from "./view";
  * solo el paso abierto es grande. Los estados de Aurora nunca se ven: los traduce `fundView`.
  */
 export function FundScreen({
-  api,
+  // Por defecto, la de lib/api: la página es de servidor y no puede pasar funciones (como DemoScreen).
+  api = fundApi,
   store,
   intervalMs,
 }: {
-  api: FundScreenApi;
+  api?: FundScreenApi;
   store?: DepositStore;
   intervalMs?: number;
 }) {
