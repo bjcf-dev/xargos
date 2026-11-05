@@ -38,4 +38,16 @@ describe("createPoolPrice", () => {
     await price.read();
     expect(calls).toBe(2);
   });
+
+  it("shares one RPC read between requests that arrive at the same time", async () => {
+    let calls = 0;
+    const price = createPoolPrice({
+      readSqrtPrice: async () => {
+        calls++;
+        return sqrtPriceFor(134);
+      },
+    });
+    await Promise.all([price.read(), price.read(), price.read()]);
+    expect(calls).toBe(1);
+  });
 });

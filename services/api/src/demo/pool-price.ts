@@ -20,7 +20,8 @@ export function createPoolPrice(d: {
   now?: () => number;
 }): PoolPrice {
   const now = d.now ?? Date.now;
-  let cached: { at: number; value: string | null } | undefined;
+  // The promise, not the value: requests that arrive while a read is in flight share it.
+  let cached: { at: number; value: Promise<string | null> } | undefined;
 
   async function fetchPrice(): Promise<string | null> {
     try {
@@ -32,8 +33,7 @@ export function createPoolPrice(d: {
 
   return {
     async read() {
-      if (!cached || now() - cached.at >= CACHE_MS)
-        cached = { at: now(), value: await fetchPrice() };
+      if (!cached || now() - cached.at >= CACHE_MS) cached = { at: now(), value: fetchPrice() };
       return cached.value;
     },
   };
