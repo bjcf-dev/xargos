@@ -144,6 +144,7 @@ export function FundNowBlock({
         <>
           <p className="text-sm text-muted-foreground">{now.note}</p>
           <Address value={now.address} label="Copy the deposit address" />
+          <Links links={[now.support]} />
         </>
       )}
 

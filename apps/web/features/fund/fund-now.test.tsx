@@ -143,10 +143,14 @@ describe("FundNowBlock", () => {
         title: "Aurora couldn't complete the swap",
         note: "Keep this deposit address…",
         address: ADDRESS,
+        support: { href: "https://t.me/auroraisnear", label: "Ask Aurora's support on Telegram" },
       },
       { tone: "danger", canStartOver: true },
     );
     expect(screen.getByRole("button", { name: /copy the deposit address/i })).toBeTruthy();
+    const support = screen.getByRole("link", { name: /aurora's support/i });
+    expect(support.getAttribute("href")).toBe("https://t.me/auroraisnear");
+    expect(support.getAttribute("target")).toBe("_blank");
   });
 
   it("offers a new address, not starting over, when time ran out", () => {
