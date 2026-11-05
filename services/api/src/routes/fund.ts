@@ -185,26 +185,29 @@ export function createFundRoutes(deps: FundRoutesDeps) {
 
     try {
       const answer = await client.status(depositAddress, memo);
-      const details = answer.swapDetails;
+      // Aurora may answer only `{ status }` (shape 2 of its reference): no details, no deadlines.
+      const full = "swapDetails" in answer ? answer : undefined;
+      const details = full?.swapDetails;
+      const quote = full?.quoteResponse.quote;
       const parsed = FundStatusResponse.safeParse({
         depositAddress,
         status: answer.status,
-        updatedAt: answer.updatedAt,
-        originTxs: details.originChainTxHashes.filter(isHttps),
-        destinationTxs: details.destinationChainTxHashes.filter(isHttps),
+        originTxs: details?.originChainTxHashes.filter(isHttps) ?? [],
+        destinationTxs: details?.destinationChainTxHashes.filter(isHttps) ?? [],
         ...present({
+          updatedAt: full?.updatedAt,
           depositMemo: memo,
-          amountIn: details.amountIn,
-          amountInFormatted: details.amountInFormatted,
-          depositedAmount: details.depositedAmount,
-          depositedAmountFormatted: details.depositedAmountFormatted,
-          amountOut: details.amountOut,
-          amountOutFormatted: details.amountOutFormatted,
-          refundedAmount: details.refundedAmount,
-          refundedAmountFormatted: details.refundedAmountFormatted,
-          refundReason: details.refundReason,
-          deadline: answer.quoteResponse.quote.deadline,
-          timeWhenInactive: answer.quoteResponse.quote.timeWhenInactive,
+          amountIn: details?.amountIn,
+          amountInFormatted: details?.amountInFormatted,
+          depositedAmount: details?.depositedAmount,
+          depositedAmountFormatted: details?.depositedAmountFormatted,
+          amountOut: details?.amountOut,
+          amountOutFormatted: details?.amountOutFormatted,
+          refundedAmount: details?.refundedAmount,
+          refundedAmountFormatted: details?.refundedAmountFormatted,
+          refundReason: details?.refundReason,
+          deadline: quote?.deadline,
+          timeWhenInactive: quote?.timeWhenInactive,
         }),
       });
       return parsed.success ? c.json(parsed.data) : off(c);

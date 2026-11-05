@@ -288,6 +288,18 @@ describe("GET /fund/status/:depositAddress", () => {
     expect(status).not.toHaveProperty("amountOut");
   });
 
+  it("answers Aurora's short status with the status and empty lists", async () => {
+    const { client } = fakeClient({ status: async () => ({ status: "PENDING_DEPOSIT" }) });
+    const res = await setup(client).app.request("/fund/status/0xabc");
+    expect(res.status).toBe(200);
+    expect(FundStatusResponse.parse(await res.json())).toEqual({
+      depositAddress: "0xabc",
+      status: "PENDING_DEPOSIT",
+      originTxs: [],
+      destinationTxs: [],
+    });
+  });
+
   it("passes the memo on and refuses one that is not a plain token", async () => {
     const asked: (string | undefined)[] = [];
     const { client } = fakeClient({
