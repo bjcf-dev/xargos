@@ -1,5 +1,5 @@
+import type { FundQuote, FundQuoteRequest, FundStatus, FundStatusResponse } from "@xargos/shared";
 import { describe, expect, it } from "vitest";
-import type { FundQuote, FundQuoteRequest, FundStatus, FundStatusResponse } from "./contract";
 import { fundReducer, isSettled } from "./reducer";
 import type { Deposit, FundEvent, FundState } from "./types";
 

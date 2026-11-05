@@ -1,6 +1,6 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import type { FundQuote, FundQuoteRequest, FundStatus } from "@xargos/shared";
 import { afterEach, describe, expect, it } from "vitest";
-import type { FundQuote, FundQuoteRequest, FundStatus } from "./contract";
 import type { FundApi } from "./runner";
 import type { DepositStore } from "./storage";
 import type { Deposit } from "./types";
