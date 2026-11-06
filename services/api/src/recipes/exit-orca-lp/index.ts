@@ -21,7 +21,7 @@ import {
 import { POOL_TICK_SPACING, WSOL_MINT } from "../../solana/constants";
 import type { BuildContext, BuiltRecipe, Recipe, RecipeStep } from "../types";
 import { withCollectFees } from "./collect-fees";
-import { tagStep } from "./steps";
+import { closeStepLabel, tagStep } from "./steps";
 
 const TOKEN_2022_PROGRAM = address("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
 
@@ -133,7 +133,10 @@ export function createExitOrcaLpRecipe(deps: ExitOrcaLpDeps): Recipe {
           kind: "guard",
         },
         ...withCollectFees(close.instructions, authority).map((instruction) =>
-          tagStep(instruction, { label: "Close the LP position", protocol: "Orca Whirlpools" }),
+          tagStep(instruction, {
+            label: closeStepLabel(instruction),
+            protocol: "Orca Whirlpools",
+          }),
         ),
         ...swap.instructions.map((instruction) =>
           tagStep(instruction, { label: "Swap SOL to demo USDC", protocol: "Orca Whirlpools" }),

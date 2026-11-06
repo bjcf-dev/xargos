@@ -1,7 +1,10 @@
 "use client";
 
 import type { DemoSetupStatus } from "@xargos/shared";
+import { TimerIcon } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Eyebrow } from "@/components/eyebrow";
+import { IrisScan } from "@/components/iris-scan";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,11 +60,25 @@ function useNow(active: boolean): number {
   return now;
 }
 
-/** role="status" (aria-live polite): el lector de pantalla anuncia el paso en curso. */
-function Busy({ children }: { children: string }) {
+/**
+ * role="status" (aria-live polite): el lector de pantalla anuncia el paso en curso.
+ * `scan`: el iris de la guía, solo al firmar (simula, compara las cuentas y espera la confirmación).
+ */
+function Busy({ children, scan = false }: { children: string; scan?: boolean }) {
+  if (scan) {
+    return (
+      <p
+        role="status"
+        className="flex items-center gap-3 rounded-lg bg-primary-soft px-3 py-2.5 text-sm"
+      >
+        <IrisScan />
+        {children}
+      </p>
+    );
+  }
   return (
     <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
-      <Spinner aria-hidden />
+      <Spinner aria-hidden className="text-primary" />
       {children}
     </p>
   );
@@ -218,7 +235,8 @@ export function DemoScreen({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">{recipe.name}</h1>
+        <Eyebrow>Demo recipe</Eyebrow>
+        <h1 className="text-3xl font-bold tracking-tight">{recipe.name}</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">{recipe.description}</p>
         <p className="text-sm">{fee} per request, paid with x402.</p>
       </div>
@@ -257,14 +275,22 @@ export function DemoScreen({
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <fieldset aria-label="Choose a demo path" className="flex min-w-0 flex-col gap-4">
+                <fieldset
+                  aria-label="Choose a demo path"
+                  className="grid min-w-0 gap-3 sm:grid-cols-2"
+                >
                   {(["A", "B"] as const).map((p) => (
-                    <div key={p} className="flex flex-col items-start gap-1">
+                    <div
+                      key={p}
+                      className="flex flex-col items-start gap-2 rounded-lg border bg-panel-raised/60 p-3"
+                    >
                       <Button
                         variant={p === "A" ? "default" : "outline"}
                         disabled={agent.status !== "ready"}
                         aria-label={DEMO_PATHS[p].ariaLabel}
                         aria-describedby={`${a11yId}-path-${p}`}
+                        // En tarjetas estrechas, el texto del camino B pasa a dos líneas.
+                        className="h-auto min-h-8 py-1.5 text-left whitespace-normal"
                         onClick={() => {
                           setPath(p);
                           demo.start();
@@ -318,7 +344,7 @@ export function DemoScreen({
               {/* Primero el pago (x402), justo debajo la siguiente acción (en el móvil queda a mano) y al final la tx. */}
               <X402Timeline state={state} mode={mode} price={recipe.price} />
               {state.status === "shocking" ? <Busy>Moving the pool price…</Busy> : null}
-              {state.status === "signing" ? <Busy>Signing and sending…</Busy> : null}
+              {state.status === "signing" ? <Busy scan>Signing and sending…</Busy> : null}
               {state.status === "built" ? (
                 <div className="flex flex-col gap-3">
                   {/* En el camino B, el shock va primero mientras se pueda lanzar; si no, firmar. */}
@@ -391,6 +417,7 @@ export function DemoScreen({
                 run={state.run}
                 secondsLeft={null}
                 failedIndex={state.status === "reverted" ? state.failure.instructionIndex : null}
+                failedByGuard={state.status === "reverted" && state.failure.guard !== null}
               />
               <div className="flex gap-2">{startOver}</div>
             </>
@@ -412,11 +439,13 @@ export function DemoScreen({
 
           {state.status === "expired" ? (
             <>
-              <Alert variant="destructive" role="presentation">
-                <AlertTitle data-step-title tabIndex={-1}>
+              {/* Ámbar y no rojo: no se ejecutó nada y se recupera con el rebuild gratis (D19). */}
+              <Alert role="presentation" className="border-warning/50 bg-warning-soft">
+                <TimerIcon className="text-warning!" />
+                <AlertTitle data-step-title tabIndex={-1} className="text-warning">
                   The transaction expired before it was sent
                 </AlertTitle>
-                <AlertDescription>
+                <AlertDescription className="text-foreground">
                   {state.error ? (
                     <p>The free rebuild did not go through: {humanError(state.error).hint}</p>
                   ) : null}

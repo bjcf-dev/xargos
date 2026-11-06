@@ -118,6 +118,9 @@ const HUMAN_ERRORS: Record<ErrorCode, HumanError | null> = {
     title: "The price shock failed",
     hint: "The price shock could not be applied.",
   },
+  // Del módulo fund (/fund): la demo no los recibe nunca; sus textos irán con la pantalla (F15).
+  FUND_QUOTE_FAILED: null,
+  FUND_UNAVAILABLE: null,
   // Nuestros propios errores (p. ej. "No signer for this agent"): el mensaje ya es para personas.
   INTERNAL: null,
 };

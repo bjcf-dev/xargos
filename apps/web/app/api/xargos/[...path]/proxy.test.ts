@@ -3,7 +3,7 @@ import { ErrorResponse, fixtureSetupReady } from "@xargos/shared";
 import { describe, expect, it } from "vitest";
 import { createApiClient } from "@/lib/api/client";
 import { ApiClientError } from "@/lib/api/errors";
-import { createXargosProxy } from "./proxy";
+import { ACCESS_CODE_HEADER, createXargosProxy, PROXY_SECRET_HEADER } from "./proxy";
 
 const AGENT = fixtureSetupReady.agent;
 
@@ -328,6 +328,102 @@ describe("createXargosProxy demo headers", () => {
       "203.0.113.7",
       "203.0.113.7",
     ]);
+  });
+});
+
+describe("createXargosProxy fund (Aurora, D31)", () => {
+  const ip = { "x-nf-client-connection-ip": "203.0.113.7" };
+  const quote = (headers: Record<string, string> = {}) =>
+    new Request(`${WEB}/fund/quote`, {
+      method: "POST",
+      body: JSON.stringify({ originAsset: "a", amount: "2000000", dry: true }),
+      headers,
+    });
+
+  it("forwards GET /fund/status with its memo query", async () => {
+    const { fetch, calls } = fakeFetch();
+    const proxy = createXargosProxy({ backendUrl: BACK, fetch });
+
+    await proxy(new Request(`${WEB}/fund/status/0xabc?memo=m1`), ["fund", "status", "0xabc"]);
+
+    expect(calls[0]?.url).toBe(`${BACK}/fund/status/0xabc?memo=m1`);
+    expect(calls[0]?.method).toBe("GET");
+  });
+
+  it("forwards POST /fund/quote with its body as is", async () => {
+    const { fetch, calls } = fakeFetch();
+    const proxy = createXargosProxy({ backendUrl: BACK, fetch });
+
+    await proxy(quote(), ["fund", "quote"]);
+
+    expect(calls[0]?.url).toBe(`${BACK}/fund/quote`);
+    expect(calls[0]?.body).toBe(JSON.stringify({ originAsset: "a", amount: "2000000", dry: true }));
+  });
+
+  // Sin código de acceso en /fund, el backend solo se fía de la IP del proxy con este secreto.
+  it("sends the proxy secret and the client IP on /fund/*", async () => {
+    const { fetch, calls } = fakeFetch();
+    const proxy = createXargosProxy({ backendUrl: BACK, proxySecret: "p-secret-16chars", fetch });
+
+    await proxy(quote(ip), ["fund", "quote"]);
+
+    expect(calls[0]?.headers.get(PROXY_SECRET_HEADER)).toBe("p-secret-16chars");
+    expect(calls[0]?.headers.get("x-xargos-client-ip")).toBe("203.0.113.7");
+  });
+
+  it("sends neither the proxy secret nor the access code anywhere but where they belong", async () => {
+    const { fetch, calls } = fakeFetch();
+    const proxy = createXargosProxy({
+      backendUrl: BACK,
+      accessCode: "s3cret",
+      proxySecret: "p-secret-16chars",
+      fetch,
+    });
+
+    await proxy(quote(), ["fund", "quote"]);
+    await proxy(new Request(`${WEB}/demo/setup`, { method: "POST", body: "{}" }), [
+      "demo",
+      "setup",
+    ]);
+    await proxy(new Request(`${WEB}/recipes`), ["recipes"]);
+
+    expect(calls.map((c) => c.headers.get(PROXY_SECRET_HEADER))).toEqual([
+      "p-secret-16chars",
+      null,
+      null,
+    ]);
+    expect(calls[0]?.headers.get(ACCESS_CODE_HEADER)).toBeNull();
+    expect(calls[0]?.body).not.toContain("s3cret");
+  });
+
+  it("never forwards a proxy secret the browser sends", async () => {
+    const { fetch, calls } = fakeFetch();
+    const proxy = createXargosProxy({ backendUrl: BACK, fetch });
+
+    await proxy(quote({ [PROXY_SECRET_HEADER]: "guess" }), ["fund", "quote"]);
+
+    expect(calls[0]?.headers.get(PROXY_SECRET_HEADER)).toBeNull();
+  });
+
+  it("passes a 503 with its contract body through untouched", async () => {
+    const body = { error: { code: "FUND_UNAVAILABLE", message: "Aurora is down." } };
+    const { fetch } = fakeFetch(() => Response.json(body, { status: 503 }));
+    const proxy = createXargosProxy({ backendUrl: BACK, fetch });
+
+    const res = await proxy(quote(), ["fund", "quote"]);
+
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual(body);
+  });
+
+  it("still rejects a root that only starts with fund", async () => {
+    const { fetch, calls } = fakeFetch();
+    const proxy = createXargosProxy({ backendUrl: BACK, fetch });
+
+    const res = await proxy(new Request(`${WEB}/fundx`), ["fundx"]);
+
+    expect(res.status).toBe(400);
+    expect(calls).toHaveLength(0);
   });
 });
 

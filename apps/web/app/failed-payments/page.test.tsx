@@ -35,6 +35,31 @@ it("states that a failed build is never settled", () => {
   expect(within(row).getAllByRole("cell").at(-1)?.textContent).toBe("No");
 });
 
+it("says in words what each case charges, not only with a color", () => {
+  render(<FailedPaymentsPage />);
+
+  const table = screen.getByRole("table");
+  const charged = within(table)
+    .getAllByRole("row")
+    .slice(1)
+    .map((row) => within(row).getAllByRole("cell").at(-1)?.textContent);
+  expect(charged).toEqual([
+    "No",
+    "No",
+    "No",
+    "Once · the rebuild is free",
+    "Fees · the recipe fee and the network fee; the position and funds stay intact",
+  ]);
+});
+
+it("marks the guard revert as an on-chain protection, not as an HTTP error", () => {
+  render(<FailedPaymentsPage />);
+
+  const row = screen.getByRole("row", { name: /less than the minimum/i });
+  expect(row.textContent).toContain("On-chain revert");
+  expect(row.textContent).not.toMatch(/\b[45]\d\d\b/);
+});
+
 // Contract drift: el status que enseña la página sale de ERROR_HTTP, nunca escrito a mano.
 const withCode = FAILED_PAYMENT_CASES.filter((row) => row.code !== null);
 

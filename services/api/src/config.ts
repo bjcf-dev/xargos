@@ -12,7 +12,7 @@ export const ConfigSchema = z.object({
    */
   APP_ENV: z.enum(["local", "staging", "production"]).default("production"),
   RPC_URL: z.url(),
-  /** Local runs: path to the payer keypair file. Railway has no files: use PAYER_KEYPAIR there. */
+  /** Local runs: path to the payer keypair file. Render has no files: use PAYER_KEYPAIR there. */
   PAYER_KEYPAIR_PATH: z.string().min(1).optional(),
   /** The payer keypair as a JSON array of bytes, set only in the host's variables panel. */
   PAYER_KEYPAIR: z.string().min(1).optional(),
@@ -43,6 +43,40 @@ export const ConfigSchema = z.object({
   MIN_PAYER_LAMPORTS: BaseUnitsNumber.default(500_000_000n),
   /** Setups per hour across every client, on top of the limit per IP. */
   SETUP_GLOBAL_LIMIT_PER_HOUR: z.coerce.number().int().min(1).default(60),
+
+  // ----- Aurora Intents (module fund, D31). All optional: without a key the module stays off. -----
+  // Only HTTP to Aurora's API, which runs on mainnet: no RPC, mint or key of mainnet here, and
+  // SOLANA_CLUSTER and assertDevnet do not change (D31).
+  /** Only Aurora's own host, over https (D31). */
+  AURORA_API_URL: z
+    .url({ protocol: /^https$/, hostname: /^intents-api\.aurora\.dev$/ })
+    .default("https://intents-api.aurora.dev"),
+  /** Goes in the request path: never logged (redact() hides it). */
+  AURORA_API_KEY: z.string().min(1).optional(),
+  /** Chains a deposit may come from, as Aurora names them. */
+  AURORA_ORIGIN_CHAINS: z
+    .string()
+    .default("base,arb,eth")
+    .transform((value) =>
+      value
+        .split(",")
+        .map((chain) => chain.trim())
+        .filter(Boolean),
+    ),
+  /** A quote must be worth between 1 $ and this, checked before calling Aurora. */
+  /**
+   * The smallest quote, in USD. Aurora's withdrawal fee is close to fixed (~0.25 USDC on a 2 USDC
+   * quote, step 0): at 1 $ it would eat a quarter, at 5 $ about 5 %.
+   */
+  AURORA_MIN_USD: z.coerce.number().min(1).max(1000).default(5),
+  AURORA_MAX_USD: z.coerce.number().min(1).max(1000).default(25),
+  /** Aurora's slippage tolerance, in basis points (100 = 1 %). */
+  AURORA_SLIPPAGE_BPS: z.coerce.number().int().min(1).max(1000).default(100),
+  /**
+   * Shared with the Netlify proxy: only with it does the backend trust the client IP the proxy
+   * forwards (P0-1). Without it, every /fund/* client shares the proxy's bucket.
+   */
+  PROXY_SHARED_SECRET: z.string().min(16).optional(),
 });
 export type Config = z.infer<typeof ConfigSchema>;
 
@@ -58,6 +92,9 @@ export function parseConfig(env: Record<string, string | undefined>): Config {
   const { PAYER_KEYPAIR, PAYER_KEYPAIR_PATH, APP_ENV, DEMO_ACCESS_CODE } = result.data;
   if (Boolean(PAYER_KEYPAIR) === Boolean(PAYER_KEYPAIR_PATH)) {
     throw new Error("Invalid configuration: set exactly one of PAYER_KEYPAIR_PATH, PAYER_KEYPAIR");
+  }
+  if (result.data.AURORA_MIN_USD > result.data.AURORA_MAX_USD) {
+    throw new Error("Invalid configuration: AURORA_MIN_USD, AURORA_MAX_USD");
   }
   if (APP_ENV !== "local" && !DEMO_ACCESS_CODE) {
     throw new Error(`Invalid configuration: DEMO_ACCESS_CODE is required when APP_ENV=${APP_ENV}`);

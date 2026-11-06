@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 import { setNativeMintWrappingStrategy } from "@orca-so/whirlpools";
+import { fetchWhirlpool } from "@orca-so/whirlpools-client";
 import {
   address,
   createKeyPairSignerFromBytes,
@@ -12,13 +13,16 @@ import { registerExactSvmScheme as registerFacilitator } from "@x402/svm/exact/f
 import { createApp } from "./app";
 import { parseConfig } from "./config";
 import { createPayerFunds } from "./demo/funds";
+import { createPoolPrice } from "./demo/pool-price";
 import { ShockGate, ShockJobs } from "./demo/shock";
 import { createShockSteps } from "./demo/shock-steps";
 import { createSetupSteps } from "./demo/steps";
+import { createAuroraClient } from "./fund/aurora";
 import { safeLog } from "./http/log";
 import { RateLimiter } from "./http/rate-limit";
 import { asFacilitatorClient } from "./payment/local-facilitator";
 import { createExitOrcaLpRecipe } from "./recipes/exit-orca-lp";
+import { createFundRoutes } from "./routes/fund";
 import { createRecipeRoutes } from "./routes/recipes";
 import { createShockRoutes } from "./routes/shock";
 import { assertDevnet } from "./solana/assert-devnet";
@@ -55,13 +59,34 @@ const buildStore = new BuildStore();
 setNativeMintWrappingStrategy("ata");
 const payerSerial = createSerial();
 
+// Aurora (D31): only HTTP to its API. Without a key the routes exist and answer FUND_UNAVAILABLE.
+const MINUTE_MS = 60 * 1000;
+const fundRoutes = createFundRoutes({
+  client: config.AURORA_API_KEY
+    ? createAuroraClient({
+        apiUrl: config.AURORA_API_URL,
+        apiKey: config.AURORA_API_KEY,
+        log: safeLog,
+      })
+    : undefined,
+  originChains: config.AURORA_ORIGIN_CHAINS,
+  minUsd: config.AURORA_MIN_USD,
+  maxUsd: config.AURORA_MAX_USD,
+  slippageBps: config.AURORA_SLIPPAGE_BPS,
+  proxySecret: config.PROXY_SHARED_SECRET,
+  quoteLimiter: new RateLimiter(10, 60 * MINUTE_MS),
+  statusLimiter: new RateLimiter(60, MINUTE_MS),
+  globalQuoteLimiter: new RateLimiter(200, 60 * MINUTE_MS),
+});
+
 const app = createApp({
+  fundRoutes,
   shockRoutes: createShockRoutes({
     jobs: new ShockJobs(),
     gate: new ShockGate(),
     steps: createShockSteps({
       rpc,
-      send: createSender(rpc, rpcSubscriptions, payer),
+      send: createSender(rpc, rpcSubscriptions, payer, { log: safeLog }),
       payer,
       whirlpool: address(config.WHIRLPOOL_ADDRESS),
       demoUsdc: address(config.DEMO_USDC_MINT),
@@ -86,7 +111,7 @@ const app = createApp({
   }),
   steps: createSetupSteps({
     rpc,
-    send: createSender(rpc, rpcSubscriptions, payer),
+    send: createSender(rpc, rpcSubscriptions, payer, { log: safeLog }),
     payer,
     circleUsdc: address(config.USDC_MINT),
     demoUsdc: address(config.DEMO_USDC_MINT),
@@ -100,6 +125,10 @@ const app = createApp({
   accessCode: config.DEMO_ACCESS_CODE,
   setupRateLimitPerHour: config.SETUP_RATE_LIMIT_PER_HOUR,
   setupGlobalLimitPerHour: config.SETUP_GLOBAL_LIMIT_PER_HOUR,
+  poolPrice: createPoolPrice({
+    readSqrtPrice: async () =>
+      (await fetchWhirlpool(rpc, address(config.WHIRLPOOL_ADDRESS))).data.sqrtPrice,
+  }),
   funds: createPayerFunds({
     rpc,
     payer: payer.address,

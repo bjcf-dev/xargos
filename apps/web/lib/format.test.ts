@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatUnits, USDC_DECIMALS } from "./format";
+import { formatUnits, parseUnits, USDC_DECIMALS } from "./format";
 
 describe("formatUnits", () => {
   it.each([
@@ -22,4 +22,27 @@ describe("formatUnits", () => {
     expect(() => formatUnits("9.95", 6)).toThrow();
     expect(() => formatUnits("-1", 6)).toThrow();
   });
+});
+
+describe("parseUnits", () => {
+  it.each([
+    ["2", 6, 2_000_000n],
+    ["0.8", 6, 800_000n],
+    [" 1.234567 ", 6, 1_234_567n],
+    ["2,5", 6, 2_500_000n],
+    [".5", 6, 500_000n],
+    ["2.", 6, 2_000_000n],
+    ["0", 6, 0n],
+    ["0.000000000000000001", 18, 1n],
+  ])("reads %j with %i decimals as %s base units", (text, decimals, expected) => {
+    expect(parseUnits(text, decimals)).toBe(expected);
+  });
+
+  // Más decimales de los que tiene el token: no se redondea, se rechaza.
+  it.each(["", " ", "abc", "-1", "1e3", "1.2.3", "1,2,3", "1.1234567", "."])(
+    "does not read %j",
+    (text) => {
+      expect(parseUnits(text, 6)).toBeUndefined();
+    },
+  );
 });

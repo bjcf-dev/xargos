@@ -36,7 +36,35 @@ src/
 - Confirmar si el middleware oficial liquida solo con respuesta 2xx.
 - Que la URL del recurso coincida con la pública del proxy (D20).
 
+## Módulo fund (Aurora Intents, D31)
+
+- **Qué es:** solo HTTP a la API de Aurora (`src/fund/aurora.ts`) y rutas `/fund/*` (`src/routes/fund.ts`). Corre en mainnet con los fondos del usuario; aquí no hay RPC, mint ni claves de mainnet, y `assertDevnet` no cambia.
+- **Variables:** `AURORA_*` y `PROXY_SHARED_SECRET`, todas opcionales. Sin `AURORA_API_KEY`, `/fund/*` responde `FUND_UNAVAILABLE` (503) y el resto arranca igual.
+- **La API key va en la ruta** (`/api/quote/<key>`): nunca se registra una URL de Aurora; se registra la llamada, el status y el `correlationId`. `redact()` tapa la key por si acaso.
+- **Límite por IP:** solo se usa `x-xargos-client-ip` si llega `x-xargos-proxy-secret` igual a `PROXY_SHARED_SECRET`. El mismo valor tiene que estar en Netlify.
+- **Lo que sabemos de Aurora por pruebas reales** (paso 0, 4 nov), no por su documentación:
+  - `GET /api/tokens` devuelve `{ tokens, asset_stats }`, no una lista suelta.
+  - Una cotización tarda unos 3 s.
+  - De 2 USDC llegan unos 1,75 (`withdrawFee`).
+
 ## Operación
 
 - **Devolver el pool a su precio.** El candado y el precio base del shock viven en memoria: tras un reinicio con el pool bajo, nadie lo restaura. `RESTORE_TO=134 pnpm --filter @xargos/api demo:shock` lo sube a ese precio, sin hacer shock. Solo sube: si el pool está por encima, no hace nada.
 - **Saldo del `payer`.** `/health` lo enseña. Por debajo de `MIN_PAYER_LAMPORTS` los setups nuevos responden `RATE_LIMITED`.
+
+## Despliegue en Render
+
+Un solo servicio, `xargos-api` (https://xargos-api.onrender.com), plan **Starter**, sin staging aparte (D26).
+
+| Ajuste | Valor |
+| --- | --- |
+| Rama | `develop`, con **auto-deploy desactivado**: el código nuevo solo llega con un deploy manual |
+| Build | `corepack enable && pnpm install --frozen-lockfile --prod=false` (`--prod=false` porque `tsx` es dependencia de desarrollo) |
+| Start | `pnpm --filter @xargos/api start` (tsx sobre el código fuente; no hay `dist/`) |
+| Health check | `/health` |
+| Node | variable `NODE_VERSION=22.23.4` |
+
+**Variables** (solo nombres; los valores, en el panel de Render, nunca en el repo): `NODE_VERSION`, `SOLANA_CLUSTER`, `APP_ENV`, `RPC_URL`, `PAYER_KEYPAIR`, `USDC_MINT`, `DEMO_USDC_MINT`, `GUARD_PROGRAM_ID`, `WHIRLPOOL_ADDRESS`, `PAY_TO_ADDRESS`, `PUBLIC_RESOURCE_URL`, `DEMO_ACCESS_CODE`, y para el módulo fund `AURORA_API_KEY` y `PROXY_SHARED_SECRET`. Secretas: `RPC_URL`, `PAYER_KEYPAIR`, `DEMO_ACCESS_CODE`, `AURORA_API_KEY` y `PROXY_SHARED_SECRET`. `PORT` no se pone: la asigna Render.
+
+**Desplegar:** Manual Deploy → Deploy latest commit en el panel, o `render deploys create srv-dbjfppetlv9c73d3lpmg --commit <sha> --wait`. Después: `/health` responde 200 y una demo A en la web pública.
+

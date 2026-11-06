@@ -46,6 +46,22 @@ All on **devnet**. Evidence is a transaction signature or a test, never a claim.
 
 Why it is built this way: [docs/decisions.md](docs/decisions.md) (D5–D8).
 
+The program's upgrade authority is a key that lives on no server (D32). Whoever gets into our backend still cannot replace the guard with one that never reverts.
+
+## Don't trust, verify
+
+The agent does not have to trust our backend. Before signing, the agent in the browser:
+
+1. **Checks the transaction** (`verifyRecipeTransaction` in `packages/shared`):
+   - the agent is the only signer;
+   - only known programs run;
+   - the guard runs exactly twice, at `snapshot` first and `assert_min_delta` last, with the promised `minDelta`;
+   - nothing touches the watched account before the snapshot;
+   - no instruction hands over control of the agent's accounts (System `Assign`, Token `Approve` or `SetAuthority`).
+2. **Simulates it and compares the agent's accounts** before and after: its wallet, its demo USDC, wSOL, the position NFT and the USDC it pays x402 with. It refuses to sign if the transaction would take SOL beyond the network fee, take or close the USDC it pays with, give another wallet control of an account, or deliver less than `minDelta`.
+
+If either check fails, nothing is signed or sent, and the demo says why.
+
 ## API
 
 Full contract and error table: [docs/api-contract.md](docs/api-contract.md).
@@ -68,7 +84,27 @@ Full contract and error table: [docs/api-contract.md](docs/api-contract.md).
 | The transaction expires before sending | Free rebuild for 120 s with the same `buildId`                                                 |
 | The outcome misses the minimum         | The whole transaction reverts on-chain; the agent only pays the recipe fee and the network fee |
 
-The first three rows are covered by tests in `services/api/src/routes/recipes.test.ts`. The last one is enforced by the guard and is not yet shown on devnet.
+The first three rows are covered by tests in `services/api/src/routes/recipes.test.ts` and `services/api/src/routes/payments-failed.test.ts`. The last one is enforced by the guard: see the demo B transactions in the status table above.
+
+## Fund your agent from any chain (Aurora Intents, mainnet)
+
+To pay recipes with x402, an agent needs USDC on Solana. Its operator's funds often live on another chain. With [Aurora Intents](https://docs.intents.aurora.dev) (Swap API), xARGOS quotes a swap from USDC or ETH on Base, Arbitrum or Ethereum. The user gets a one-time deposit address, sends the funds **from their own wallet**, and receives USDC on Solana at the address they choose.
+
+**The boundary:** funding runs on **mainnet with real funds**. xARGOS only quotes and reads the status: it never holds or signs anything. Recipes, the guard and x402 stay on devnet. The backend has no mainnet RPC, mint or key ([D31](docs/decisions.md)).
+
+| Situation | What the user sees |
+| --- | --- |
+| Waiting | The deposit address and a countdown to `deadline`, the last moment to send |
+| Less than quoted arrives (`INCOMPLETE_DEPOSIT`) | How much is missing; a deposit that is not completed is refunded |
+| Sent after `deadline` | Refunded automatically to the refund address |
+| Done (`SUCCESS`) | The USDC received and the destination transaction |
+| Refunded (`REFUNDED`) | The amount, the reason and the refund transaction |
+
+- **Fees are shown before the deposit.** Aurora's withdrawal fee is close to fixed (about 0.25 USDC in our test quote of 2 USDC), so small amounts lose a large share. If the recipient has no USDC account on Solana, Aurora creates it and the user pays for it.
+- **API:** `GET /fund/assets`, `POST /fund/quote`, `GET /fund/status/:depositAddress` and `POST /fund/deposit` ([contract](docs/api-contract.md)). Without an Aurora key they answer `FUND_UNAVAILABLE` and the rest of the backend works as usual.
+- **Safety:**
+  - Aurora's API key travels in the request path, so it is never logged: log lines are redacted.
+  - The limit per IP only trusts the client IP that our Netlify proxy forwards with a shared secret.
 
 ## Repository
 
@@ -107,14 +143,16 @@ All on **Solana devnet**. Contribution flow: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Allowed by the organizers as long as it is disclosed (confirmed by Encode, Oct 20, 2026).
 - Tooling and libraries: pnpm, TypeScript, Biome, Vitest, Zod, lefthook (see `package.json` files).
-  Frontend (`apps/web`): Next.js, React, Tailwind CSS, next-themes, Base UI, lucide-react, class-variance-authority, cn, tw-animate-css, `@solana/kit`, `@solana-program/system`, the official x402 client packages `@x402/core`, `@x402/svm`, `@x402/fetch` (the agent pays the recipe from the browser), Testing Library, jsdom, MSW.
+  Frontend (`apps/web`): Next.js, React, Tailwind CSS, next-themes, Base UI, lucide-react, class-variance-authority, cn, tw-animate-css, `@solana/kit`, `@solana-program/system`, the official x402 client packages `@x402/core`, `@x402/svm`, `@x402/fetch` (the agent pays the recipe from the browser), Testing Library, jsdom, MSW. Fonts: Geist, Geist Mono and Antonio (Google Fonts, SIL Open Font License 1.1), self-hosted with `next/font`.
   Backend (`services/api`): Hono, `@hono/node-server`, tsx, `@solana/kit`, `@solana-program/token`, and the official x402 packages `@x402/core`, `@x402/svm`, `@x402/hono`, `@x402/fetch`, and the Orca SDK `@orca-so/whirlpools` and `@orca-so/whirlpools-client` (devnet pool scripts in `services/api/src/scripts/orca`).
   Guard program (`programs/guard`): Rust, Anchor (`anchor-lang`, `anchor-spl`), tests with LiteSVM (`litesvm`, `litesvm-token`), built with `anchor build`; the layout follows the `anchor init` template (Anchor CLI 1.0.1), with all program code written during the hackathon. Guard client (`packages/guard-client`): generated with [Codama](https://github.com/codama-idl/codama) (`codama`, `@codama/nodes-from-anchor`, `@codama/renderers-js`); `src/generated` is Codama output (MIT), regenerated with `pnpm --filter @xargos/guard-client generate`.
 - Scaffolds:
   - `apps/web` started from the `nextjs` template of [`create-solana-dapp`](https://github.com/solana-foundation/create-solana-dapp) v4.8.5 ([solana-foundation/templates](https://github.com/solana-foundation/templates), MIT), trimmed: we kept the layout, theme provider/toggle, explorer helper and Next/PostCSS config, and dropped the wallet connection, demo actions, cluster selector and Surfpool tests.
-  - `apps/web/components/ui/*`, `apps/web/components.json` and the theme tokens in `apps/web/app/globals.css` come from [shadcn/ui](https://ui.shadcn.com) (CLI v4.22.1, `base-nova` preset, MIT).
+  - `apps/web/components/ui/*`, `apps/web/components.json` and the theme token names in `apps/web/app/globals.css` come from [shadcn/ui](https://ui.shadcn.com) (CLI v4.22.1, `base-nova` preset, MIT). The color values are our own identity palette.
   - `apps/web/public/mockServiceWorker.js` is generated by [MSW](https://mswjs.io) v3.0.3 (`msw init`, MIT) and kept unmodified.
-- Logo (`apps/web/public/logo.png` and the icons cut from it): generated with Google Gemini (Nano Banana image model) and provided by a collaborator who prefers to remain anonymous. The prompt is not available.
+- Earlier logo (`apps/web/public/logo.png`): generated with Google Gemini (Nano Banana image model) and provided by a collaborator who prefers to remain anonymous. The prompt is not available.
+- Brand kit (`apps/web/public/brand/*`, `apps/web/app/icon.png`, `apps/web/app/apple-icon.png`): generated by the team with ChatGPT, then cut into separate pieces. The only edit: a near-invisible background haze removed from the sculpture.
+- Third-party service: [Aurora Intents](https://docs.intents.aurora.dev) Swap API (module `fund`, mainnet), called over HTTP with our API key. Our integrator fee is 0.
 - Pre-existing utilities: none.
 
 All other code was written during the hackathon (from Oct 12, 2026).

@@ -111,10 +111,11 @@ git push --force-with-lease
 | Cuándo                       | Qué se despliega                 | Dónde                                   |
 | ---------------------------- | -------------------------------- | --------------------------------------- |
 | Al abrir o actualizar una PR | Preview del front                | Netlify, enlace en la propia PR         |
-| Al mergear en `develop`      | Staging                          | Netlify (`develop`) + Railway (staging) |
-| Al mergear en `main`         | Producción (lo que ve el jurado) | Netlify (prod) + Railway (prod)         |
+| Al mergear en `develop`      | Branch deploy del front          | Netlify (`develop`)                     |
+| Al mergear en `main`         | Producción (lo que ve el jurado) | Netlify (prod)                          |
+| A mano, cuando toca          | Backend                          | Render (un solo servicio, ver abajo)    |
 
-No hay nada que lanzar a mano, salvo los cambios on-chain de la fase 4.
+El backend **no se despliega solo**: hay un único servicio en Render, `xargos-api`, que sigue la rama `develop` con el auto-deploy desactivado. Se despliega a mano desde el panel o con `render deploys create`; los pasos están en `services/api/CLAUDE.md` ("Despliegue en Render"). No hay staging aparte: las previews y la producción del front usan ese mismo backend.
 
 ## Fase 7 · Revisión cruzada
 

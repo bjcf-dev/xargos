@@ -33,8 +33,16 @@ describe("ERROR_HTTP", () => {
     ["REBUILD_WINDOW_CLOSED", 410],
     ["RATE_LIMITED", 429],
     ["BUILD_FAILED", 500],
+    ["FUND_QUOTE_FAILED", 400],
+    ["FUND_UNAVAILABLE", 503],
     ["INTERNAL", 500],
   ] as const)("%s answers %i", (code, status) => {
     expect(ERROR_HTTP[code].status).toBe(status);
+  });
+
+  // A refused quote fails the same way again; Aurora being down may not.
+  it("retries FUND_UNAVAILABLE but not FUND_QUOTE_FAILED", () => {
+    expect(ERROR_HTTP.FUND_UNAVAILABLE.retryable).toBe(true);
+    expect(ERROR_HTTP.FUND_QUOTE_FAILED.retryable).toBe(false);
   });
 });

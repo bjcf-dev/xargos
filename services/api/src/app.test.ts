@@ -51,7 +51,18 @@ describe("createApp", () => {
     expect(await res.json()).toEqual({ ok: true, payer: { sol: "1", usdc: "2" } });
   });
 
-  it("stays healthy without knowing the balances, so Railway does not restart it", async () => {
+  it("reports the demo pool's price in /health", async () => {
+    const funds = { read: async () => ({ sol: "1", usdc: "2" }), enough: async () => true };
+    const poolPrice = { read: async () => "134.0000" };
+    const res = await app(new Hono(), { funds, poolPrice }).request("/health");
+    expect(await res.json()).toEqual({
+      ok: true,
+      payer: { sol: "1", usdc: "2" },
+      poolPrice: "134.0000",
+    });
+  });
+
+  it("stays healthy without knowing the balances, so Render does not restart it", async () => {
     const funds = { read: async () => null, enough: async () => true };
     const res = await app(new Hono(), { funds }).request("/health");
     expect(res.status).toBe(200);

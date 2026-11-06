@@ -40,13 +40,24 @@ type TxAnatomyProps = {
   secondsLeft: number | null;
   /** Instrucción que falló en un revert (D15), para marcarla. */
   failedIndex?: number | null;
+  /** D15: true solo si la cadena dice que falló el guard (GUARD_FAIL); entonces va en protección. */
+  failedByGuard?: boolean;
 };
 
 /** Qué hace la tx paso a paso y qué garantiza el guard. Todas las cifras salen del build. */
-export function TxAnatomy({ run, secondsLeft, failedIndex = null }: TxAnatomyProps) {
+export function TxAnatomy({
+  run,
+  secondsLeft,
+  failedIndex = null,
+  failedByGuard = false,
+}: TxAnatomyProps) {
   const { quote, guard, steps } = run.build;
   const expected = formatUnits(quote.expectedOut, USDC_DECIMALS);
   const minimum = formatUnits(guard.minDelta, USDC_DECIMALS);
+  // Lo que envuelve el guard: los pasos entre su snapshot y su assert.
+  const guardIndexes = steps.filter((s) => stepTag(s, guard) === "guard").map((s) => s.index);
+  const opens = Math.min(...guardIndexes);
+  const closes = Math.max(...guardIndexes);
   const trend =
     run.shock?.priceBefore && run.shock.priceAfter
       ? shockTrend(run.shock.priceBefore, run.shock.priceAfter)
@@ -89,7 +100,7 @@ export function TxAnatomy({ run, secondsLeft, failedIndex = null }: TxAnatomyPro
           {POOL_TOKEN}, the whole transaction reverts.
         </p>
         {run.shock?.priceBefore && run.shock.priceAfter ? (
-          <Badge variant="destructive">
+          <Badge variant="warning">
             {trend === "down" ? <TrendingDownIcon data-icon="inline-start" /> : null}
             {trend === "up" ? <TrendingUpIcon data-icon="inline-start" /> : null}
             {describeShock(run.shock.priceBefore, run.shock.priceAfter)}
@@ -100,13 +111,18 @@ export function TxAnatomy({ run, secondsLeft, failedIndex = null }: TxAnatomyPro
           {steps.map((step) => {
             const tag = stepTag(step, guard);
             const failed = step.index === failedIndex;
+            const wrapped = step.index > opens && step.index < closes;
             return (
               <li
                 key={step.index}
                 className={cn(
                   "flex items-center gap-3 rounded-md px-2 py-1.5",
-                  tag === "guard" && "bg-muted",
-                  failed && "ring-1 ring-destructive",
+                  tag === "guard" && "bg-primary-soft",
+                  wrapped && "ml-3 rounded-none border-l-2 border-primary/60",
+                  failed &&
+                    (failedByGuard
+                      ? "bg-protect-soft ring-1 ring-protect"
+                      : "ring-1 ring-destructive"),
                 )}
               >
                 <span className="w-4 text-right font-mono text-muted-foreground tabular-nums">
@@ -115,7 +131,13 @@ export function TxAnatomy({ run, secondsLeft, failedIndex = null }: TxAnatomyPro
                 <span className="flex-1">
                   {step.label} <span className="text-muted-foreground">· {step.protocol}</span>
                 </span>
-                {failed ? (
+                {failed && failedByGuard ? (
+                  <Badge variant="protect">
+                    <ShieldCheckIcon data-icon="inline-start" />
+                    Stopped here
+                  </Badge>
+                ) : null}
+                {failed && !failedByGuard ? (
                   <Badge variant="destructive">
                     <XCircleIcon data-icon="inline-start" />
                     Failed

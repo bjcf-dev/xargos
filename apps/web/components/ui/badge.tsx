@@ -13,6 +13,10 @@ const badgeVariants = cva(
         destructive:
           "bg-destructive/10 text-destructive focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:focus-visible:ring-destructive/40 [a]:hover:bg-destructive/20",
         outline: "border-border text-foreground [a]:hover:bg-muted [a]:hover:text-muted-foreground",
+        // Estados de la guía de identidad: fondo suave y texto del mismo tono (4,5:1, theme-contrast).
+        success: "bg-success-soft text-success",
+        warning: "bg-warning-soft text-warning",
+        protect: "bg-protect-soft text-protect",
         ghost: "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
         link: "text-primary underline-offset-4 hover:underline",
       },

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import type { PayerFunds } from "./demo/funds";
+import type { PoolPrice } from "./demo/pool-price";
 import type { SetupSteps } from "./demo/setup-runner";
 import { errorResponse } from "./http/errors";
 import { RateLimiter } from "./http/rate-limit";
@@ -12,12 +13,16 @@ export type AppDeps = {
   recipeRoutes: Hono;
   /** POST/GET /demo/price-shock, built in index.ts with the shared build store. */
   shockRoutes: Hono;
+  /** /fund/* (Aurora Intents, D31), built in index.ts. Absent in tests that do not need it. */
+  fundRoutes?: Hono;
   steps: SetupSteps;
   accessCode?: string | undefined;
   setupRateLimitPerHour: number;
   setupMaxJobs: number;
   setupGlobalLimitPerHour?: number;
   funds?: PayerFunds;
+  /** The demo pool's price, shown in /health so a drift after demo B is visible (P1-5). */
+  poolPrice?: PoolPrice;
   log?: { error(data: object, message: string): void };
 };
 
@@ -40,12 +45,17 @@ export function createApp(deps: AppDeps) {
     }),
   );
 
-  // Railway's health check: it must answer even if the RPC is down.
+  // Render's health check: it must answer even if the RPC is down.
   app.get("/health", async (c) =>
-    c.json({ ok: true, payer: deps.funds ? await deps.funds.read() : null }),
+    c.json({
+      ok: true,
+      payer: deps.funds ? await deps.funds.read() : null,
+      ...(deps.poolPrice ? { poolPrice: await deps.poolPrice.read() } : {}),
+    }),
   );
   app.route("/", deps.recipeRoutes);
   app.route("/", deps.shockRoutes);
+  if (deps.fundRoutes) app.route("/", deps.fundRoutes);
   app.route(
     "/",
     createDemoRoutes({

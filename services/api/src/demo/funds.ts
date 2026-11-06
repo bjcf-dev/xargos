@@ -21,7 +21,8 @@ export function createPayerFunds(d: {
   now?: () => number;
 }): PayerFunds {
   const now = d.now ?? Date.now;
-  let cached: { at: number; value: PayerBalances | null } | undefined;
+  // The promise, not the value: requests that arrive while a read is in flight share it.
+  let cached: { at: number; value: Promise<PayerBalances | null> } | undefined;
 
   async function fetchBalances(): Promise<PayerBalances | null> {
     try {
@@ -45,7 +46,7 @@ export function createPayerFunds(d: {
 
   const read = async () => {
     if (!cached || now() - cached.at >= CACHE_MS) {
-      cached = { at: now(), value: await fetchBalances() };
+      cached = { at: now(), value: fetchBalances() };
     }
     return cached.value;
   };

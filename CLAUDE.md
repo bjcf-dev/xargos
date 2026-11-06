@@ -9,13 +9,13 @@ Lee este archivo entero al empezar cualquier sesión. Es el puente entre las con
 - Recibe una transacción v0 completa, lista para firmar, que empieza con `snapshot` y termina con `assert_min_delta` de nuestro programa **guard**: si el agente recibe menos de `minDelta` USDC, Solana revierte la transacción entera.
 - No custodiamos fondos ni firmamos por el agente. La garantía la impone la cadena.
 
-Hackathon: Encode Solana Hackathon 2026, reto **Best Use of x402 on Solana**. Entrega intermedia **lun 2 nov 12:59 (Madrid)**, final **lun 9 nov 12:59**. Detalles en `docs/hackathon.md`.
+Hackathon: Encode Solana Hackathon 2026, reto **Best Use of x402 on Solana** y, como secundario, **Aurora Intents** (módulo `fund`, D31). Entrega intermedia **lun 2 nov 12:59 (Madrid)**, final **lun 9 nov 12:59**. Detalles en `docs/hackathon.md`.
 
 Equipo: **Billy** (backend `services/api` + programa `programs/guard` + `scripts/`) y **Leandro** (frontend `apps/web`). `packages/shared` es de los dos.
 
 ## Reglas que no se rompen
 
-1. **Solo devnet.** Ningún RPC, mint, program ID ni clave de mainnet.
+1. **Solo devnet.** Ningún RPC, mint, program ID ni clave de mainnet. **Única excepción (D31):** el módulo `fund` puede llamar por HTTP a la API de Aurora Intents, que trabaja en mainnet con los fondos que envía el usuario desde su wallet. Ni siquiera ahí hay RPC, mint, program ID ni claves de mainnet en el backend, y `assertDevnet` no se toca.
 2. **Cero secretos en archivos commiteados**, incluidos `.md`, logs y descripciones de PR. Claves privadas, API keys y URLs de RPC con `api-key` se escriben como `***` o "ver `.env`".
 3. **Nada de SAVE en este repo.** SAVE es un proyecto privado de Billy que opera en mainnet. De él se reutiliza **conocimiento** (`docs/lessons-from-save.md`), nunca archivos, direcciones ni configuración. No intentes leer carpetas fuera de este repo.
 4. **No usar nunca la config global de Solana** (`solana config`). Siempre `--url devnet --keypair <ruta de xARGOS>` o lo que diga `Anchor.toml`. Las claves de xARGOS viven en `~/.config/xargos/` y no se leen ni se imprimen.
@@ -43,7 +43,7 @@ Equipo: **Billy** (backend `services/api` + programa `programs/guard` + `scripts
 
 ## Stack (resumen)
 
-pnpm workspaces · Node 22 (≥ 22.23.4) · TypeScript strict · **`@solana/kit`** (no web3.js v1) · Zod en `packages/shared` · Biome · Vitest · Anchor 1.0.x + LiteSVM · Codama · x402 oficial (`@x402/core`, `@x402/svm`, `@x402/fetch`) · Hono · Next.js App Router · Netlify (front) · Railway (back).
+pnpm workspaces · Node 22 (≥ 22.23.4) · TypeScript strict · **`@solana/kit`** (no web3.js v1) · Zod en `packages/shared` · Biome · Vitest · Anchor (CLI 1.0.1, `anchor-lang` 1.2.1) + LiteSVM · Codama · x402 oficial (`@x402/core`, `@x402/svm`, `@x402/fetch`) · Hono · Next.js App Router · Netlify (front) · Render (back).
 
 ## Cómo trabajar conmigo (preferencias de Billy)
 

@@ -79,4 +79,26 @@ describe("parseConfig", () => {
       "staging",
     );
   });
+
+  it("leaves the Aurora module off without a key, with safe defaults", () => {
+    const config = parseConfig(valid);
+    expect(config.AURORA_API_KEY).toBeUndefined();
+    expect(config.AURORA_API_URL).toBe("https://intents-api.aurora.dev");
+    expect(config.AURORA_ORIGIN_CHAINS).toEqual(["base", "arb", "eth"]);
+  });
+
+  it.each([
+    "http://intents-api.aurora.dev",
+    "https://evil.example",
+    "https://intents-api.aurora.dev.evil.example",
+  ])("only talks to Aurora's host over https, not %s", (url) => {
+    expect(() => parseConfig({ ...valid, AURORA_API_URL: url })).toThrow(/AURORA_API_URL/);
+  });
+
+  it("defaults the Aurora minimum to 5 USD and refuses a minimum above the maximum", () => {
+    expect(parseConfig(valid).AURORA_MIN_USD).toBe(5);
+    expect(() => parseConfig({ ...valid, AURORA_MIN_USD: "30", AURORA_MAX_USD: "25" })).toThrow(
+      /AURORA_MIN_USD/,
+    );
+  });
 });
