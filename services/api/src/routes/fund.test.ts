@@ -238,6 +238,18 @@ describe("POST /fund/quote", () => {
     expect(quotes).toHaveLength(0);
   });
 
+  it("counts in cents, so the exact minimum in USDC priced just under 1 $ is accepted", async () => {
+    // Aurora priced USDC at 0.999429 $ in production (6 Nov): 5 USDC are 4.997 $.
+    const cheapUsdc = tokens.map((token) =>
+      token.symbol === "USDC" ? { ...token, price: 0.999429 } : token,
+    );
+    const { client, quotes } = fakeClient({ tokens: async () => cheapUsdc });
+    const app = setup(client, { minUsd: 5 });
+    expect((await app.post("/fund/quote", { ...validQuote, amount: "5000000" })).status).toBe(200);
+    expect((await app.post("/fund/quote", { ...validQuote, amount: "4980000" })).status).toBe(400);
+    expect(quotes).toHaveLength(1);
+  });
+
   it("uses the configured minimum, 5 USD by default in production", async () => {
     const { client, quotes } = fakeClient();
     const res = await setup(client, { minUsd: 5 }).post("/fund/quote", validQuote); // 2 USDC
