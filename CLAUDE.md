@@ -43,7 +43,7 @@ Equipo: **Billy** (backend `services/api` + programa `programs/guard` + `scripts
 
 ## Stack (resumen)
 
-pnpm workspaces · Node 22 (≥ 22.23.4) · TypeScript strict · **`@solana/kit`** (no web3.js v1) · Zod en `packages/shared` · Biome · Vitest · Anchor 1.0.x + LiteSVM · Codama · x402 oficial (`@x402/core`, `@x402/svm`, `@x402/fetch`) · Hono · Next.js App Router · Netlify (front) · Render (back).
+pnpm workspaces · Node 22 (≥ 22.23.4) · TypeScript strict · **`@solana/kit`** (no web3.js v1) · Zod en `packages/shared` · Biome · Vitest · Anchor (CLI 1.0.1, `anchor-lang` 1.2.1) + LiteSVM · Codama · x402 oficial (`@x402/core`, `@x402/svm`, `@x402/fetch`) · Hono · Next.js App Router · Netlify (front) · Render (back).
 
 ## Cómo trabajar conmigo (preferencias de Billy)
 
