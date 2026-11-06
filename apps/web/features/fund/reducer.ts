@@ -38,7 +38,8 @@ const PRICE_STATES: ReadonlySet<FundState["status"]> = new Set([
 /**
  * Reducer puro de /fund. Un evento que no aplica al estado actual devuelve el MISMO objeto.
  * Mientras se sigue un depósito nunca se pierde su dirección: los fallos de consulta se
- * guardan en `lastError` y se reintenta; solo `expired` o un estado final de Aurora lo cierran.
+ * guardan en `lastError` y se reintenta; solo `expired`, `unknown` o un estado final de Aurora lo
+ * cierran.
  */
 export function fundReducer(state: FundState, event: FundEvent): FundState {
   switch (event.type) {
@@ -91,6 +92,11 @@ export function fundReducer(state: FundState, event: FundEvent): FundState {
 
     case "STATUS_FAILED":
       if (state.status !== "tracking" || isSettled(state)) return state;
+      // Solo si Aurora nunca contestó por esta dirección: si ya lo hizo, puede haber dinero de
+      // camino y un NOT_FOUND se trata como cualquier fallo (se reintenta).
+      if (event.error.code === "NOT_FOUND" && state.latest === undefined) {
+        return { status: "unknown", deposit: state.deposit };
+      }
       return { ...state, lastError: event.error };
 
     case "DEADLINE_PASSED":

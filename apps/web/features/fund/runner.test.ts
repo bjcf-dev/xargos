@@ -134,6 +134,28 @@ describe("trackDeposit", () => {
     expect(events[1]).toMatchObject({ error: { code: "INTERNAL" } });
   });
 
+  // #136: una dirección que Aurora no conoce no aparece por reintentar: se para y no se duerme.
+  it("stops at once when Aurora does not know the deposit address", async () => {
+    const unknown = new ApiClientError("NOT_FOUND", "Unknown deposit address", { status: 404 });
+    const { api, calls } = fakeApi([unknown, "SUCCESS"]);
+    const clock = fakeClock(DEADLINE - 60_000);
+    const events: FundEvent[] = [];
+
+    const end = await trackDeposit(
+      { api, now: clock.now, sleep: clock.sleep },
+      (e) => events.push(e),
+      tracking(),
+      new AbortController().signal,
+    );
+
+    expect(end).toEqual({ status: "unknown", deposit: DEPOSIT });
+    expect(calls).toHaveLength(1);
+    expect(clock.slept).toEqual([]);
+    expect(events).toEqual([
+      { type: "STATUS_FAILED", error: expect.objectContaining({ code: "NOT_FOUND" }) },
+    ]);
+  });
+
   it("waits as long as a 429 asks before checking again, never less than the interval", async () => {
     const slowDown = (s: number) =>
       new ApiClientError("RATE_LIMITED", "slow down", { status: 429, retryAfterSeconds: s });

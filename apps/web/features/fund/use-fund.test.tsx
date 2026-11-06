@@ -1,6 +1,7 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { FundQuote, FundQuoteRequest, FundStatus } from "@xargos/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ApiClientError } from "@/lib/api/errors";
 import type { FundApi } from "./runner";
 import type { DepositStore } from "./storage";
 import type { Deposit } from "./types";
@@ -157,6 +158,28 @@ describe("useFund", () => {
     const { result } = renderHook(() => useFund({ api, store, intervalMs: 1 }));
 
     await waitFor(() => expect(result.current.state.status).toBe("expired"));
+  });
+
+  // #136: un localStorage viejo o tocado. Aurora no conoce la dirección: se cierra, sin reintentar.
+  it("closes a saved deposit Aurora does not know, and forgets it on starting over", async () => {
+    const statusCalls: string[] = [];
+    const api: FundApi = {
+      quote: async () => QUOTE,
+      async status(address) {
+        statusCalls.push(address);
+        throw new ApiClientError("NOT_FOUND", "Unknown deposit address", { status: 404 });
+      },
+    };
+    const memory = memoryStore(DEPOSIT);
+    const { result } = renderHook(() => useFund({ api, store: memory.store, intervalMs: 1 }));
+
+    await waitFor(() => expect(result.current.state.status).toBe("unknown"));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(statusCalls).toEqual(["0xdeposit"]);
+
+    act(() => result.current.reset());
+    expect(result.current.state).toEqual({ status: "idle" });
+    expect(memory.saved()).toBeUndefined();
   });
 
   it("stops polling once unmounted", async () => {
