@@ -105,6 +105,7 @@ export function FundNowBlock({
               <Address value={now.address} label="Copy the deposit address" />
               {now.memo && <Address value={now.memo} label="Copy the memo" />}
               <SendBy left={left} />
+              {now.neverAfter && <p className="text-sm text-muted-foreground">{now.neverAfter}</p>}
               {now.kind === "send" && (
                 <p className="text-sm text-muted-foreground">From your own wallet.</p>
               )}
@@ -140,7 +141,7 @@ export function FundNowBlock({
         </>
       )}
 
-      {now.kind === "failed" && (
+      {(now.kind === "failed" || now.kind === "unknown") && (
         <>
           <p className="text-sm text-muted-foreground">{now.note}</p>
           <Address value={now.address} label="Copy the deposit address" />
@@ -151,6 +152,9 @@ export function FundNowBlock({
       {now.kind === "expired" && (
         <>
           <p className="text-sm text-muted-foreground">{now.note}</p>
+          {/* Solo para el soporte, si ya se envió: el aviso de arriba dice que no se envíe. */}
+          <Address value={now.address} label="Copy the deposit address" />
+          <Links links={[now.support]} />
           <Button type="button" variant="outline" className="self-start" onClick={onNewQuote}>
             Get a new address
           </Button>

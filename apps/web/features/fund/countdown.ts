@@ -13,6 +13,18 @@ export function formatCountdown(ms: number): string {
   return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
 }
 
+/** La hora de un instante ISO, "12:30" (24 h, hora local). undefined si no se puede leer. */
+export function formatClock(iso: string, timeZone?: string): string | undefined {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    ...(timeZone ? { timeZone } : {}),
+  }).format(date);
+}
+
 /**
  * Milisegundos hasta `until` (hora absoluta), al segundo. Se para en 0; undefined si no hay hora.
  */

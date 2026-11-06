@@ -33,6 +33,9 @@ export const FUND_COPY = {
   now: {
     send: (amount: string, symbol?: string, network?: string) =>
       words("Send exactly", amount, symbol, network && `on ${network}`),
+    /** Desde `timeWhenInactive` Aurora deja de vigilar la dirección (contrato, 5 nov). */
+    neverAfter: (until: string) =>
+      `Never send after ${until}: Aurora stops watching this address, and getting a refund may need its support.`,
     incomplete: (missing?: string, symbol?: string) =>
       missing ? words("Send", missing, symbol, "more") : "Send the rest",
     incompleteNote: (received: string | undefined, symbol: string | undefined, refundTo: string) =>
@@ -53,8 +56,16 @@ export const FUND_COPY = {
     /** El canal oficial de Aurora en Telegram (lo pasó Leandro, 5 nov). */
     support: { href: "https://t.me/auroraisnear", label: "Ask Aurora's support on Telegram" },
     expired: "Time ran out. Nothing was sent",
-    expiredNote: (refundTo: string) =>
-      `No funds moved. Don't send to this address anymore. If you already sent, it comes back to ${refundTo} automatically.`,
+    // Aurora (5 nov): automático solo hasta `timeWhenInactive`; después, reembolso manual.
+    expiredNote: (refundTo: string, until?: string) =>
+      `No funds moved. Don't send to this address anymore. ${
+        until
+          ? `If you already sent, it comes back to ${refundTo} automatically until ${until}. After that, contact Aurora's support with this address.`
+          : `If you already sent, it should come back to ${refundTo} automatically; if it doesn't, contact Aurora's support with this address.`
+      }`,
+    unknown: "This deposit address isn't known to Aurora",
+    unknownNote:
+      "Don't send to it. If you already did, contact Aurora's support with this address.",
     retrying: "Can't reach Aurora right now, retrying…",
     checking: "Checking your deposit…",
     timeUpTitle: "Time's up",
