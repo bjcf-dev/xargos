@@ -321,6 +321,18 @@ describe("GET /fund/status/:depositAddress", () => {
     });
   });
 
+  it("answers NOT_FOUND for an address Aurora does not know", async () => {
+    // Production (6 Nov): Aurora answers 400 "Deposit address … not found".
+    const { client } = fakeClient({
+      status: async () => {
+        throw new AuroraError("rejected", "Deposit address 0xabc not found", 400);
+      },
+    });
+    const res = await setup(client).app.request("/fund/status/0xabc");
+    expect(res.status).toBe(404);
+    expect(ErrorResponse.parse(await res.json()).error.code).toBe("NOT_FOUND");
+  });
+
   it("passes the memo on and refuses one that is not a plain token", async () => {
     const asked: (string | undefined)[] = [];
     const { client } = fakeClient({
