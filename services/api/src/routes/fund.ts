@@ -218,6 +218,10 @@ export function createFundRoutes(deps: FundRoutesDeps) {
       });
       return parsed.success ? c.json(parsed.data) : off(c);
     } catch (error) {
+      // Aurora answers 400 for an address it does not know: that is "not found", not a refused quote.
+      if (error instanceof AuroraError && error.kind === "rejected") {
+        return errorResponse(c, "NOT_FOUND", "Unknown deposit address");
+      }
       return failed(c, error);
     }
   });
