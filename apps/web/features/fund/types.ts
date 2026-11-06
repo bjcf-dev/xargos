@@ -48,6 +48,11 @@ export type FundState =
       /** La última consulta falló: se reintenta sin perder el depósito. */
       lastError?: FundError;
     }
+  /**
+   * Aurora no conoce la dirección (NOT_FOUND, #136) y nunca había contestado por ella: p. ej. un
+   * localStorage viejo o tocado a mano. Reintentar no cambia nada.
+   */
+  | { status: "unknown"; deposit: Deposit }
   /** Pasó el plazo y la última consulta seguía en PENDING_DEPOSIT: no enviar nada. */
   | { status: "expired"; deposit: Deposit; latest?: FundStatusResponse }
   /** Falló una cotización: todavía no hay dinero en juego. */

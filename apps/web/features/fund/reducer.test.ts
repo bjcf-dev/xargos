@@ -230,6 +230,46 @@ describe("fundReducer: tracking", () => {
     },
   );
 
+  // #136: Aurora no conoce la dirección (localStorage viejo o tocado). Reintentar no cambia nada.
+  const NOT_FOUND = {
+    type: "STATUS_FAILED",
+    error: { code: "NOT_FOUND", message: "Unknown deposit address" },
+  } as const;
+
+  it.each([
+    ["just restored", tracking()],
+    ["just created", { status: "tracking", deposit: DEPOSIT, aurora: "PENDING_DEPOSIT" }],
+  ] as [string, FundState][])(
+    "closes as unknown when Aurora does not know the address (%s)",
+    (_name, state) => {
+      expect(run(state, NOT_FOUND)).toEqual({ status: "unknown", deposit: DEPOSIT });
+    },
+  );
+
+  // Si Aurora ya contestó por esta dirección, un NOT_FOUND no puede esconder dinero de camino.
+  it.each(["PENDING_DEPOSIT", "PROCESSING"] as const)(
+    "keeps retrying a NOT_FOUND once Aurora has answered for the address (%s)",
+    (aurora) => {
+      expect(run(tracking(aurora), NOT_FOUND)).toMatchObject({
+        status: "tracking",
+        aurora,
+        lastError: NOT_FOUND.error,
+      });
+    },
+  );
+
+  it("ignores every status event once the address is unknown", () => {
+    const state: FundState = { status: "unknown", deposit: DEPOSIT };
+    for (const event of [
+      { type: "STATUS_RECEIVED", status: status("PROCESSING") },
+      { type: "STATUS_FAILED", error: { code: "NOT_FOUND", message: "x" } },
+      { type: "DEADLINE_PASSED" },
+      { type: "RESTORED", deposit: DEPOSIT },
+    ] as FundEvent[]) {
+      expect(fundReducer(state, event)).toBe(state);
+    }
+  });
+
   it("is not settled while Aurora is still working", () => {
     for (const s of [
       "PENDING_DEPOSIT",
@@ -322,6 +362,7 @@ describe("fundReducer: reload and reset", () => {
     ["previewed", { status: "previewed", request: REQUEST, preview: PREVIEW }],
     ["error", { status: "error", request: REQUEST, error: { code: "INTERNAL", message: "x" } }],
     ["expired", { status: "expired", deposit: DEPOSIT }],
+    ["unknown", { status: "unknown", deposit: DEPOSIT }],
     ["settled", tracking("SUCCESS")],
   ] as [string, FundState][])("starts over from %s", (_name, state) => {
     expect(fundReducer(state, { type: "RESET" })).toEqual({ status: "idle" });

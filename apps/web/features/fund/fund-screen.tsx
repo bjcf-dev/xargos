@@ -41,7 +41,9 @@ export function FundScreen({
   const view = fundView(fund.state, origins);
 
   const deposit =
-    fund.state.status === "tracking" || fund.state.status === "expired"
+    fund.state.status === "tracking" ||
+    fund.state.status === "expired" ||
+    fund.state.status === "unknown"
       ? fund.state.deposit
       : undefined;
   // sendBy avisa en consola si usa el respaldo: una vez por depósito, no en cada render.
