@@ -13,6 +13,7 @@ import { type FundForm, formFromQuote } from "./form";
 import { FundNowBlock } from "./fund-now";
 import { sendBy } from "./runner";
 import type { DepositStore } from "./storage";
+import { useAgentAddress } from "./use-agent-address";
 import { useFund } from "./use-fund";
 import { type FundScreenApi, useFundAssets } from "./use-fund-assets";
 import { fundView } from "./view";
@@ -32,6 +33,7 @@ export function FundScreen({
   intervalMs?: number;
 }) {
   const assets = useFundAssets(api);
+  const agentAddress = useAgentAddress();
   const fund = useFund({
     api,
     ...(store ? { store } : {}),
@@ -151,6 +153,7 @@ export function FundScreen({
             destination={assets.assets.destination}
             state={fund.state}
             {...(form.initial ? { initial: form.initial } : {})}
+            {...(agentAddress ? { agentAddress } : {})}
             onPreview={fund.preview}
             onRequest={fund.requestDeposit}
           />

@@ -31,6 +31,7 @@ export function AmountForm({
   destination,
   state,
   initial,
+  agentAddress,
   onPreview,
   onRequest,
 }: {
@@ -38,6 +39,8 @@ export function AmountForm({
   destination: FundAsset;
   state: FundState;
   initial?: FundForm;
+  /** La pública del agente de la demo en este navegador: no vale como destinatario. */
+  agentAddress?: string;
   onPreview(request: FundQuoteRequest): void;
   onRequest(request: FundQuoteRequest): void;
 }) {
@@ -54,7 +57,7 @@ export function AmountForm({
   const set = (field: keyof FundForm) => (event: { target: { value: string } }) =>
     setForm((current) => ({ ...current, [field]: event.target.value }));
 
-  const reading = readFundForm(form, origins);
+  const reading = readFundForm(form, origins, agentAddress);
   const ready = reading.kind === "ready" ? reading.request : undefined;
   const errors = reading.kind === "invalid" ? reading.errors : {};
   const asset = origins.find((o) => o.assetId === form.originAsset);

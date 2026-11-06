@@ -18,6 +18,8 @@ export const FUND_COPY = {
     recipient: "This isn't a Solana address.",
     refundTo: "Use an address that starts with 0x and has 40 more characters.",
     notTheAgent: "Use your own wallet, not the demo agent's key.",
+    isTheAgent:
+      "That's the demo agent's key: it can't be exported and expires in 24 h. Use your own wallet.",
     firstTimeCosts:
       "The first funding to a new address costs a bit more: a USDC account is created for it.",
     refundHint: "The wallet you'll send from.",

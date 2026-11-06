@@ -14,8 +14,12 @@ export type FormReading =
 
 const EVM_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 
-/** El formulario → la petición de cotización, con el importe en unidades base del token. */
-export function readFundForm(form: FundForm, origins: FundAsset[]): FormReading {
+/**
+ * El formulario → la petición de cotización, con el importe en unidades base del token.
+ * `agent`: la pública del agente de la demo en este navegador. No vale como destinatario: no se
+ * puede exportar y caduca a las 24 h, así que el USDC se perdería con ella.
+ */
+export function readFundForm(form: FundForm, origins: FundAsset[], agent?: string): FormReading {
   const value = {
     originAsset: form.originAsset.trim(),
     amount: form.amount.trim(),
@@ -29,7 +33,9 @@ export function readFundForm(form: FundForm, origins: FundAsset[]): FormReading 
   if (!asset) errors.originAsset = FUND_COPY.form.originAsset;
   const amount = asset ? parseUnits(value.amount, asset.decimals) : undefined;
   if (asset && (amount === undefined || amount <= 0n)) errors.amount = FUND_COPY.form.amount;
-  if (!isAddress(value.recipient)) errors.recipient = FUND_COPY.form.recipient;
+  if (agent !== undefined && value.recipient === agent)
+    errors.recipient = FUND_COPY.form.isTheAgent;
+  else if (!isAddress(value.recipient)) errors.recipient = FUND_COPY.form.recipient;
   if (!EVM_ADDRESS.test(value.refundTo)) errors.refundTo = FUND_COPY.form.refundTo;
 
   if (Object.keys(errors).length > 0 || amount === undefined) return { kind: "invalid", errors };
