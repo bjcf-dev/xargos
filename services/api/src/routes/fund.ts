@@ -218,8 +218,13 @@ export function createFundRoutes(deps: FundRoutesDeps) {
       });
       return parsed.success ? c.json(parsed.data) : off(c);
     } catch (error) {
-      // Aurora answers 400 for an address it does not know: that is "not found", not a refused quote.
-      if (error instanceof AuroraError && error.kind === "rejected") {
+      // Aurora answers 400 "Deposit address … not found" for an address it does not know: that is
+      // NOT_FOUND, not a refused quote. Any other 400 keeps the usual answer.
+      if (
+        error instanceof AuroraError &&
+        error.kind === "rejected" &&
+        /not found/i.test(error.message)
+      ) {
         return errorResponse(c, "NOT_FOUND", "Unknown deposit address");
       }
       return failed(c, error);

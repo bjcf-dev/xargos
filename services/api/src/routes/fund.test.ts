@@ -333,6 +333,16 @@ describe("GET /fund/status/:depositAddress", () => {
     expect(ErrorResponse.parse(await res.json()).error.code).toBe("NOT_FOUND");
   });
 
+  it("keeps any other 400 of Aurora as a refusal, not as NOT_FOUND", async () => {
+    const { client } = fakeClient({
+      status: async () => {
+        throw new AuroraError("rejected", "depositMemo is required", 400);
+      },
+    });
+    const res = await setup(client).app.request("/fund/status/0xabc");
+    expect(ErrorResponse.parse(await res.json()).error.code).toBe("FUND_QUOTE_FAILED");
+  });
+
   it("passes the memo on and refuses one that is not a plain token", async () => {
     const asked: (string | undefined)[] = [];
     const { client } = fakeClient({
