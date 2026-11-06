@@ -1,6 +1,6 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { formatCountdown, useCountdown } from "./countdown";
+import { formatClock, formatCountdown, useCountdown } from "./countdown";
 
 describe("formatCountdown", () => {
   it.each([
@@ -13,6 +13,17 @@ describe("formatCountdown", () => {
     [Number.NaN, "0:00"],
   ])("shows %i ms as %s", (ms, text) => {
     expect(formatCountdown(ms)).toBe(text);
+  });
+});
+
+describe("formatClock", () => {
+  it("shows the hour and minute of an ISO time, in 24 h", () => {
+    expect(formatClock("2026-11-06T12:30:00.000Z", "UTC")).toBe("12:30");
+    expect(formatClock("2026-11-06T00:05:00.000Z", "UTC")).toBe("00:05");
+  });
+
+  it("is undefined for a time it cannot read", () => {
+    expect(formatClock("not a date", "UTC")).toBeUndefined();
   });
 });
 

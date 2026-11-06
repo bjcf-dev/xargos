@@ -2,6 +2,7 @@ import type { FundAsset, FundStatusResponse, FundTx } from "@xargos/shared";
 import { formatUnits } from "@/lib/format";
 import { ellipsify } from "@/lib/solana/explorer";
 import { FUND_COPY } from "./copy";
+import { formatClock } from "./countdown";
 import { isSettled } from "./reducer";
 import type { Deposit, FundState } from "./types";
 
@@ -16,12 +17,20 @@ export type FundNow =
   | { kind: "form" }
   /** Recién recargado: aún no se sabe si ya llegó algo, así que no se pide enviar nada. */
   | { kind: "checking"; title: string }
-  | { kind: "send"; title: string; address: string; memo?: string }
-  | { kind: "incomplete"; title: string; note: string; address: string; memo?: string }
+  | { kind: "send"; title: string; address: string; memo?: string; neverAfter?: string }
+  | {
+      kind: "incomplete";
+      title: string;
+      note: string;
+      address: string;
+      memo?: string;
+      neverAfter?: string;
+    }
   | { kind: "arriving"; title: string; stage: 1 | 2; estimate?: string }
   | { kind: "success" | "refunded"; title: string; note: string; links: FundLink[] }
-  | { kind: "failed"; title: string; note: string; address: string; support: FundLink }
-  | { kind: "expired"; title: string; note: string };
+  /** failed: Aurora no terminó. unknown: Aurora no conoce la dirección (NOT_FOUND, #136). */
+  | { kind: "failed" | "unknown"; title: string; note: string; address: string; support: FundLink }
+  | { kind: "expired"; title: string; note: string; address: string; support: FundLink };
 
 export type FundView = {
   done: FundLine[];
@@ -62,10 +71,17 @@ const link = (tx: FundTx): FundLink => ({
   label: explorerLabel(tx.explorerUrl),
 });
 const memoOf = (deposit: Deposit) => (deposit.depositMemo ? { memo: deposit.depositMemo } : {});
+/** Hasta cuándo vigila Aurora la dirección ("12:30"), si lo dijo. */
+const inactiveAt = (deposit: Deposit) =>
+  deposit.timeWhenInactive ? formatClock(deposit.timeWhenInactive) : undefined;
+const neverAfterOf = (deposit: Deposit) => {
+  const until = inactiveAt(deposit);
+  return until ? { neverAfter: FUND_COPY.now.neverAfter(until) } : {};
+};
 
 /** De la máquina de F14 a lo que enseña la página: pasos cerrados arriba y el paso abierto. */
 export function fundView(state: FundState, origins: FundAsset[] | undefined): FundView {
-  if (state.status !== "tracking" && state.status !== "expired") {
+  if (state.status !== "tracking" && state.status !== "expired" && state.status !== "unknown") {
     return {
       done: [],
       now: { kind: "form" },
@@ -99,9 +115,27 @@ export function fundView(state: FundState, origins: FundAsset[] | undefined): Fu
       now: {
         kind: "expired",
         title: FUND_COPY.now.expired,
-        note: FUND_COPY.now.expiredNote(refundTo),
+        note: FUND_COPY.now.expiredNote(refundTo, inactiveAt(deposit)),
+        address: deposit.depositAddress,
+        support: { ...FUND_COPY.now.support },
       },
       tone: "action",
+      retrying: false,
+      canStartOver: true,
+    };
+  }
+
+  if (state.status === "unknown") {
+    return {
+      done,
+      now: {
+        kind: "unknown",
+        title: FUND_COPY.now.unknown,
+        note: FUND_COPY.now.unknownNote,
+        address: deposit.depositAddress,
+        support: { ...FUND_COPY.now.support },
+      },
+      tone: "danger",
       retrying: false,
       canStartOver: true,
     };
@@ -133,6 +167,7 @@ export function fundView(state: FundState, origins: FundAsset[] | undefined): Fu
         title: FUND_COPY.now.send(quote.amountInFormatted, symbol, network),
         address: deposit.depositAddress,
         ...memoOf(deposit),
+        ...neverAfterOf(deposit),
       },
       tone: "progress",
     };
@@ -169,6 +204,7 @@ export function fundView(state: FundState, origins: FundAsset[] | undefined): Fu
           note: FUND_COPY.now.incompleteNote(latest?.depositedAmountFormatted, symbol, refundTo),
           address: deposit.depositAddress,
           ...memoOf(deposit),
+          ...neverAfterOf(deposit),
         },
         tone: "action",
       };

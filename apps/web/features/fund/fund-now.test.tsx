@@ -42,6 +42,15 @@ describe("FundNowBlock", () => {
     expect(screen.getByRole("button", { name: /copy the deposit address/i })).toBeTruthy();
   });
 
+  it("warns never to send after the address goes inactive", () => {
+    const neverAfter = "Never send after 12:30: Aurora stops watching this address.";
+    show(
+      { kind: "send", title: "Send exactly 2 USDC on Base", address: ADDRESS, neverAfter },
+      { deadline: Date.now() + 60_000 },
+    );
+    expect(screen.getByText(neverAfter)).toBeTruthy();
+  });
+
   it("shows no countdown at all without a time limit", () => {
     show({ kind: "send", title: "Send exactly 2 USDC on Base", address: ADDRESS });
     expect(screen.queryByText(/send within/i)).toBeNull();
@@ -155,14 +164,41 @@ describe("FundNowBlock", () => {
 
   it("offers a new address, not starting over, when time ran out", () => {
     const { onNewQuote } = show(
-      { kind: "expired", title: "Time ran out. Nothing was sent", note: "No funds moved." },
+      {
+        kind: "expired",
+        title: "Time ran out. Nothing was sent",
+        note: "No funds moved.",
+        address: ADDRESS,
+        support: { href: "https://t.me/auroraisnear", label: "Ask Aurora's support on Telegram" },
+      },
       { tone: "action", canStartOver: true },
     );
     expect(screen.queryByRole("button", { name: /start over/i })).toBeNull();
+    // Para el soporte, si ya se envió después del plazo.
+    expect(screen.getByText(ADDRESS)).toBeTruthy();
+    expect(screen.getByRole("link", { name: /aurora's support/i })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: /get a new address/i }));
 
     expect(onNewQuote).toHaveBeenCalledOnce();
+  });
+
+  it("closes an unknown address with it, the support link and a way to start over", () => {
+    const { onStartOver } = show(
+      {
+        kind: "unknown",
+        title: "This deposit address isn't known to Aurora",
+        note: "Don't send to it.",
+        address: ADDRESS,
+        support: { href: "https://t.me/auroraisnear", label: "Ask Aurora's support on Telegram" },
+      },
+      { tone: "danger", canStartOver: true },
+    );
+    expect(screen.getByText("Don't send to it.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /copy the deposit address/i })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /aurora's support/i })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /start over/i }));
+    expect(onStartOver).toHaveBeenCalledOnce();
   });
 
   it("only offers to start over when nothing is on its way", () => {

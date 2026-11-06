@@ -1,5 +1,6 @@
 import type { FundAsset, FundQuote, FundStatus, FundStatusResponse } from "@xargos/shared";
 import { describe, expect, it } from "vitest";
+import { formatClock } from "./countdown";
 import type { Deposit, FundState } from "./types";
 import { explorerLabel, fundView, missingAmount, networkName } from "./view";
 
@@ -91,6 +92,21 @@ describe("fundView", () => {
       expect(view.tone).toBe("progress");
       expect(view.upcoming).toBe("Arrives at 9xQe...VFin");
       expect(view.canStartOver).toBe(false);
+    }
+  });
+
+  // Desde timeWhenInactive Aurora deja de vigilar la dirección: el reembolso puede ser manual.
+  it("says never to send after the address goes inactive, when Aurora gives that time", () => {
+    const until = "2099-01-01T00:30:00.000Z";
+    const deposit = { ...DEPOSIT, timeWhenInactive: until };
+    for (const aurora of ["PENDING_DEPOSIT", "INCOMPLETE_DEPOSIT"] as const) {
+      const view = fundView(
+        { status: "tracking", deposit, aurora, latest: latest(aurora) },
+        ORIGINS,
+      );
+      expect(view.now).toMatchObject({
+        neverAfter: `Never send after ${formatClock(until)}: Aurora stops watching this address, and getting a refund may need its support.`,
+      });
     }
   });
 
@@ -228,11 +244,53 @@ describe("fundView", () => {
       { text: QUOTE_LINE },
       { text: "Deposit address 0xde...00ab expired", faded: true },
     ]);
-    expect(view.now).toMatchObject({ kind: "expired", title: "Time ran out. Nothing was sent" });
+    expect(view.now).toMatchObject({
+      kind: "expired",
+      title: "Time ran out. Nothing was sent",
+      address: DEPOSIT.depositAddress,
+      support: { href: "https://t.me/auroraisnear", label: "Ask Aurora's support on Telegram" },
+    });
     if (view.now.kind !== "expired") return;
     expect(view.now.note).toContain("Don't send to this address anymore");
     expect(view.now.note).toContain("0x11...1111");
     expect(view.upcoming).toBeUndefined();
+    expect(view.canStartOver).toBe(true);
+  });
+
+  // Aurora (5 nov): el reembolso es automático solo hasta timeWhenInactive; después, manual.
+  it("promises an automatic refund only until the address goes inactive", () => {
+    const until = "2099-01-01T00:30:00.000Z";
+    const view = fundView(
+      { status: "expired", deposit: { ...DEPOSIT, timeWhenInactive: until } },
+      ORIGINS,
+    );
+    if (view.now.kind !== "expired") throw new Error("not expired");
+    expect(view.now.note).toBe(
+      `No funds moved. Don't send to this address anymore. If you already sent, it comes back to 0x11...1111 automatically until ${formatClock(until)}. After that, contact Aurora's support with this address.`,
+    );
+  });
+
+  it("does not promise an automatic refund without the inactive time", () => {
+    const view = fundView({ status: "expired", deposit: DEPOSIT }, ORIGINS);
+    if (view.now.kind !== "expired") throw new Error("not expired");
+    expect(view.now.note).not.toMatch(/comes back .* automatically\./);
+    expect(view.now.note).toContain("contact Aurora's support with this address");
+  });
+
+  // #136: una dirección que Aurora no conoce. Se cierra, sin prometer nada, con el soporte a mano.
+  it("closes an address Aurora does not know, with its support", () => {
+    const view = fundView({ status: "unknown", deposit: DEPOSIT }, ORIGINS);
+    expect(view.tone).toBe("danger");
+    expect(view.done).toEqual([{ text: QUOTE_LINE }]);
+    expect(view.now).toEqual({
+      kind: "unknown",
+      title: "This deposit address isn't known to Aurora",
+      note: "Don't send to it. If you already did, contact Aurora's support with this address.",
+      address: DEPOSIT.depositAddress,
+      support: { href: "https://t.me/auroraisnear", label: "Ask Aurora's support on Telegram" },
+    });
+    expect(view.upcoming).toBeUndefined();
+    expect(view.retrying).toBe(false);
     expect(view.canStartOver).toBe(true);
   });
 
@@ -259,6 +317,7 @@ describe("fundView", () => {
       ] as const
     ).map((s) => tracking(s)),
     { status: "expired", deposit: DEPOSIT },
+    { status: "unknown", deposit: DEPOSIT },
   ];
 
   it("never shows Aurora's own words", () => {
