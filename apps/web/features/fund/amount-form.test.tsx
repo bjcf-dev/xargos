@@ -50,7 +50,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function setup(state: FundState = { status: "idle" }) {
+function setup(state: FundState = { status: "idle" }, agentAddress?: string) {
   const onPreview = vi.fn();
   const onRequest = vi.fn();
   const view = render(
@@ -58,6 +58,7 @@ function setup(state: FundState = { status: "idle" }) {
       origins={ORIGINS}
       destination={USDC_SOL}
       state={state}
+      {...(agentAddress ? { agentAddress } : {})}
       onPreview={onPreview}
       onRequest={onRequest}
     />,
@@ -90,6 +91,20 @@ const wait = (ms: number) =>
   });
 
 describe("AmountForm", () => {
+  it("refuses the demo agent's address as the recipient, and never quotes it", () => {
+    const { onPreview } = setup({ status: "idle" }, RECIPIENT);
+    fillValid();
+    wait(FUND_PREVIEW_DELAY_MS);
+
+    const field = screen.getByLabelText(/solana address/i);
+    expect(field.getAttribute("aria-invalid")).toBe("true");
+    expect(screen.getByText(/that's the demo agent's key/i)).toBeTruthy();
+    expect(onPreview).not.toHaveBeenCalled();
+    expect(
+      (screen.getByRole("button", { name: /get deposit address/i }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
   it("starts on USDC on Base", () => {
     setup();
     expect((screen.getByLabelText(/you send/i) as HTMLSelectElement).value).toBe(USDC_BASE.assetId);

@@ -78,6 +78,26 @@ describe("readFundForm", () => {
   });
 });
 
+// Brief F15: el agente de la demo no se exporta y caduca a las 24 h. El USDC se perdería con él.
+describe("readFundForm with the demo agent's address", () => {
+  const AGENT = "AgentAgentAgentAgentAgentAgentAgentAgent1111";
+
+  it("refuses the demo agent as the recipient", () => {
+    const reading = readFundForm({ ...VALID, recipient: ` ${AGENT} ` }, ORIGINS, AGENT);
+    expect(reading).toEqual({
+      kind: "invalid",
+      errors: {
+        recipient:
+          "That's the demo agent's key: it can't be exported and expires in 24 h. Use your own wallet.",
+      },
+    });
+  });
+
+  it("accepts any other recipient", () => {
+    expect(readFundForm(VALID, ORIGINS, AGENT).kind).toBe("ready");
+  });
+});
+
 describe("defaultOrigin", () => {
   it("picks USDC on Base even when it is not first", () => {
     expect(defaultOrigin(ORIGINS)).toBe(USDC_BASE.assetId);
