@@ -54,25 +54,34 @@ describe("fund mock handlers", () => {
 
   it("prices a dry request without a deposit address", async () => {
     server.resetHandlers(...createFundHandlers());
-    const quote = await api.fundQuote(request("2", true));
+    const quote = await api.fundQuote(request("5", true));
     expect(quote.dry).toBe(true);
     expect(quote.depositAddress).toBeUndefined();
-    expect(quote.amountIn).toBe("2000000");
+    expect(quote.amountIn).toBe("5000000");
   });
 
-  // Como la ruta de #101: fuera del rango en USD responde VALIDATION_ERROR, sin llamar a Aurora.
-  it("refuses an amount below 1 like the backend would", async () => {
+  // Como la ruta de #101 con AURORA_MIN_USD=5: fuera de 5–25 $ responde VALIDATION_ERROR.
+  it.each(["4.98", "26"])("refuses %s USDC like the backend would", async (units) => {
     server.resetHandlers(...createFundHandlers());
-    await expect(api.fundQuote(request("0.5", true))).rejects.toMatchObject({
+    await expect(api.fundQuote(request(units, true))).rejects.toMatchObject({
       code: "VALIDATION_ERROR",
-      message: "The amount must be worth between 1 and 25 USD",
+      message: "The amount must be worth between 5 and 25 USD",
     });
+  });
+
+  // Como #136: en céntimos. Aurora pone el USDC a 0,9994 $ y 5 USDC justos siguen valiendo 5,00 $.
+  it.each(["5", "25"])("accepts exactly %s USDC, counted in cents", async (units) => {
+    const cheap = fixtureFundAssets.origins.map((o) =>
+      o.assetId === USDC_BASE.assetId ? { ...o, priceUsd: 0.999429 } : o,
+    );
+    server.resetHandlers(...createFundHandlers({ origins: cheap }));
+    await expect(api.fundQuote(request(units, true))).resolves.toMatchObject({ dry: true });
   });
 
   it("gives each real request its own address and send-by time", async () => {
     server.resetHandlers(...createFundHandlers());
-    const a = await deposit("2");
-    const b = await deposit("2");
+    const a = await deposit("5");
+    const b = await deposit("5");
     expect(a.address).not.toBe(b.address);
     expect(a.address).toMatch(/^0x[0-9a-f]{40}$/);
     expect(Date.parse(a.quote.deadline ?? "")).toBeGreaterThan(Date.now());
@@ -80,7 +89,7 @@ describe("fund mock handlers", () => {
 
   it("answers the first check in the short form", async () => {
     server.resetHandlers(...createFundHandlers());
-    const { address } = await deposit("2");
+    const { address } = await deposit("5");
     const first = await api.fundStatus(address);
     expect(first).toEqual({
       depositAddress: address,
@@ -92,7 +101,7 @@ describe("fund mock handlers", () => {
 
   it.each<[string, (FundStatus | "503")[]]>([
     [
-      "2",
+      "5",
       [
         "PENDING_DEPOSIT",
         "PENDING_DEPOSIT",
@@ -104,7 +113,7 @@ describe("fund mock handlers", () => {
       ],
     ],
     [
-      "3",
+      "6",
       [
         "PENDING_DEPOSIT",
         "INCOMPLETE_DEPOSIT",
@@ -114,11 +123,11 @@ describe("fund mock handlers", () => {
         "REFUNDED",
       ],
     ],
-    ["4", ["PENDING_DEPOSIT", "PENDING_DEPOSIT", "PENDING_DEPOSIT", "PENDING_DEPOSIT"]],
-    ["5", ["PENDING_DEPOSIT", "KNOWN_DEPOSIT_TX", "REFUNDED", "REFUNDED"]],
-    ["6", ["PENDING_DEPOSIT", "KNOWN_DEPOSIT_TX", "FAILED", "FAILED"]],
+    ["7", ["PENDING_DEPOSIT", "PENDING_DEPOSIT", "PENDING_DEPOSIT", "PENDING_DEPOSIT"]],
+    ["8", ["PENDING_DEPOSIT", "KNOWN_DEPOSIT_TX", "REFUNDED", "REFUNDED"]],
+    ["9", ["PENDING_DEPOSIT", "KNOWN_DEPOSIT_TX", "FAILED", "FAILED"]],
     [
-      "7",
+      "10",
       [
         "503",
         "PENDING_DEPOSIT",
@@ -148,7 +157,7 @@ describe("fund mock handlers", () => {
 
   it("gives the expiring scenario a short window to send", async () => {
     server.resetHandlers(...createFundHandlers({ sendWindowMs: 5_000 }));
-    const { quote } = await deposit("4");
+    const { quote } = await deposit("7");
     const left = Date.parse(quote.deadline ?? "") - Date.now();
     expect(left).toBeGreaterThan(0);
     expect(left).toBeLessThanOrEqual(5_000);
@@ -156,25 +165,33 @@ describe("fund mock handlers", () => {
 
   it("fills an incomplete deposit and its refund with consistent amounts", async () => {
     server.resetHandlers(...createFundHandlers());
-    const { address } = await deposit("3");
+    const { address } = await deposit("6");
     await api.fundStatus(address);
     const incomplete = await api.fundStatus(address);
-    expect(incomplete).toMatchObject({ amountIn: "3000000", depositedAmount: "2250000" });
+    expect(incomplete).toMatchObject({ amountIn: "6000000", depositedAmount: "4500000" });
     await api.fundStatus(address);
     await api.fundStatus(address);
     const refunded = await api.fundStatus(address);
     expect(refunded).toMatchObject({
       status: "REFUNDED",
-      depositedAmount: "2250000",
-      refundedAmount: "2250000",
+      depositedAmount: "4500000",
+      refundedAmount: "4500000",
     });
     expect(refunded.originTxs.length).toBeGreaterThan(0);
   });
 
   it("still answers for an address it does not know, after a page reload", async () => {
     server.resetHandlers(...createFundHandlers());
-    const { address } = await deposit("5");
+    const { address } = await deposit("8");
     server.resetHandlers(...createFundHandlers());
     expect(await statuses(address, 3)).toEqual(["PENDING_DEPOSIT", "KNOWN_DEPOSIT_TX", "REFUNDED"]);
+  });
+
+  // Como #136: Aurora no conoce la dirección (p. ej. un localStorage viejo) → NOT_FOUND.
+  it("answers NOT_FOUND for an address that is not one of its scenarios", async () => {
+    server.resetHandlers(...createFundHandlers());
+    await expect(
+      api.fundStatus("0x2000000000000000000000000000000000000001"),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });
