@@ -116,7 +116,9 @@ export function createFundRoutes(deps: FundRoutesDeps) {
       const origin = list.origins.find((asset) => asset.assetId === originAsset);
       if (!origin) return errorResponse(c, "VALIDATION_ERROR", "Unsupported origin asset");
       // Checked here so an amount out of range never reaches Aurora.
-      const usd = (Number(amount) / 10 ** origin.decimals) * origin.priceUsd;
+      // In cents, as a person reads it: 5 USDC priced at 0.9994 $ are 5.00 $, not "under 5".
+      const usd =
+        Math.round((Number(amount) / 10 ** origin.decimals) * origin.priceUsd * 100) / 100;
       if (!(usd >= minUsd && usd <= maxUsd)) {
         return errorResponse(
           c,
