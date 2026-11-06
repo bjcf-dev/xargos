@@ -115,7 +115,7 @@ El status de cada código vive en `ERROR_HTTP` (`packages/shared/src/errors.ts`)
 | --------------------------------------- | ---- | ----------------------------------------------------------- | ------------------ |
 | `PAYMENT_REQUIRED` / `PAYMENT_INVALID`  | 402  | Sin pago / pago inválido o insuficiente                     | No                 |
 | `VALIDATION_ERROR`                      | 400  | Petición mal formada                                        | No                 |
-| `NOT_FOUND`                             | 404  | Ruta o recurso desconocido (agente sin setup, shock sin id) | No                 |
+| `NOT_FOUND`                             | 404  | Ruta o recurso desconocido (agente sin setup, shock sin id, dirección de depósito que Aurora no conoce) | No                 |
 | `ACCESS_DENIED`                         | 403  | Código de acceso de la demo incorrecto                      | No                 |
 | `REBUILD_WINDOW_CLOSED`                 | 410  | Ya pasó `rebuildUntil` o se gastaron los 5 rebuilds: hay que pedir un build nuevo (pago) | No                 |
 | `RATE_LIMITED`                          | 429  | Demasiadas peticiones; cabecera `Retry-After`               | Sí, tras esperar   |
@@ -143,7 +143,7 @@ Fondear al agente desde otra cadena. **Corre en mainnet con fondos del usuario**
 | ------ | ------------------------------------- | ---------------------- | ---------------------------------------------------------------------- |
 | GET    | `/fund/assets`                        | `FundAssetsResponse`   | Destino (USDC en Solana) y orígenes admitidos                          |
 | POST   | `/fund/quote` `FundQuoteRequest`      | `FundQuote`            | `dry: true` solo da el precio: sin `depositAddress` ni plazos          |
-| GET    | `/fund/status/:depositAddress?memo=`  | `FundStatusResponse`   | Los 7 estados de Aurora, tal cual                                      |
+| GET    | `/fund/status/:depositAddress?memo=`  | `FundStatusResponse`   | Los 7 estados de Aurora, tal cual. `NOT_FOUND` (404) si Aurora no conoce la dirección |
 | POST   | `/fund/deposit` `FundDepositRequest`  | 202                    | Avisa a Aurora del depósito para que lo detecte antes (opcional)       |
 
 Sin código de acceso: el jurado lo prueba con sus fondos. Con límite por IP.
