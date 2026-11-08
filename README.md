@@ -2,7 +2,9 @@
 
 **Multi-step DeFi recipes for AI agents, paid per request with x402 on Solana. Kept as promised, or not executed at all.**
 
-> Encode Solana Hackathon 2026 · Challenge: _Best Use of x402 on Solana_ · 🚧 Checkpoint 1: work in progress
+> Encode Solana Hackathon 2026 · Challenges: _Best Use of x402 on Solana_ and _Aurora Intents_ · Final submission
+
+**Live demo:** https://xargos-project-d1825d.netlify.app · **Presentation:** https://docs.google.com/presentation/d/12CbsCaj7Gj7zAXGYXNis1-1ukvWng-eg/edit
 
 ## The problem
 
@@ -16,7 +18,7 @@ AI agents that manage funds on Solana often need multi-step operations: exit an 
 
 No custody, no escrow: the guarantee is enforced by the chain.
 
-## Status (checkpoint 1)
+## Status
 
 All on **devnet**. Evidence is a transaction signature or a test, never a claim.
 
@@ -29,6 +31,7 @@ All on **devnet**. Evidence is a transaction signature or a test, never a claim.
 | Price shock (demo B) and free rebuild | Implemented, tested | `services/api/src/routes/shock.test.ts` |
 | Demo A end to end through the paid route | Demonstrated by script against a local API | [`4Vn4sfLQ…xi67xcw`](https://explorer.solana.com/tx/4Vn4sfLQosq1RNw8McGbRM2vdhknrCnAn9f7wQ56agb3nSNKw9EoUyq22j7Xjo1o4nAQ1NtsVaoCZMucxxi67xcw?cluster=devnet) |
 | Demo B revert on devnet | Five runs in a row, all reverted by the guard with `GUARD_FAIL` | [1](https://explorer.solana.com/tx/iEjy2ksysir2sYv14cBRqakA3bwgLCUd52nbQkScEYeUYqKMckujw3Fokj8JcyVnq8bTjudXB49jk9DwVoKk1Zm?cluster=devnet), [2](https://explorer.solana.com/tx/TZyfcaBsV56aB4Jjfy3no8vih5EKCTR7cdojC7pqW4aNmVMRJWN8Gf2PGcphgrusjnuRFMeMg4S6YRSd1NjwPk5?cluster=devnet), [3](https://explorer.solana.com/tx/5PQRDmr1wACX3idxL7EjqB7av9LpDESJRKdM2QNwSrXgDsFvTyMZpH4NtYBxwENMRNr6RHajXKgk5mLDQYQY1eYy?cluster=devnet), [4](https://explorer.solana.com/tx/4mJW4FpEgGRnwAw6oy5U1XDnL6Nb4LC2gcUFSWktcW4T5QBZTsRR8j65bZbupkL7D7koxyydmew3jPwmVwMAsUkP?cluster=devnet), [5](https://explorer.solana.com/tx/5a5EBtWzDmYeXNwtaktgAj1Bi1DwoDFXp52PbqSzFuUumMm1SCxY166i1EsdLrr3viYNz7Z5t2gAduyQBYy9CJMc?cluster=devnet) |
+| Live demo (web + API) | Deployed | [xargos-project-d1825d.netlify.app](https://xargos-project-d1825d.netlify.app): web on Netlify, API on Render |
 
 ## How Solana makes it possible
 
@@ -73,7 +76,7 @@ Full contract and error table: [docs/api-contract.md](docs/api-contract.md).
 | POST | `/recipes/:id/build` with `{ buildId }` | no, until `rebuildUntil` | Rebuilt with the same promised minimum, no new payment |
 | POST / GET | `/demo/setup`, `/demo/setup/:agent` | no (access code) | Funds a demo agent and opens its position, by phases |
 | POST / GET | `/demo/price-shock`, `/demo/price-shock/:shockId` | no (access code) | Moves the demo pool price, then restores it after a cooldown |
-| GET | `/health` | no | `{ ok: true }` |
+| GET | `/health` | no | `{ ok, payer, poolPrice }`: payer balances and the demo pool price. |
 
 ## Failed payments
 
@@ -96,7 +99,7 @@ To pay recipes with x402, an agent needs USDC on Solana. Its operator's funds of
 | --- | --- |
 | Waiting | The deposit address and a countdown to `deadline`, the last moment to send |
 | Less than quoted arrives (`INCOMPLETE_DEPOSIT`) | How much is missing; a deposit that is not completed is refunded |
-| Sent after `deadline` | Refunded automatically to the refund address |
+| Sent after `deadline` | Refunded automatically while Aurora still watches the address (until `timeWhenInactive`). In our tests Aurora set both to 72 h after the quote. |
 | Done (`SUCCESS`) | The USDC received and the destination transaction |
 | Refunded (`REFUNDED`) | The amount, the reason and the refund transaction |
 
