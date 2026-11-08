@@ -1,6 +1,6 @@
 import type { FundAsset, FundQuote, FundStatus, FundStatusResponse } from "@xargos/shared";
 import { describe, expect, it } from "vitest";
-import { formatClock } from "./countdown";
+import { formatWhen } from "./countdown";
 import type { Deposit, FundState } from "./types";
 import { explorerLabel, fundView, missingAmount, networkName } from "./view";
 
@@ -98,6 +98,8 @@ describe("fundView", () => {
   // Desde timeWhenInactive Aurora deja de vigilar la dirección: el reembolso puede ser manual.
   it("says never to send after the address goes inactive, when Aurora gives that time", () => {
     const until = "2099-01-01T00:30:00.000Z";
+    // Not today: the warning carries the date, not just the time (8 Nov: 72 h looked like today).
+    expect(formatWhen(until)).toMatch(/^\d{1,2} \w+, \d\d:\d\d$/);
     const deposit = { ...DEPOSIT, timeWhenInactive: until };
     for (const aurora of ["PENDING_DEPOSIT", "INCOMPLETE_DEPOSIT"] as const) {
       const view = fundView(
@@ -105,7 +107,7 @@ describe("fundView", () => {
         ORIGINS,
       );
       expect(view.now).toMatchObject({
-        neverAfter: `Never send after ${formatClock(until)}: Aurora stops watching this address, and getting a refund may need its support.`,
+        neverAfter: `Never send after ${formatWhen(until)}: Aurora stops watching this address, and getting a refund may need its support.`,
       });
     }
   });
@@ -266,7 +268,7 @@ describe("fundView", () => {
     );
     if (view.now.kind !== "expired") throw new Error("not expired");
     expect(view.now.note).toBe(
-      `No funds moved. Don't send to this address anymore. If you already sent, it comes back to 0x11...1111 automatically until ${formatClock(until)}. After that, contact Aurora's support with this address.`,
+      `No funds moved. Don't send to this address anymore. If you already sent, it comes back to 0x11...1111 automatically until ${formatWhen(until)}. After that, contact Aurora's support with this address.`,
     );
   });
 
