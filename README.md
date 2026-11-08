@@ -2,7 +2,9 @@
 
 **Multi-step DeFi recipes for AI agents, paid per request with x402 on Solana. Kept as promised, or not executed at all.**
 
-> Encode Solana Hackathon 2026 · Challenge: _Best Use of x402 on Solana_ · 🚧 Checkpoint 1: work in progress
+> Encode Solana Hackathon 2026 · Challenges: _Best Use of x402 on Solana_ and _Aurora Intents_ · Final submission
+
+**Live demo:** https://xargos-project-d1825d.netlify.app · **Demo video:** https://youtu.be/VyuGzl1bDnY · **Presentation:** https://docs.google.com/presentation/d/12CbsCaj7Gj7zAXGYXNis1-1ukvWng-eg/edit
 
 ## The problem
 
@@ -16,9 +18,9 @@ AI agents that manage funds on Solana often need multi-step operations: exit an 
 
 No custody, no escrow: the guarantee is enforced by the chain.
 
-## Status (checkpoint 1)
+## Status
 
-All on **devnet**. Evidence is a transaction signature or a test, never a claim.
+All on **devnet**, except the Aurora funding row (mainnet). Evidence is a transaction signature or a test, never a claim.
 
 | Piece | State | Evidence |
 | ----- | ----- | -------- |
@@ -27,8 +29,10 @@ All on **devnet**. Evidence is a transaction signature or a test, never a claim.
 | x402 payment verified and settled | Done in the spike | [`3q2HbKhx…cSQRq`](https://explorer.solana.com/tx/3q2HbKhxgbRDW86HkNo3F1wPFUfSwcNHzmxaNY4SAZxFApWzz9Nh2K2nrfrL7uDKWkHMW4qRC1aU2tvZQFcfSQRq?cluster=devnet), see [ADR 0001](docs/adr/0001-x402-self-facilitation.md) |
 | Paid `POST /recipes/:id/build` (verify → build → simulate → settle) | Implemented; real x402 payment settled on devnet | `pnpm --filter @xargos/api demo:full`; `services/api/src/routes/recipes.test.ts` |
 | Price shock (demo B) and free rebuild | Implemented, tested | `services/api/src/routes/shock.test.ts` |
-| Demo A end to end through the paid route | Demonstrated by script against a local API | [`4Vn4sfLQ…xi67xcw`](https://explorer.solana.com/tx/4Vn4sfLQosq1RNw8McGbRM2vdhknrCnAn9f7wQ56agb3nSNKw9EoUyq22j7Xjo1o4nAQ1NtsVaoCZMucxxi67xcw?cluster=devnet) |
-| Demo B revert on devnet | Five runs in a row, all reverted by the guard with `GUARD_FAIL` | [1](https://explorer.solana.com/tx/iEjy2ksysir2sYv14cBRqakA3bwgLCUd52nbQkScEYeUYqKMckujw3Fokj8JcyVnq8bTjudXB49jk9DwVoKk1Zm?cluster=devnet), [2](https://explorer.solana.com/tx/TZyfcaBsV56aB4Jjfy3no8vih5EKCTR7cdojC7pqW4aNmVMRJWN8Gf2PGcphgrusjnuRFMeMg4S6YRSd1NjwPk5?cluster=devnet), [3](https://explorer.solana.com/tx/5PQRDmr1wACX3idxL7EjqB7av9LpDESJRKdM2QNwSrXgDsFvTyMZpH4NtYBxwENMRNr6RHajXKgk5mLDQYQY1eYy?cluster=devnet), [4](https://explorer.solana.com/tx/4mJW4FpEgGRnwAw6oy5U1XDnL6Nb4LC2gcUFSWktcW4T5QBZTsRR8j65bZbupkL7D7koxyydmew3jPwmVwMAsUkP?cluster=devnet), [5](https://explorer.solana.com/tx/5a5EBtWzDmYeXNwtaktgAj1Bi1DwoDFXp52PbqSzFuUumMm1SCxY166i1EsdLrr3viYNz7Z5t2gAduyQBYy9CJMc?cluster=devnet) |
+| Demo A end to end through the paid route | Delivered on the live site and by script against a local API | live site: [`3Cwe7VX2…NrHhS`](https://explorer.solana.com/tx/3Cwe7VX2XnYy38XfdMjMawXRJ7MSZwQ3WiRsz5FUwvKpo3zPFPGzmgkPkXMqH1wcPjfYPBZ7kDNWc5M9AK2NrHhS?cluster=devnet); script: [`4Vn4sfLQ…xi67xcw`](https://explorer.solana.com/tx/4Vn4sfLQosq1RNw8McGbRM2vdhknrCnAn9f7wQ56agb3nSNKw9EoUyq22j7Xjo1o4nAQ1NtsVaoCZMucxxi67xcw?cluster=devnet) |
+| Demo B revert on devnet | Reverted by the guard on the live site, and in five runs in a row, all with `GUARD_FAIL` | live site: [`3D7RJ4Uo…5Lpc5`](https://explorer.solana.com/tx/3D7RJ4UokDV32f1NLZJUN3EW5YNk4wXfK2S5TMCXTgLXHRnksqP8LxtEJczhir8DQfrd1LaYKQKeSiF3JFs5Lpc5?cluster=devnet); runs: [1](https://explorer.solana.com/tx/iEjy2ksysir2sYv14cBRqakA3bwgLCUd52nbQkScEYeUYqKMckujw3Fokj8JcyVnq8bTjudXB49jk9DwVoKk1Zm?cluster=devnet), [2](https://explorer.solana.com/tx/TZyfcaBsV56aB4Jjfy3no8vih5EKCTR7cdojC7pqW4aNmVMRJWN8Gf2PGcphgrusjnuRFMeMg4S6YRSd1NjwPk5?cluster=devnet), [3](https://explorer.solana.com/tx/5PQRDmr1wACX3idxL7EjqB7av9LpDESJRKdM2QNwSrXgDsFvTyMZpH4NtYBxwENMRNr6RHajXKgk5mLDQYQY1eYy?cluster=devnet), [4](https://explorer.solana.com/tx/4mJW4FpEgGRnwAw6oy5U1XDnL6Nb4LC2gcUFSWktcW4T5QBZTsRR8j65bZbupkL7D7koxyydmew3jPwmVwMAsUkP?cluster=devnet), [5](https://explorer.solana.com/tx/5a5EBtWzDmYeXNwtaktgAj1Bi1DwoDFXp52PbqSzFuUumMm1SCxY166i1EsdLrr3viYNz7Z5t2gAduyQBYy9CJMc?cluster=devnet) |
+| Live demo (web + API) | Deployed | [xargos-project-d1825d.netlify.app](https://xargos-project-d1825d.netlify.app): web on Netlify, API on Render |
+| Fund from another chain (Aurora, mainnet) | Real swap done: 5 USDC on Base, 4.76 USDC delivered on Solana | [Base](https://basescan.org/tx/0xfe7a61a53b04c387e22deea20f1306393750e10978fb5c1715fd9b300be5fd21) → [Solana](https://solscan.io/tx/54PbRZCLkDQT7PcRbXSuR3A5Lvu9Hz5cRnhLMXsBGymXLmT46B74guA3aHgXAP25R5DcLPhD76HqShRPJc9M3f4z) |
 
 ## How Solana makes it possible
 
@@ -73,7 +77,7 @@ Full contract and error table: [docs/api-contract.md](docs/api-contract.md).
 | POST | `/recipes/:id/build` with `{ buildId }` | no, until `rebuildUntil` | Rebuilt with the same promised minimum, no new payment |
 | POST / GET | `/demo/setup`, `/demo/setup/:agent` | no (access code) | Funds a demo agent and opens its position, by phases |
 | POST / GET | `/demo/price-shock`, `/demo/price-shock/:shockId` | no (access code) | Moves the demo pool price, then restores it after a cooldown |
-| GET | `/health` | no | `{ ok: true }` |
+| GET | `/health` | no | `{ ok, payer, poolPrice }`: payer balances and the demo pool price. |
 
 ## Failed payments
 
@@ -96,11 +100,11 @@ To pay recipes with x402, an agent needs USDC on Solana. Its operator's funds of
 | --- | --- |
 | Waiting | The deposit address and a countdown to `deadline`, the last moment to send |
 | Less than quoted arrives (`INCOMPLETE_DEPOSIT`) | How much is missing; a deposit that is not completed is refunded |
-| Sent after `deadline` | Refunded automatically to the refund address |
+| Sent after `deadline` | Refunded automatically while Aurora still watches the address (until `timeWhenInactive`). In our tests Aurora set both to 72 h after the quote. |
 | Done (`SUCCESS`) | The USDC received and the destination transaction |
 | Refunded (`REFUNDED`) | The amount, the reason and the refund transaction |
 
-- **Fees are shown before the deposit.** Aurora's withdrawal fee is close to fixed (about 0.25 USDC in our test quote of 2 USDC), so small amounts lose a large share. If the recipient has no USDC account on Solana, Aurora creates it and the user pays for it.
+- **Fees are shown before the deposit.** Aurora's fee is about 0.01 USDC to an address that already holds USDC; the first deposit to a new address also pays for its USDC account: our real 5 USDC swap delivered 4.76 USDC.
 - **API:** `GET /fund/assets`, `POST /fund/quote`, `GET /fund/status/:depositAddress` and `POST /fund/deposit` ([contract](docs/api-contract.md)). Without an Aurora key they answer `FUND_UNAVAILABLE` and the rest of the backend works as usual.
 - **Safety:**
   - Aurora's API key travels in the request path, so it is never logged: log lines are redacted.

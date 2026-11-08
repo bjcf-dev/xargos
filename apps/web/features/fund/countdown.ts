@@ -26,6 +26,24 @@ export function formatClock(iso: string, timeZone?: string): string | undefined 
 }
 
 /**
+ * Like `formatClock`, with the date in front ("11 Nov, 13:53") when it is not the same local day
+ * as `now`: a 72 h deadline must not look like today. undefined if it cannot be read.
+ */
+export function formatWhen(
+  iso: string,
+  now: number = Date.now(),
+  timeZone?: string,
+): string | undefined {
+  const clock = formatClock(iso, timeZone);
+  if (clock === undefined) return undefined;
+  const day = (options: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat("en-GB", { ...options, ...(timeZone ? { timeZone } : {}) });
+  const sameDay = day({ year: "numeric", month: "2-digit", day: "2-digit" });
+  if (sameDay.format(new Date(iso)) === sameDay.format(new Date(now))) return clock;
+  return `${day({ day: "numeric", month: "short" }).format(new Date(iso))}, ${clock}`;
+}
+
+/**
  * Milisegundos hasta `until` (hora absoluta), al segundo. Se para en 0; undefined si no hay hora.
  */
 export function useCountdown(

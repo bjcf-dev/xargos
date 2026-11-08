@@ -1,6 +1,6 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { formatClock, formatCountdown, useCountdown } from "./countdown";
+import { formatClock, formatCountdown, formatWhen, useCountdown } from "./countdown";
 
 describe("formatCountdown", () => {
   it.each([
@@ -24,6 +24,27 @@ describe("formatClock", () => {
 
   it("is undefined for a time it cannot read", () => {
     expect(formatClock("not a date", "UTC")).toBeUndefined();
+  });
+});
+
+describe("formatWhen", () => {
+  const now = Date.parse("2026-11-08T10:00:00.000Z");
+
+  it("shows only the time when it falls on the same day", () => {
+    expect(formatWhen("2026-11-08T12:30:00.000Z", now, "UTC")).toBe("12:30");
+  });
+
+  it("adds the date when it falls on another day", () => {
+    expect(formatWhen("2026-11-11T12:53:00.000Z", now, "UTC")).toBe("11 Nov, 12:53");
+  });
+
+  it("is undefined for a time it cannot read", () => {
+    expect(formatWhen("not a date", now, "UTC")).toBeUndefined();
+  });
+
+  it("adds the date just past midnight", () => {
+    const late = Date.parse("2026-11-08T23:50:00.000Z");
+    expect(formatWhen("2026-11-09T00:10:00.000Z", late, "UTC")).toBe("9 Nov, 00:10");
   });
 });
 

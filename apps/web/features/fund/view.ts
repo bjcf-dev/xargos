@@ -2,7 +2,7 @@ import type { FundAsset, FundStatusResponse, FundTx } from "@xargos/shared";
 import { formatUnits } from "@/lib/format";
 import { ellipsify } from "@/lib/solana/explorer";
 import { FUND_COPY } from "./copy";
-import { formatClock } from "./countdown";
+import { formatWhen } from "./countdown";
 import { isSettled } from "./reducer";
 import type { Deposit, FundState } from "./types";
 
@@ -71,9 +71,9 @@ const link = (tx: FundTx): FundLink => ({
   label: explorerLabel(tx.explorerUrl),
 });
 const memoOf = (deposit: Deposit) => (deposit.depositMemo ? { memo: deposit.depositMemo } : {});
-/** Hasta cuándo vigila Aurora la dirección ("12:30"), si lo dijo. */
+/** Until when Aurora watches the address ("12:30", or "11 Nov, 12:30" if not today), if it said. */
 const inactiveAt = (deposit: Deposit) =>
-  deposit.timeWhenInactive ? formatClock(deposit.timeWhenInactive) : undefined;
+  deposit.timeWhenInactive ? formatWhen(deposit.timeWhenInactive) : undefined;
 const neverAfterOf = (deposit: Deposit) => {
   const until = inactiveAt(deposit);
   return until ? { neverAfter: FUND_COPY.now.neverAfter(until) } : {};
